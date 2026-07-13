@@ -1,0 +1,1004 @@
+{
+  "generatedUtc": "2026-07-13T16:44:38.0542171Z",
+  "roots": [
+    {
+      "name": "mdr-kernel",
+      "path": ".",
+      "counts": {
+        "total": 26,
+        "strictBoth": 25,
+        "legacy": 1,
+        "partial": 0,
+        "missing": 0,
+        "tracked": 26,
+        "untracked": 0
+      },
+      "topDirs": [
+        "_templates",
+        "(root)",
+        "docs",
+        "protocol",
+        "reference",
+        "skills",
+        "specs"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "root": "mdr-kernel",
+      "relPath": "AGENTS.md",
+      "title": "AGENTS.md - mdr-kernel phase-zero door",
+      "type": "Phase-Zero Agent Front Door",
+      "context": "Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "_templates/handoff-template.md",
+      "title": "Handoff - YYYY-MM-DD - <short topic>",
+      "type": "Handoff / Session Closeout",
+      "context": "End-of-session transfer note that lets another full participant resume the work cold.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "handoffs/",
+        "nextSequentialFile": "handoffs/INDEX.md",
+        "relatedWorkflows": [
+          "STATE.md",
+          "DECISIONS.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "handoffs",
+        "nextSequentialFile": "handoffs/INDEX.md",
+        "relatedWorkflows": [
+          "STATE.md",
+          "DECISIONS.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "_templates/handoff-example.md",
+      "title": "Handoff — 2026-01-15 — first recall gate for the deploy loop",
+      "type": "Handoff / Session Closeout (EXAMPLE)",
+      "context": "Worked example of a filled handoff. Not a live handoff — do not place in handoffs/. Shows the expected shape, altitude, and completeness for an mdr-kernel closeout note.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "_templates/",
+        "nextSequentialFile": "_templates/handoff-template.md",
+        "relatedWorkflows": [
+          "STATE.md",
+          "DECISIONS.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "_templates",
+        "nextSequentialFile": "_templates/handoff-template.md",
+        "relatedWorkflows": [
+          "STATE.md",
+          "DECISIONS.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "specs/node-map.md",
+      "title": "Node map",
+      "type": "Spec / Retrieval Contract",
+      "context": "Defines the generated node-map subsystem that keeps mdr-kernel routing small, inspectable, and accurate.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "specs/",
+        "nextSequentialFile": "../CONTRIBUTING.md",
+        "relatedWorkflows": [
+          "../maps/node-roots.json",
+          "../maps/NODE-MAP.md",
+          "../maps/node-map.json",
+          "../bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "specs",
+        "nextSequentialFile": "CONTRIBUTING.md",
+        "relatedWorkflows": [
+          "maps/node-roots.json",
+          "maps/NODE-MAP.md",
+          "maps/node-map.json",
+          "bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "specs/INDEX.md",
+      "title": "Specs index",
+      "type": "Specs Index / Authority Registry",
+      "context": "Registry of specs with current status and update dates.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "specs/",
+        "nextSequentialFile": "../STATE.md",
+        "relatedWorkflows": [
+          "../STATE.md"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "specs",
+        "nextSequentialFile": "STATE.md",
+        "relatedWorkflows": [
+          "STATE.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "specs/brain-architecture.md",
+      "title": "Spec — mdr-kernel architecture: shared memory across model surfaces",
+      "type": "Spec / Design Authority",
+      "context": "Design rationale for the shared-memory coordination kernel — the invariant, the surfaces, the guardrails, and the known residual failure modes. Verify live status against STATE.md and DECISIONS.md before acting.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "specs/",
+        "nextSequentialFile": "specs/INDEX.md",
+        "relatedWorkflows": [
+          "specs/brain-active-recall.md",
+          "STATE.md",
+          "DECISIONS.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md",
+          "bin/update-node-map.ps1"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "specs",
+        "nextSequentialFile": "specs/INDEX.md",
+        "relatedWorkflows": [
+          "specs/brain-active-recall.md",
+          "STATE.md",
+          "DECISIONS.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md",
+          "bin/update-node-map.ps1"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "specs/brain-active-recall.md",
+      "title": "Spec — mdr-kernel active recall: closing the storage-vs-use gap",
+      "type": "Spec / Active Architecture",
+      "context": "Design rationale for the objective-time recall gate — why storing knowledge is not enough, what a valid fix must satisfy, and how the gate works. STATE.md and DECISIONS.md win for live status.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "specs/",
+        "nextSequentialFile": "specs/INDEX.md",
+        "relatedWorkflows": [
+          "specs/brain-architecture.md",
+          "STATE.md",
+          "DECISIONS.md",
+          "reference/action-recall-gates.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md",
+          "bin/update-node-map.ps1"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "specs",
+        "nextSequentialFile": "specs/INDEX.md",
+        "relatedWorkflows": [
+          "specs/brain-architecture.md",
+          "STATE.md",
+          "DECISIONS.md",
+          "reference/action-recall-gates.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md",
+          "bin/update-node-map.ps1"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3587223Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "skills/mdr-kernel/SKILL.md",
+      "title": "mdr-kernel adoption and operations",
+      "type": "Skill Definition / Workflow Instructions",
+      "context": "Repeatable procedure for setting up, operating, and extending an mdr-kernel repo from an existing messy workspace.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "skills/mdr-kernel/",
+        "nextSequentialFile": "../../_templates/skill-template.md",
+        "relatedWorkflows": [
+          "../../protocol/CONTRACT.md",
+          "../../docs/adoption-guide.md",
+          "../../_templates/skill-template.md"
+        ],
+        "aiExecutionPrompts": [
+          "../../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "skills/mdr-kernel",
+        "nextSequentialFile": "_templates/skill-template.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "docs/adoption-guide.md",
+          "_templates/skill-template.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3515984Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "reference/markdown-system-node-standard.md",
+      "title": "Markdown system node standard",
+      "type": "Documentation Standard / Retrieval Envelope",
+      "context": "Defines the required AI-crawlable header and terminal node block for tracked Markdown in an mdr-kernel repo.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "reference/",
+        "nextSequentialFile": "reference/INDEX.md",
+        "relatedWorkflows": [
+          "_templates/markdown-file-template.md",
+          "_templates/handoff-template.md",
+          "bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "reference",
+        "nextSequentialFile": "reference/INDEX.md",
+        "relatedWorkflows": [
+          "_templates/markdown-file-template.md",
+          "_templates/handoff-template.md",
+          "bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3460710Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "reference/INDEX.md",
+      "title": "Reference index",
+      "type": "Reference Index / Knowledge Registry",
+      "context": "Registry of durable reference notes; the shared facts other sessions rely on.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "reference/",
+        "nextSequentialFile": "../STATE.md",
+        "relatedWorkflows": [
+          "../STATE.md"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "reference",
+        "nextSequentialFile": "STATE.md",
+        "relatedWorkflows": [
+          "STATE.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3443629Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "reference/action-recall-gates.md",
+      "title": "Action recall gates",
+      "type": "Reference / Active-Recall Protocol",
+      "context": "How to author and maintain objective-time recall gates so an agent surfaces recurrence-counted prior traps before acting.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "reference/",
+        "nextSequentialFile": "reference/INDEX.md",
+        "relatedWorkflows": [
+          "protocol/recall-gates.example.json",
+          "bin/brain-recall.ps1",
+          "specs/brain-active-recall.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "reference",
+        "nextSequentialFile": "reference/INDEX.md",
+        "relatedWorkflows": [
+          "protocol/recall-gates.example.json",
+          "bin/brain-recall.ps1",
+          "specs/brain-active-recall.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3335905Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "protocol/RUNBOOK.md",
+      "title": "RUNBOOK - how to start and end an mdr-kernel session",
+      "type": "Operator Runbook / Session Workflow",
+      "context": "Human-facing session startup, closeout, lock, and participant workflow guide.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "protocol/",
+        "nextSequentialFile": "../docs/adoption-guide.md",
+        "relatedWorkflows": [
+          "CONTRACT.md",
+          "../docs/adoption-guide.md",
+          "../skills/mdr-kernel/SKILL.md",
+          "../docs/brand-manual.md",
+          "bin/start-session.ps1",
+          "bin/close-session.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "protocol",
+        "nextSequentialFile": "docs/adoption-guide.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "docs/adoption-guide.md",
+          "skills/mdr-kernel/SKILL.md",
+          "docs/brand-manual.md",
+          "bin/start-session.ps1",
+          "bin/close-session.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3335905Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "protocol/CONTRACT.md",
+      "title": "CONTRACT - the canonical mdr-kernel contract",
+      "type": "Canonical Contract / Model Door Source",
+      "context": "Canonical contract source that generates the model front doors and defines participation rules.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "protocol/",
+        "nextSequentialFile": "RUNBOOK.md",
+        "relatedWorkflows": [
+          "bin/sync-doors.ps1",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "protocol",
+        "nextSequentialFile": "protocol/RUNBOOK.md",
+        "relatedWorkflows": [
+          "bin/sync-doors.ps1",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3276086Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/node-map-usage-guide.md",
+      "title": "Node map usage guide",
+      "type": "Operator Guide / Retrieval Workflow",
+      "context": "Shows how humans and agents use the node map to route work without wasting context.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "../specs/node-map.md",
+        "relatedWorkflows": [
+          "../maps/NODE-MAP.md",
+          "../maps/node-map.json",
+          "../bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "specs/node-map.md",
+        "relatedWorkflows": [
+          "maps/NODE-MAP.md",
+          "maps/node-map.json",
+          "bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/brand-manual.md",
+      "title": "mdr-kernel brand manual",
+      "type": "Public Style Guide / Brand Manual",
+      "context": "Defines the visual, written, and terminal-output style for mdr-kernel. Authoritative for all public-facing docs, UX copy, and visual assets.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "node-map-usage-guide.md",
+        "relatedWorkflows": [
+          "../README.md",
+          "../FLOOR-GUIDE.md",
+          "../bin/brain-doctor.ps1",
+          "../bin/waffle-party.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "docs/node-map-usage-guide.md",
+        "relatedWorkflows": [
+          "README.md",
+          "FLOOR-GUIDE.md",
+          "bin/brain-doctor.ps1",
+          "bin/waffle-party.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/adoption-guide.md",
+      "title": "Adoption guide",
+      "type": "Operator Guide / First System Setup",
+      "context": "Practical path for turning an existing messy workspace into an mdr-kernel memory without importing chaos.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "../skills/mdr-kernel/SKILL.md",
+        "relatedWorkflows": [
+          "../protocol/RUNBOOK.md",
+          "../_templates/skill-template.md",
+          "../skills/mdr-kernel/SKILL.md",
+          "../bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "skills/mdr-kernel/SKILL.md",
+        "relatedWorkflows": [
+          "protocol/RUNBOOK.md",
+          "_templates/skill-template.md",
+          "skills/mdr-kernel/SKILL.md",
+          "bin/update-node-map.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "SECURITY.md",
+      "title": "mdr-kernel security and privacy-bug reporting",
+      "type": "Security Policy",
+      "context": "How to report a vulnerability or a bug that could leak private memory content, privately and before public disclosure.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "CONTRIBUTING.md",
+        "relatedWorkflows": [
+          "CONTRIBUTING.md",
+          "README.md",
+          "bin/remote-privacy.ps1",
+          "tests/remote-privacy-unit.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "CONTRIBUTING.md",
+        "relatedWorkflows": [
+          "CONTRIBUTING.md",
+          "README.md",
+          "bin/remote-privacy.ps1",
+          "tests/remote-privacy-unit.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.2005217Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "README.md",
+      "title": "mdr-kernel",
+      "type": "Public README / Coordination Kernel",
+      "context": "Public orientation for a git-backed shared-memory kernel for AI coding agents.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "FLOOR-GUIDE.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "protocol/RUNBOOK.md",
+          "docs/adoption-guide.md",
+          "skills/mdr-kernel/SKILL.md",
+          "docs/brand-manual.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "FLOOR-GUIDE.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "protocol/RUNBOOK.md",
+          "docs/adoption-guide.md",
+          "skills/mdr-kernel/SKILL.md",
+          "docs/brand-manual.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "PUBLIC-EXPORT-AUDIT.md",
+      "title": "Public export audit",
+      "type": "Generated Audit / Public Release Hygiene",
+      "context": "Documents how the public mdr-kernel export was sanitized and verified.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "README.md",
+        "relatedWorkflows": [
+          "README.md",
+          "PUBLIC-EXPORT-AUDIT.md",
+          "maps/NODE-MAP.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "README.md",
+        "relatedWorkflows": [
+          "README.md",
+          "PUBLIC-EXPORT-AUDIT.md",
+          "maps/NODE-MAP.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3966474Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "GEMINI.md",
+      "title": "GEMINI.md - mdr-kernel phase-zero door",
+      "type": "Phase-Zero Agent Front Door",
+      "context": "Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "FLOOR-GUIDE.md",
+      "title": "Floor Guide",
+      "type": "Public Reference / Themed Glossary",
+      "context": "Defines the contained workplace metaphor used by mdr-kernel and maps each themed alias to its real mechanism.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/brand-manual.md",
+          "protocol/CONTRACT.md",
+          "bin/brain-recall.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/brand-manual.md",
+          "protocol/CONTRACT.md",
+          "bin/brain-recall.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "employee-handbook.md",
+      "title": "Employee handbook",
+      "type": "Public Themed Layer / Onboarding Texture",
+      "context": "The emotional center of the mdr-kernel themed layer — corporate-polite lore, taste and humor rules, and the metaphor-to-mechanism intent. Not operational authority; STATE.md, the contract, the runbook, and the scripts win.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "FLOOR-GUIDE.md",
+        "relatedWorkflows": [
+          "FLOOR-GUIDE.md",
+          "docs/brand-manual.md",
+          "README.md",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "FLOOR-GUIDE.md",
+        "relatedWorkflows": [
+          "FLOOR-GUIDE.md",
+          "docs/brand-manual.md",
+          "README.md",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1914617Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "CONTRIBUTING.md",
+      "title": "Contributing to mdr-kernel",
+      "type": "Public Contribution Guide",
+      "context": "Explains how to report cold-clone issues, portability gaps, and useful adaptations.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "README.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/brand-manual.md",
+          "protocol/RUNBOOK.md",
+          "bin/brain-doctor.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "README.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/brand-manual.md",
+          "protocol/RUNBOOK.md",
+          "bin/brain-doctor.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "CLAUDE.md",
+      "title": "CLAUDE.md - mdr-kernel phase-zero door",
+      "type": "Phase-Zero Agent Front Door",
+      "context": "Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "README.md",
+          "bin/setup-private.ps1",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "_templates/markdown-file-template.md",
+      "title": "<Document Title>",
+      "type": "<See type vocabulary below>",
+      "context": "<One sentence: why this file exists and what it is for. Written for a model that has never seen this file before.>",
+      "envelopeTop": "strict",
+      "nodeBlock": "legacy",
+      "links": {
+        "directoryPath": "",
+        "nextSequentialFile": "",
+        "relatedWorkflows": [],
+        "aiExecutionPrompts": []
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "",
+        "relatedWorkflows": [],
+        "aiExecutionPrompts": []
+      },
+      "issues": [],
+      "waivedIssues": [
+        "note:Directory Path:Relative path of the directory containing this file (e.g. docs/).",
+        "note:Next Sequential File:Relative path to the next file a reader should open after this one.",
+        "note:Related Workflows:Comma-separated relative paths to files that execute or depend on this one.",
+        "note:AI Execution Prompts:Relative path to the contract or skill that governs agent behavior here."
+      ],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "_templates/skill-template.md",
+      "title": "<Skill Title>",
+      "type": "Skill Definition / Workflow Instructions",
+      "context": "<One sentence: what repeatable workflow this skill covers and when it fires.>",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "skills/<skill-name>/",
+        "nextSequentialFile": "../../docs/adoption-guide.md",
+        "relatedWorkflows": [
+          "../../docs/adoption-guide.md",
+          "../../protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "../../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "docs/adoption-guide.md",
+        "relatedWorkflows": [
+          "docs/adoption-guide.md",
+          "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [
+        "broken-link:skills/<skill-name>/"
+      ],
+      "tracked": true,
+      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+    }
+  ]
+}

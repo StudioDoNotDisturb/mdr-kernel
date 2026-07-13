@@ -1,0 +1,16 @@
+#!/bin/sh
+# Backstop the per-model attribution trailer. If the commit message has no `Brain-Model:` line,
+# append one so every model's commits are attributable in `git log` even when the author forgot.
+# Identity resolution: $BRAIN_MODEL  ->  `git config brain.model`  ->  "unknown".
+#   - Set BRAIN_MODEL in each tool's environment (automated jobs export their own id).
+#   - Or, in a single-model clone only:  git config brain.model <id>
+#     (a shared clone should use BRAIN_MODEL so it reflects the actual session model)
+# Interactive agents include the trailer in their message per the contract; this hook only fills
+# the gap, so it never double-stamps.
+msg_file="$1"
+grep -qi '^Brain-Model:' "$msg_file" 2>/dev/null && exit 0
+
+model="${BRAIN_MODEL:-$(git config brain.model 2>/dev/null)}"
+[ -z "$model" ] && model="unknown"
+printf '\nBrain-Model: %s\n' "$model" >> "$msg_file"
+exit 0

@@ -1,0 +1,21 @@
+# Ships to: .github/workflows/privacy-live-smoke.yml
+# Optional integration evidence only. Required push/PR CI stays hermetic in doctor.yml.
+name: privacy live smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-visibility:
+    name: live GitHub visibility refusal
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Refuse a known public GitHub repository
+        run: pwsh -NoProfile -File tests/remote-privacy-live.ps1

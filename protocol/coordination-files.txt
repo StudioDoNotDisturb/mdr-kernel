@@ -1,0 +1,46 @@
+# mdr-kernel coordination files - single-writer under STATE.lock.
+# THE authoritative list. .githooks/pre-commit blocks any commit that stages one of these
+# unless STATE.lock is held by the committing model; the contract and RUNBOOK cite this file
+# instead of enumerating. One repo-relative path per line, exact match; # starts a comment.
+#
+# These are the files that ship with the template. As you grow your own memory, add the shared
+# facts you don't want two sessions co-editing (e.g. reference/ notes, a MANIFEST).
+STATE.md
+DECISIONS.md
+README.md
+handoffs/INDEX.md
+specs/INDEX.md
+reference/INDEX.md
+protocol/CONTRACT.md
+protocol/RUNBOOK.md
+protocol/advisory.md
+protocol/coordination-files.txt
+protocol/recall-gates.json
+skills/mdr-kernel/SKILL.md
+maps/node-roots.json
+maps/NODE-MAP.md
+maps/node-map.json
+maps/OBSIDIAN-NODE-LINKS.md
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+bin/brain-doctor.ps1
+bin/brain-recall.ps1
+bin/write-approval.ps1
+bin/update-node-map.ps1
+bin/start-session.ps1
+bin/state-lock.ps1
+bin/state-budget.ps1
+bin/session-stop.ps1
+bin/sync-doors.ps1
+bin/bootstrap-clone.ps1
+bin/setup-private.ps1
+bin/remote-privacy.ps1
+bin/remote-identity.ps1
+bin/secret-audit.ps1
+bin/sync-private.ps1
+bin/close-session.ps1
+bin/waffle-party.ps1
+.githooks/pre-commit
+.githooks/prepare-commit-msg
+.githooks/pre-push

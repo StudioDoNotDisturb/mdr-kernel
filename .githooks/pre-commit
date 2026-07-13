@@ -1,0 +1,252 @@
+#!/bin/sh
+# mdr-kernel pre-commit. Five gates:
+#   1. canonical-root check  -> WARNING for ordinary commits; coordination files staged from a
+#                               non-canonical clone are BLOCKED in gate 5. A linked worktree of
+#                               the canonical repo counts as canonical.
+#   2. secret scan           -> BLOCK if staged changes add a credential-shaped string
+#   3. doors-in-sync check   -> BLOCK if a front door drifted from protocol/CONTRACT.md
+#   4. write approval gate   -> BLOCK if new live reference/skill files are staged without
+#                               a matching approve audit entry in the same commit
+#   5. coordination lock     -> BLOCK if coordination files are staged (added, modified,
+#                               deleted, OR renamed away) without STATE.lock, or with
+#                               a mismatched lock token when the session is sealed
+# Override (rare, after review): git commit --no-verify
+
+repo=$(git rev-parse --show-toplevel 2>/dev/null)
+
+# --- 1) canonical-root WARNING -------------------------------------------------
+# A linked git worktree of the canonical repo is canonical for coordination purposes:
+# it shares the canonical .git, so its commits land in the same object store on the same branch.
+# We tell it apart from a foreign mirror by resolving dirname(--git-common-dir): for the main
+# working tree and any of its worktrees that resolves to the canonical repo top; a separate clone
+# resolves to its own top. Only a genuine foreign clone stays "non-canonical" and blocks gate 5.
+noncanon=0
+want_raw=''
+marker="$repo/.brain-root"
+if [ -f "$marker" ]; then
+  norm() { printf '%s' "$1" | tr 'A-Z\\' 'a-z/' | sed 's:/*$::'; }
+  want_raw=$(tr -d '\r\n' < "$marker")
+  if [ "$(norm "$want_raw")" != "$(norm "$repo")" ]; then
+    # Path differs from .brain-root — either a worktree of canonical, or a foreign mirror.
+    common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    [ -z "$common_dir" ] && common_dir=$(git rev-parse --git-common-dir 2>/dev/null)
+    canon_top=$(dirname "$common_dir" 2>/dev/null)
+    if [ -n "$canon_top" ] && [ "$(norm "$want_raw")" = "$(norm "$canon_top")" ]; then
+      echo "note: committing from a linked worktree of the canonical repo ($repo) — treated as canonical." >&2
+    else
+      noncanon=1
+      echo "WARN: committing from a non-canonical clone." >&2
+      echo "      here:      $repo" >&2
+      echo "      canonical: $want_raw   (this may be a mirror — prefer writing in the canonical root)" >&2
+    fi
+  fi
+fi
+
+# --- 2) secret scan (BLOCK) ----------------------------------------------------
+added=$(git diff --cached --no-color --diff-filter=ACM -U0 -- . ':(exclude).githooks/*' \
+  | grep '^+' | grep -v '^+++')
+
+if [ -n "$added" ]; then
+  patterns='sk-ant-[A-Za-z0-9_-]{20,}'
+  patterns="$patterns"'|sk-(proj|svcacct)-[A-Za-z0-9_-]{20,}'
+  patterns="$patterns"'|sk-[A-Za-z0-9]{20,}'
+  patterns="$patterns"'|ghp_[A-Za-z0-9]{30,}'
+  patterns="$patterns"'|github_pat_[A-Za-z0-9_]{40,}'
+  patterns="$patterns"'|AKIA[0-9A-Z]{16}'
+  patterns="$patterns"'|AIza[0-9A-Za-z_-]{30,}'
+  patterns="$patterns"'|xox[baprs]-[A-Za-z0-9-]{10,}'
+  patterns="$patterns"'|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+  patterns="$patterns"'|[[:alnum:]_-]*(api[_-]?key|secret|passwd|password|access[_-]?token)[[:alnum:]_-]*[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}["'"'"']'
+
+  hits=$(printf '%s\n' "$added" | grep -nEi "$patterns")
+  if [ -n "$hits" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: possible secret in staged changes:" >&2
+    printf '%s\n' "$hits" | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "  Move the value into a secret store outside the repo and reference it by name." >&2
+    echo "  Genuine false positive? Re-run: git commit --no-verify" >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+if git diff --cached --name-only -- '.brain-root' | grep -q .; then
+  echo "" >&2
+  echo "X mdr-kernel pre-commit: .brain-root is local clone metadata and must never be committed." >&2
+  echo "  Remove it from the index: git restore --staged .brain-root" >&2
+  echo "" >&2
+  exit 1
+fi
+
+# --- 3) doors-in-sync with the contract (BLOCK when checkable, WARN otherwise) --
+door_paths='
+protocol/CONTRACT.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+skills/mdr-kernel/SKILL.md
+'
+staged_doors=''
+for f in $(git diff --cached --name-only --diff-filter=ACDMRT); do
+  case "$door_paths" in
+    *"
+$f
+"*) staged_doors="${staged_doors}${f}
+" ;;
+  esac
+done
+
+# Only spend the pwsh spawn when a door/contract file is actually staged: any commit that stages
+# a door is still checked, and the full startup doctor re-checks doors-in-sync every session.
+if [ -n "$staged_doors" ]; then
+  if [ -f "$repo/bin/sync-doors.ps1" ] && command -v pwsh >/dev/null 2>&1; then
+    # -Staged: judge the INDEX blobs, not the working tree — the commit snapshots the index, so a
+    # partially staged contract/door set can look in-sync on disk while the commit itself drifts.
+    if ! pwsh -NoProfile -File "$repo/bin/sync-doors.ps1" -Check -Staged >/dev/null 2>&1; then
+      echo "" >&2
+      echo "X mdr-kernel pre-commit: the STAGED contract/door set is internally drifted." >&2
+      echo "  Run: pwsh -NoProfile -File bin/sync-doors.ps1   then re-stage the contract AND every door together." >&2
+      echo "" >&2
+      exit 1
+    fi
+  else
+    echo "WARN: pwsh unavailable - front-door drift check skipped while door/contract files are staged." >&2
+    echo "      verify from a pwsh-capable clone before merging/publishing. Staged:" >&2
+    printf '%s' "$staged_doors" | sed '/^$/d; s/^/        /' >&2
+  fi
+fi
+
+# --- 4) write approval for new live knowledge/procedure files (BLOCK) -----------
+# Agent-authored durable knowledge/procedure files start as local proposals and are promoted by
+# bin/write-approval.ps1, which appends an approve record to inbox/write-approval-audit.jsonl.
+# This gate covers new reference notes and new skill entrypoints; existing-file edits still use
+# the normal STATE.lock/decision discipline.
+if command -v pwsh >/dev/null 2>&1; then
+  approval_check=$(pwsh -NoProfile -File "$repo/bin/write-approval.ps1" -ValidateStagedApprovals 2>&1)
+  approval_exit=$?
+  if [ "$approval_exit" -ne 0 ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: $approval_check" >&2
+    echo "  Use: pwsh -NoProfile -File bin/write-approval.ps1 -Propose ... then -Approve ..." >&2
+    echo "  The approve entry must be staged in inbox/write-approval-audit.jsonl with the new file." >&2
+    echo "" >&2
+    exit 1
+  fi
+else
+  echo "WARN: pwsh unavailable - write-approval gate skipped." >&2
+fi
+
+# --- 5) coordination files require STATE.lock (BLOCK) ---------------------------
+# The authoritative list lives in protocol/coordination-files.txt so docs and enforcement cannot
+# drift. Minimal built-in fallback if the list file is ever missing.
+coord_file="$repo/protocol/coordination-files.txt"
+if [ -f "$coord_file" ]; then
+  coord_paths=$(grep -v '^[[:space:]]*#' "$coord_file" | grep -v '^[[:space:]]*$' | tr -d '\r')
+else
+  echo "WARN: protocol/coordination-files.txt missing - using minimal built-in coordination list" >&2
+  coord_paths='STATE.md
+DECISIONS.md
+protocol/CONTRACT.md'
+fi
+coord_paths="
+$coord_paths
+"
+# name-status with rename detection, old AND new paths, deletions included:
+# a deleted or renamed-away coordination file is just as much a coordination edit as a
+# modification. `cut -f2-` keeps the path column(s); renames emit "old<TAB>new" -> two lines.
+staged_coord=''
+for f in $(git diff --cached --name-status -M --diff-filter=ACDMRT | cut -f2- | tr '\t' '\n'); do
+  case "$coord_paths" in
+    *"
+$f
+"*) staged_coord="${staged_coord}${f}
+" ;;
+  esac
+done
+
+# Holder extraction: structured JSON lock with legacy single-line fallback.
+# STATE.lock is ONE shared file across the canonical clone and its worktrees, anchored to
+# dirname(--git-common-dir). A per-tree "$repo/STATE.lock" would let a worktree session and the
+# canonical clone each hold a separate lock and both commit coordination files, defeating
+# single-writer. Fall back to "$repo/STATE.lock" only if git can't resolve the common dir.
+lock_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+[ -z "$lock_common" ] && lock_common=$(git rev-parse --git-common-dir 2>/dev/null)
+lock_top=$(dirname "$lock_common" 2>/dev/null)
+if [ -n "$lock_top" ] && [ -d "$lock_top" ]; then
+  lock="$lock_top/STATE.lock"
+else
+  lock="$repo/STATE.lock"
+fi
+holder=''
+lock_token=''
+if [ -f "$lock" ]; then
+  holder=$(sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$lock" | head -n1)
+  lock_token=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$lock" | head -n1)
+  [ -z "$holder" ] && holder=$(awk 'NR==1{print $1}' "$lock" 2>/dev/null)
+fi
+model=${BRAIN_MODEL:-$(git config brain.model 2>/dev/null)}
+token_ok=1
+if [ -n "$lock_token" ] && { [ -z "$BRAIN_LOCK_TOKEN" ] || [ "$lock_token" != "$BRAIN_LOCK_TOKEN" ]; }; then
+  token_ok=0
+fi
+
+if [ -n "$staged_coord" ]; then
+  # Coordination-root hard block: ordinary commits from a mirror stay a warning, but the shared
+  # coordination layer is only ever written from the canonical root.
+  if [ "$noncanon" = "1" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: coordination files staged from a NON-CANONICAL clone." >&2
+    echo "  here:      $repo" >&2
+    echo "  canonical: $want_raw" >&2
+    echo "  Re-do this work in the canonical root (or move the changes there). Staged:" >&2
+    printf '%s' "$staged_coord" | sed '/^$/d; s/^/    /' >&2
+    echo "" >&2
+    exit 1
+  fi
+
+  if [ ! -f "$lock" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: coordination files are staged but STATE.lock is not held." >&2
+    echo "  Acquire it first: pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<model-id>'" >&2
+    echo "  Staged coordination files:" >&2
+    printf '%s' "$staged_coord" | sed '/^$/d; s/^/    /' >&2
+    echo "" >&2
+    exit 1
+  fi
+
+  if [ -z "$model" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: STATE.lock is held by '$holder', but BRAIN_MODEL/git config brain.model is unset." >&2
+    echo "  Set BRAIN_MODEL for this shell/session, or set git config brain.model for this surface." >&2
+    echo "  Env vars do NOT persist between separate tool shells - set it inline with the commit:" >&2
+    echo '    PowerShell:  $env:BRAIN_MODEL='"'"'<model-id>'"'"'; git commit ...' >&2
+    echo '    bash:        BRAIN_MODEL=<model-id> git commit ...' >&2
+    echo "" >&2
+    exit 1
+  fi
+  if [ "$holder" != "$model" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: coordination files are staged but STATE.lock is held by '$holder', not '$model'." >&2
+    echo "  Do not commit STATE/index/contract files until the holder releases the lock." >&2
+    echo "" >&2
+    exit 1
+  fi
+
+  if [ "$token_ok" != "1" ]; then
+    echo "" >&2
+    echo "X mdr-kernel pre-commit: coordination files are staged but BRAIN_LOCK_TOKEN does not match STATE.lock." >&2
+    echo "  Use the token printed by bin/state-lock.ps1 -Acquire, or wait for the holder to release the lock." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+# --- 6) commit-driven heartbeat -------------------------------------------------
+# Every commit the lock holder makes refreshes STATE.lock's heartbeat, so a live session
+# stays visibly live and a dead one goes stale. Never blocks the commit.
+if [ -f "$lock" ] && [ -n "$model" ] && [ "$holder" = "$model" ] && [ "$token_ok" = "1" ] && command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoProfile -File "$repo/bin/state-lock.ps1" -Heartbeat >/dev/null 2>&1 || true
+fi
+
+exit 0

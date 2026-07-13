@@ -1,0 +1,24 @@
+name: Bug report
+description: Cold-clone breakage, a dangling reference, or other ordinary correctness bug.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include the exact command and its full output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and PowerShell version
+      placeholder: "e.g. Windows 11, PowerShell 7.4.6 — run $PSVersionTable.PSVersion"
+    validations:
+      required: true

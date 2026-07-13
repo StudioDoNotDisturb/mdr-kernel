@@ -1,0 +1,28 @@
+# mdr-kernel — the coordination lock is runtime state, never committed
+STATE.lock
+.brain-root
+
+# local-only overrides
+*.local.*
+*.local
+.write-proposals/
+
+# secrets never live in the repo (see the contract)
+.secrets/
+*.secret
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# AI-harness runtime dirs (worktrees are full repo copies that would double the node map).
+# Tracked here so every clone shares the junk-knowledge; the node-map scanner honors git
+# ignore data and skips these automatically.
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/

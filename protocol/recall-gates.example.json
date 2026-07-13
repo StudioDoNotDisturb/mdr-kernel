@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "updated": "2026-07-07",
+  "description": "Example active-recall gates. Bootstrap copies this to protocol/recall-gates.json. Surface relevant prior traps before a model acts. Replace the example domain gate with your own recurring traps; keep the recurring-work gate.",
+  "gates": [
+    {
+      "id": "RECURRING-WORK",
+      "label": "Recurring or stuck work active recall",
+      "times_recurred": 0,
+      "triggers": [
+        "again",
+        "same song",
+        "same exact sequence",
+        "stuck",
+        "recurring",
+        "loop",
+        "amnesia",
+        "forgot",
+        "forgetting",
+        "re-derive",
+        "rederive",
+        "groundhog",
+        "keeps failing",
+        "keeps breaking",
+        "we have been through",
+        "multiple times"
+      ],
+      "aliases": [
+        "redo",
+        "re-do",
+        "happening again",
+        "happened before",
+        "we did this",
+        "did this before",
+        "been here before",
+        "back to square one",
+        "circular",
+        "deja vu",
+        "going in circles",
+        "round in circles",
+        "every session",
+        "every time",
+        "history repeating",
+        "repeating itself",
+        "not the first time"
+      ],
+      "required_reads": [
+        "DECISIONS.md - grep your objective's domain terms + skim the newest entries ONLY (append-only log; never read whole)",
+        "handoffs/INDEX.md - newest rows ONLY (never read whole)"
+      ],
+      "traps": [
+        {
+          "id": "STORED-BUT-UNUSED",
+          "times_recurred": 0,
+          "symptom": "A model records a trap, then a later session re-derives the same path instead of acting on the record.",
+          "wrong_move": "Add another reminder sentence or fix only the newest symptom.",
+          "right_move": "Run the recall gate, name the recurrence pattern, read the required sources, and choose a mechanical surfacing point before acting.",
+          "evidence_refs": [
+            "DECISIONS.md",
+            "handoffs/INDEX.md"
+          ]
+        }
+      ],
+      "stop_signs": [
+        "The operator says this is recurring, stuck, the same loop, or amnesia.",
+        "A prior decision says a path is solved but the same operational dance is happening again.",
+        "The next step is to guide a manual recovery before checking the prior traps."
+      ]
+    },
+    {
+      "id": "EXAMPLE-DOMAIN",
+      "label": "EXAMPLE — replace with a recurring trap from your own stack",
+      "times_recurred": 0,
+      "triggers": [
+        "deploy",
+        "rollback",
+        "migration"
+      ],
+      "aliases": [
+        "release",
+        "roll back",
+        "schema change"
+      ],
+      "required_reads": [
+        "reference/INDEX.md",
+        "DECISIONS.md - grep the decision ids named in the traps ONLY (never read whole)"
+      ],
+      "traps": [
+        {
+          "id": "EXAMPLE-TRAP",
+          "times_recurred": 0,
+          "symptom": "Describe the observable symptom of a mistake your sessions keep repeating.",
+          "wrong_move": "Describe the tempting wrong path a fresh session takes.",
+          "right_move": "Describe the correct move, and which decision/reference proves it.",
+          "evidence_refs": [
+            "DECISIONS.md"
+          ]
+        }
+      ],
+      "stop_signs": [
+        "Name the moment where a session is about to repeat this trap.",
+        "Delete this example gate once you have added a real one."
+      ]
+    },
+    {
+      "id": "AGENT-EVIDENCE",
+      "label": "Agent-reported completion vs repository truth",
+      "times_recurred": 0,
+      "triggers": [
+        "transcript",
+        "transcripts",
+        "fabricated",
+        "fabrication",
+        "agent log",
+        "agent logs",
+        "agent output",
+        "session claims",
+        "said it finished",
+        "reported done",
+        "completion report",
+        "went silent",
+        "verify the close"
+      ],
+      "aliases": [
+        "says it pushed",
+        "says it committed",
+        "displayed log",
+        "final summary",
+        "agent finished",
+        "trust the log"
+      ],
+      "required_reads": [
+        "DECISIONS.md - grep the incident that made you keep this gate"
+      ],
+      "traps": [
+        {
+          "id": "AGENT-FABRICATED-COMPLETION",
+          "times_recurred": 0,
+          "symptom": "An agent's final summary or displayed 'log' reports a successful commit/close that never happened - invented commit hashes, log formats its scripts cannot emit - and the session goes silent after the real failure, leaving the lock stranded.",
+          "wrong_move": "Treat an agent-displayed transcript, log block, or completion summary as evidence; fold its claims into STATE or a handoff; debug from the fabricated output.",
+          "right_move": "A displayed log is a claim, not evidence. Verify against the repository: git log/rev-parse that HEAD moved, ls-remote for pushes, git fsck + reflog when a claimed hash is missing, and read the invoked script to see what output it CAN emit. Pin every finding to a hash.",
+          "evidence_refs": [
+            "DECISIONS.md"
+          ]
+        }
+      ],
+      "stop_signs": [
+        "A completion log's format does not match anything the invoked script can print.",
+        "A claimed commit hash is absent from git log, reflog, or fsck.",
+        "An agent session ends silently right after an error, with the lock still held.",
+        "STATE or a handoff is about to record another session's claims without a hash check."
+      ]
+    }
+  ]
+}

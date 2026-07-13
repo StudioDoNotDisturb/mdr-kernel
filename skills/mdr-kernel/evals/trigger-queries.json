@@ -1,0 +1,37 @@
+{
+  "should_trigger": [
+    {
+      "query": "Set up this repo for my existing projects and notes.",
+      "why": "Adoption from messy existing work is the primary workflow."
+    },
+    {
+      "query": "Where should I put this recurring release checklist?",
+      "why": "The skill decides between reference, specs, inbox, and skills."
+    },
+    {
+      "query": "Agents keep repeating the same mistake in this repo.",
+      "why": "Recurring mistakes route to active recall and evidence-backed gates."
+    }
+  ],
+  "should_not_trigger": [
+    {
+      "query": "Implement the login form in my app.",
+      "why": "Ordinary coding should route through STATE and the node map to project files."
+    },
+    {
+      "query": "Explain what PowerShell is.",
+      "why": "General tool education is not mdr-kernel operations."
+    },
+    {
+      "query": "Summarize this unrelated article.",
+      "why": "No repo setup, memory, coordination, or skill workflow is involved."
+    }
+  ],
+  "output_quality_assertions": [
+    "Names the selected file set and why it was selected.",
+    "Distinguishes live state, durable reference, specs, handoffs, inbox notes, and skills.",
+    "Does not recommend importing a whole messy workspace into the repo.",
+    "Runs or instructs active recall before implementation advice when work is assigned.",
+    "States whether coordination edits need STATE.lock."
+  ]
+}

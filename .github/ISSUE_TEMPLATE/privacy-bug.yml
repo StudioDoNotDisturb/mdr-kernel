@@ -1,0 +1,26 @@
+name: Privacy or security bug
+description: A bug that could leak private memory content or bypass the private-destination guard.
+labels: ["privacy", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop — use this only to request a private channel.** If this bug lets private memory
+        reach an unintended destination (a public repo, a fork, a bypassed hook) or exposes a
+        secret, do not describe the exploit here. Use **Security → Report a vulnerability** on
+        this repository instead (see [SECURITY.md](../../SECURITY.md)). This form exists only for
+        the case where you cannot reach that private flow and need another contact method.
+  - type: textarea
+    id: contact
+    attributes:
+      label: How should the maintainer reach you?
+      description: An email or another private channel. Do not include exploit details below.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have not included exploit details, private repo URLs, or secret values in this issue.
+          required: true

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "mdr-kernel",
+    "path": ".",
+    "writePolicy": "repair-allowed",
+    "trackGit": true,
+    "excludes": [
+      ".git/**",
+      ".claude/**",
+      ".venv/**",
+      "__pycache__/**",
+      "node_modules/**",
+      "_tmp/**",
+      "maps/**"
+    ],
+    "waivedLegacy": [],
+    "waivedIssues": [
+      "_templates/markdown-file-template.md|note:Directory Path:Relative path of the directory containing this file (e.g. docs/).",
+      "_templates/markdown-file-template.md|note:Next Sequential File:Relative path to the next file a reader should open after this one.",
+      "_templates/markdown-file-template.md|note:Related Workflows:Comma-separated relative paths to files that execute or depend on this one.",
+      "_templates/markdown-file-template.md|note:AI Execution Prompts:Relative path to the contract or skill that governs agent behavior here.",
+      "_templates/skill-template.md|broken-link:skills/<skill-name>/"
+    ]
+  }
+]
