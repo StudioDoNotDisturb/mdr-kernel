@@ -8,7 +8,7 @@ Generated from `maps/node-map.json` by `bin/update-node-map.ps1`. Do not hand-ed
 
 This file gives Markdown graph tools real links for the node map. The source files remain canonical; this generated bridge exists so graph views, backlinks, and outgoing links can see the retrieval structure.
 
-generatedUtc: 2026-10-03T14:23:40.3067723Z
+generatedUtc: 2026-10-03T17:11:31.2826602Z
 
 ## [AGENTS.md](../AGENTS.md)
 
@@ -149,7 +149,7 @@ generatedUtc: 2026-10-03T14:23:40.3067723Z
 
 - Title: Upgrade the kernel while preserving your memory
 - Type: Operator Guide / Upgrade
-- Context: Provides a deliberate merge path for existing private memories without replacing their history, gates, or operator authority.
+- Context: Exact, rehearsed commands for moving an existing private 0.1 memory to 0.2 without merging histories or touching your STATE, decisions, handoffs, gates or remote.
 - Next Sequential File: [docs/decision-authority.md](../docs/decision-authority.md)
 - Related Workflows: [CHANGELOG.md](../CHANGELOG.md), [docs/decision-authority.md](../docs/decision-authority.md), [docs/recall-hooks.md](../docs/recall-hooks.md), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)

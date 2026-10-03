@@ -43,9 +43,9 @@ if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
   Write-Host "`n== startup result =="
   Write-Host 'STARTUP_STATUS=BLOCKED'
   Write-Host 'NOTE=This folder is not a git working tree. Use git clone (preferred) or git init before bootstrap/start-session.'
-  Write-Host 'RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus maps/NODE-MAP.md (or maps/node-map.json) to pick the smallest relevant file set before reading broadly.'
+  Write-Host 'RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus reference/INDEX.md to pick the smallest relevant file set before reading broadly; the generated node map checks link health.'
   Write-Host 'SHARED_MEMORY_CONTRACT=Anything another model needs must be written into the repo; never rely on private model memory.'
-  Write-Host "RECALL_CONTRACT=Before acting on assigned work, run: pwsh -NoProfile -File bin/brain-recall.ps1 -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action."
+  Write-Host "RECALL_CONTRACT=Before acting on assigned work, recall must run: a verified prompt hook (bin/hook-recall.ps1) or pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action."
   exit 1
 }
 Write-Host '---' -ForegroundColor DarkCyan
@@ -108,9 +108,9 @@ if (Test-Path -LiteralPath $statePath) {
 Write-Host "`n== startup result =="
 Write-Host "STARTUP_STATUS=$status"
 foreach ($note in $notes) { Write-Host "NOTE=$note" }
-Write-Host 'RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus maps/NODE-MAP.md (or maps/node-map.json) to pick the smallest relevant file set before reading broadly.'
+Write-Host 'RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus reference/INDEX.md to pick the smallest relevant file set before reading broadly; the generated node map checks link health.'
 Write-Host 'SHARED_MEMORY_CONTRACT=Anything another model needs must be written into the repo; never rely on private model memory.'
-Write-Host "RECALL_CONTRACT=Before acting on assigned work, run: pwsh -NoProfile -File bin/brain-recall.ps1 -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action."
+Write-Host "RECALL_CONTRACT=Before acting on assigned work, recall must run: a verified prompt hook (bin/hook-recall.ps1) or pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action."
 
 if ($status -ne 'READY') { exit 1 }
 exit 0

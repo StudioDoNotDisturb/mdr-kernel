@@ -1,5 +1,5 @@
 {
-  "generatedUtc": "2026-10-03T14:23:40.3067723Z",
+  "generatedUtc": "2026-10-03T17:11:31.2826602Z",
   "roots": [
     {
       "name": "mdr-kernel",
@@ -60,7 +60,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.8941926Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2489750Z"
     },
     {
       "root": "mdr-kernel",
@@ -97,7 +97,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.3215476Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4910036Z"
     },
     {
       "root": "mdr-kernel",
@@ -134,7 +134,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.3165486Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4890044Z"
     },
     {
       "root": "mdr-kernel",
@@ -173,7 +173,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2699224Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4613627Z"
     },
     {
       "root": "mdr-kernel",
@@ -206,7 +206,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2659224Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4598591Z"
     },
     {
       "root": "mdr-kernel",
@@ -245,7 +245,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2599155Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4568489Z"
     },
     {
       "root": "mdr-kernel",
@@ -286,7 +286,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2523855Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4523731Z"
     },
     {
       "root": "mdr-kernel",
@@ -323,7 +323,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2371144Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4464713Z"
     },
     {
       "root": "mdr-kernel",
@@ -360,7 +360,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2320977Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4434658Z"
     },
     {
       "root": "mdr-kernel",
@@ -393,7 +393,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2280963Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4399402Z"
     },
     {
       "root": "mdr-kernel",
@@ -432,7 +432,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2210965Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4379378Z"
     },
     {
       "root": "mdr-kernel",
@@ -475,7 +475,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2140935Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4343798Z"
     },
     {
       "root": "mdr-kernel",
@@ -510,14 +510,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.2025117Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4261786Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "docs/upgrading.md",
       "title": "Upgrade the kernel while preserving your memory",
       "type": "Operator Guide / Upgrade",
-      "context": "Provides a deliberate merge path for existing private memories without replacing their history, gates, or operator authority.",
+      "context": "Exact, rehearsed commands for moving an existing private 0.1 memory to 0.2 without merging histories or touching your STATE, decisions, handoffs, gates or remote.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -549,7 +549,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1955123Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4201012Z"
     },
     {
       "root": "mdr-kernel",
@@ -588,7 +588,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1885120Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4165860Z"
     },
     {
       "root": "mdr-kernel",
@@ -625,7 +625,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1854578Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4142960Z"
     },
     {
       "root": "mdr-kernel",
@@ -668,7 +668,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1814580Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4122910Z"
     },
     {
       "root": "mdr-kernel",
@@ -707,7 +707,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1774578Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4097793Z"
     },
     {
       "root": "mdr-kernel",
@@ -746,7 +746,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.1698790Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4077735Z"
     },
     {
       "root": "mdr-kernel",
@@ -785,7 +785,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9425583Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2778323Z"
     },
     {
       "root": "mdr-kernel",
@@ -826,7 +826,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9375276Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2753274Z"
     },
     {
       "root": "mdr-kernel",
@@ -863,7 +863,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.3325529Z"
+      "mtimeUtc": "2026-10-03T17:11:29.5026317Z"
     },
     {
       "root": "mdr-kernel",
@@ -900,7 +900,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9265474Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2723239Z"
     },
     {
       "root": "mdr-kernel",
@@ -939,7 +939,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9235479Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2698161Z"
     },
     {
       "root": "mdr-kernel",
@@ -978,7 +978,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9205471Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2562767Z"
     },
     {
       "root": "mdr-kernel",
@@ -1017,7 +1017,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9145417Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2542476Z"
     },
     {
       "root": "mdr-kernel",
@@ -1054,7 +1054,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.9003351Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2522482Z"
     },
     {
       "root": "mdr-kernel",
@@ -1091,7 +1091,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:37.8986989Z"
+      "mtimeUtc": "2026-10-03T17:11:29.2509755Z"
     },
     {
       "root": "mdr-kernel",
@@ -1121,7 +1121,7 @@
         "note:AI Execution Prompts:Relative path to the contract or skill that governs agent behavior here."
       ],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.3255528Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4930108Z"
     },
     {
       "root": "mdr-kernel",
@@ -1158,7 +1158,7 @@
         "broken-link:skills/<skill-name>/"
       ],
       "tracked": true,
-      "mtimeUtc": "2026-10-03T14:23:38.3285526Z"
+      "mtimeUtc": "2026-10-03T17:11:29.4951053Z"
     }
   ]
 }

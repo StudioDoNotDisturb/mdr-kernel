@@ -321,9 +321,9 @@ should trust:
 - **Setup does not auto-upgrade an initialized memory.** Bootstrap only scaffolds files that are
   missing; it never overwrites `bin/*`, `protocol/CONTRACT.md`, or any file your memory already
   has. If the public template improves after your private repo was created, you get those
-  improvements only by deliberately merging them in yourself (e.g. add the template as a second
-  git remote and cherry-pick or merge) — there is no update command. `docs/upgrading.md` is the
-  checklist for that merge.
+  improvements only by applying a release deliberately — there is no update command, and pulling
+  from your private origin never fetches one. [`docs/upgrading.md`](docs/upgrading.md) is the
+  exact, rehearsed walkthrough.
 - It is a **pattern, not a product.** No daemon, no service, no telemetry — just scripts, git, and
   a contract. You adapt it to your stack rather than installing it.
 
@@ -335,10 +335,12 @@ is a tagged commit on this repository's `main`.
 
 Your private memory is a **snapshot, not a subscription** — see "Setup does not auto-upgrade" in
 Known Limits above. There is no update command and no compatibility promise across versions yet
-(pre-`1.0.0`). To pull in template improvements after your own repo was created, add this
-repository as a second git remote in your private clone and merge or cherry-pick deliberately;
-review the diff first, since your memory's `bin/*` and `protocol/*` may have your own local
-adaptations.
+(pre-`1.0.0`). "Use this template" gives your repository a fresh history that shares no commits
+with this one, so do not merge this repository into it. To apply a release, follow
+[`docs/upgrading.md`](docs/upgrading.md): it fetches the tag read-only, copies the release's
+files, three-way merges the ones you adapted (such as `protocol/CONTRACT.md`), and leaves your
+STATE, decisions, handoffs, gates and remote untouched. Watch > Custom > Releases tells you when
+one is published.
 
 ## What This Is Not
 

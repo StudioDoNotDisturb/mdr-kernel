@@ -4,6 +4,18 @@ Context: Describes portable changes in the distribution without treating a sourc
 
 # Changes
 
+## Unreleased on main (after 0.2.0)
+
+- `docs/upgrading.md` is now an exact, rehearsed 0.1-to-0.2 walkthrough for template copies and
+  retained-history clones: read-only release fetch, path-by-path copy with three-way merges of
+  your edits, decision-log preflight before the new hooks arrive, explicit authority migration,
+  expected refusals and rollback by revert. The README no longer suggests merging the public
+  repository as a second remote.
+- `tests/decision-authority.ps1` clears an inherited session identity and lock token before it
+  runs, so it passes inside a memory where a session holds the lock.
+- `bin/start-session.ps1` closing lines now name `reference/INDEX.md` for the reading slice and the
+  recall hook or `bin/prepare-work.ps1` for recall, matching the 0.2 contract.
+
 ## 0.2.0
 
 - Explicit session identity and sealed tokens for lock mutations, ownership checks and commit

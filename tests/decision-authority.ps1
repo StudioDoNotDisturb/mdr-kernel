@@ -60,6 +60,13 @@ $bootstrapText = [IO.File]::ReadAllText("$source/bin/bootstrap-clone.ps1")
 $scaffold = [regex]::Match($bootstrapText, "(?s)New-IfMissing 'DECISIONS\.md' @'\r?\n(?<t>.*?)\r?\n'@").Groups['t'].Value -replace "`r`n", "`n"
 if (-not $scaffold.Contains('_No decisions yet._')) { throw 'Could not extract the bootstrap DECISIONS.md scaffold.' }
 
+# Run as CI does: a caller's session identity or lock token must not leak into fixture locks
+# (state-lock seals an inherited BRAIN_LOCK_TOKEN and then prints no new token).
+$savedEnvironment = @{}
+foreach ($name in 'BRAIN_MODEL','BRAIN_LOCK_TOKEN','BRAIN_OBJECTIVE','MDR_FORCE_LIVE_LOCK') {
+  $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+  Remove-Item -LiteralPath "Env:\$name" -ErrorAction SilentlyContinue
+}
 try {
   # --- structure and authority --------------------------------------------------------------
   Check $empty $true 'empty new log passes'
@@ -274,5 +281,10 @@ try {
   Run 'state-lock.ps1' ($lockArgs + '-Release')
 
   Write-Host "DECISION_TESTS=PASS count=$passed seconds=$([int]$started.Elapsed.TotalSeconds)"
-} catch { Write-Host "DECISION_TESTS=FAIL fixture=$fixture"; throw }
+} catch { Write-Host "DECISION_TESTS=FAIL fixture=$fixture"; throw } finally {
+  foreach ($name in $savedEnvironment.Keys) {
+    if ($null -eq $savedEnvironment[$name]) { Remove-Item -LiteralPath "Env:\$name" -ErrorAction SilentlyContinue }
+    else { [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process') }
+  }
+}
 # Keep tiny synthetic fixtures for diagnosis; no recursive deletion of a computed path.

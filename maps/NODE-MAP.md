@@ -6,7 +6,7 @@ Context: Generated dashboard for Markdown retrieval envelopes and SYSTEM NODE LI
 
 Generated from `maps/node-roots.json` by `bin/update-node-map.ps1`.
 
-generatedUtc: 2026-10-03T14:23:40.3067723Z
+generatedUtc: 2026-10-03T17:11:31.2826602Z
 
 ## Root Counts
 
