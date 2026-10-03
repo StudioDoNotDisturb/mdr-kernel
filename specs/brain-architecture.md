@@ -1,6 +1,6 @@
 Title: Spec — mdr-kernel architecture: shared memory across model surfaces
 Type: Spec / Design Authority
-Context: Design rationale for the shared-memory coordination kernel — the invariant, the surfaces, the guardrails, and the known residual failure modes. Verify live status against STATE.md and DECISIONS.md before acting.
+Context: Use when you need the design rationale of the shared-memory kernel (invariant, surfaces, guardrails, residual failure modes); verify live status against STATE.md and DECISIONS.md before acting.
 
 # Spec — mdr-kernel architecture
 
@@ -15,7 +15,8 @@ The core invariant:
 > If another model needs a fact, decision, current state, or handoff, it must live in this repo.
 
 The repository is the memory. The chat transcript is not. Agents start each shift without trusted
-private continuity, route through a small retrieval slice instead of reading broadly, confront known
+private continuity, read a small slice chosen from `STATE.md` and `reference/INDEX.md` instead of
+reading broadly, confront known
 traps before acting, and leave accountable handoff for the next shift.
 
 ## 2. Architecture
@@ -25,7 +26,7 @@ traps before acting, and leave accountable handoff for the next shift.
 | Surface | Role | Write discipline |
 |---|---|---|
 | `STATE.md` | Live state of play; wins over other docs when they disagree | Single-writer under `STATE.lock` |
-| `DECISIONS.md` | Append-only decision log | Newest on top; never rewrite history |
+| `DECISIONS.md` | Append-only decision log; each entry is `proposed` or quoted `operator-ruled` | Newest on top via `bin/add-decision.ps1`; never rewrite history; replacement only through explicit stamps |
 | `specs/` | Topic specs and architecture rationale | One topic per file; update `specs/INDEX.md` |
 | `reference/` | Shared facts addressable by `[[wiki-links]]` | One fact per file; update `reference/INDEX.md` |
 | `handoffs/` | Session narratives and evidence | One handoff per session; update `handoffs/INDEX.md` |
@@ -35,18 +36,21 @@ Git is the transport and audit log. The expected lifecycle is:
 
 1. Run `bin/start-session.ps1 -Model <actual-id>`, which performs the health check, a safe
    pull/rebase, and a complete `STATE.md` readback.
-2. Run the active-recall gate when the operator assigns work.
+2. Run the active-recall gate when the operator assigns work (a configured prompt hook through
+   `bin/hook-recall.ps1`, or `bin/prepare-work.ps1` by hand).
 3. Work.
-4. Acquire `STATE.lock` before coordination edits.
+4. Set `BRAIN_MODEL`, then acquire `STATE.lock` before coordination edits and carry the printed
+   token as `BRAIN_LOCK_TOKEN`.
 5. Update state / index / handoff / decisions as needed, committing in checkpoints.
-6. Commit with a `Brain-Model:` trailer, push, then release the lock.
+6. Close with `bin/close-session.ps1`: commit the close set with a `Brain-Model:` trailer, push
+   when a private remote exists, then release the lock.
 
 ### 2.2 Participant tiers
 
 | Tier | Capabilities | Contract |
 |---|---|---|
 | Full participants | Read/write repo, run scripts, commit/push | Universal contract block generated from `protocol/CONTRACT.md` |
-| Read-only local participant | Read allowlisted files; output inbox-ready notes; no write/lock/git route | Same contract, routing subset |
+| Read-only local participant | Read allowlisted files; output inbox-ready notes; no write/lock/git route | Same contract, read-only subset |
 | Advisory participants | No file/git access; reason from pasted STATE | Advisory contract block |
 
 The split is intentional. A surface that cannot run the scripts or hold the lock is not a full
@@ -69,11 +73,11 @@ and pre-commit to make drift loud. Edit the contract, never the generated doors.
 |---|---|---|
 | `bin/brain-doctor.ps1` | Checks root, cleanliness, hooks, state freshness, door drift, indexes, secret-shaped tracked content, wiki-links, inbox, and lock state | Advisory except committed-secret hazards |
 | `.githooks/pre-commit` | Blocks added secret-shaped strings, front-door drift, and protected coordination commits without a matching `STATE.lock` — including deletions, renames-away, and commits from a non-canonical root | Only runs when `core.hooksPath=.githooks`; can be bypassed with `--no-verify` |
-| `.githooks/prepare-commit-msg` | Adds a `Brain-Model:` trailer when missing | Falls back to `unknown` unless env/config is set |
-| `STATE.lock` | Machine-local cooperative lock for coordination files; JSON body, atomic acquire, holder-verified release, opt-in token ownership, commit-refreshed heartbeat | Not a cross-machine lock; same-model same-host sessions share identity unless the acquiring session carries a per-lock token |
+| `.githooks/prepare-commit-msg` | Adds a `Brain-Model:` trailer from explicit `BRAIN_MODEL`; refuses a commit with neither `BRAIN_MODEL` nor a trailer, or with a trailer that disagrees with `BRAIN_MODEL` | Only runs when hooks are armed; `git config brain.model` is never used |
+| `STATE.lock` | Machine-local cooperative lock for coordination files; JSON body, atomic acquire, explicit identity plus the session's own token for every mutation, commit-refreshed heartbeat | Not a cross-machine lock; a stale heartbeat is a reason to investigate, never proof of abandonment |
 | `bin/start-session.ps1` | Canonical startup: doctor → clean-tree gate → pull/rebase → STATE readback | Requires PowerShell and a writable canonical clone |
-| `bin/brain-recall.ps1` + `protocol/recall-gates.json` | Active recall gate: matches assigned objectives to recurrence-counted traps and required reads before an agent acts | Surfaces knowledge but cannot force good reasoning |
-| `bin/bootstrap-clone.ps1` | Sets hooks, checks the canonical root, and runs the doctor for a fresh clone | Must be run once per clone |
+| `bin/brain-recall.ps1` + `protocol/recall-gates.json` | Active recall gate: matches assigned objectives to recurrence-counted traps and required reads before an agent acts; reached through `bin/hook-recall.ps1` or `bin/prepare-work.ps1` | Surfaces knowledge but cannot force good reasoning; a configured hook is not proof that a host fired it |
+| `bin/setup-private.ps1` (calls `bin/bootstrap-clone.ps1`) | Verifies and pins the private destination, arms hooks, scaffolds memory, regenerates doors and the map, runs the doctor | Must be run once per clone |
 
 ## 3. Residual failure modes
 
@@ -84,18 +88,21 @@ stable taxonomy; adopters inherit the same failure surface.
 
 Git does not version-control `core.hooksPath`. A fresh clone can have the hook files present but
 inactive, bypassing secret scanning, door-drift checks, lock enforcement, and commit attribution.
-Mitigation: the doctor warns when `core.hooksPath` is not `.githooks`, and `bin/bootstrap-clone.ps1`
-arms hooks and runs the doctor for a fresh clone.
+Mitigation: the doctor warns when `core.hooksPath` is not `.githooks`, and `bin/setup-private.ps1`
+arms hooks and runs the doctor in every clone.
 
 ### R2 — `STATE.lock` is cooperative, local, and easy to release incorrectly
 
 The lock is a local JSON file (model, host, pid, timestamps, base commit, objective, token). It is
-not a cross-machine lock, and token ownership only seals sessions that carry `$env:BRAIN_LOCK_TOKEN`
-or pass `-Token`. Acquisition is atomic (no test-then-write race), re-acquiring your own lock
-refreshes the heartbeat, and every commit the holder makes refreshes it too — so staleness is judged
-by heartbeat age, not acquire age. The doctor flags a lock whose heartbeat is older than two hours as
-a dead session and prints the recovery command. Mitigation: doctor reporting plus pre-commit checking
-staged coordination edits against the holder.
+not a cross-machine lock. Every mutation and ownership check needs an explicit identity
+(`-Model` or `BRAIN_MODEL`) and the token printed by the session's own acquire
+(`$env:BRAIN_LOCK_TOKEN` or `-Token`); a tokenless lock never proves ownership. Acquisition is
+atomic (no test-then-write race), and every commit the holder makes refreshes the heartbeat. A
+heartbeat older than two hours is reported as stale, which is a reason to investigate, not proof
+that the holder is gone. Forced recovery requires `-Release -Force -AbandonmentReason` recording
+independent evidence or operator direction, plus `MDR_FORCE_LIVE_LOCK=1` when the heartbeat is
+still fresh. Mitigation: doctor reporting plus pre-commit checking staged coordination edits
+against the holder's token.
 
 ### R3 — Canonical-root protection is asymmetric by design
 
@@ -125,16 +132,18 @@ tracked files entirely; reference secrets by filename from an untracked location
 ### R7 — Model-ID labels drift
 
 Concrete model ids age quickly. Full participants set a process-scoped `BRAIN_MODEL` or write an
-explicit `Brain-Model:` trailer; a shared `git config brain.model` is only a warned fallback because a
-shared clone pinned to one model mislabels every other model's commits. The tier-detection regex is
-version-generous so a newer point release still classifies correctly.
+explicit `Brain-Model:` trailer, and the commit-message hook refuses a commit with neither. A shared
+`git config brain.model` is display-only: a clone pinned to one model would mislabel every other
+model's commits, so it never attributes a commit or proves lock ownership.
 
 ### R8 — Close-out is protocol-driven, not fully automated
 
 The close flow asks an agent to update STATE, write a handoff, update indexes, commit, push, and
 release the lock. `bin/close-session.ps1` automates the mechanical tail: it verifies the lock holder
 (auto-acquiring when free), today's handoff and INDEX row, STATE freshness, and doctor hard failures;
-then stages, commits with the trailer, pushes, and releases the lock only after the push succeeds. The
+then stages only its close set (coordination files, the handoff, generated maps, explicit `-Also`
+paths), refuses foreign staged paths without unstaging them, commits with the trailer, pushes, and
+releases the lock only after the push succeeds. The
 contract also mandates checkpoint commits mid-session, because concentrating all durable writes at
 session end is exactly when token exhaustion strikes — checkpoint commits cap a dead session's loss
 and double as lock heartbeats.
@@ -152,13 +161,14 @@ can be blocked on files it was never told are protected. `protocol/coordination-
 single authoritative list (self-listing); pre-commit reads it and the doctor verifies every listed
 path exists, so a rename cannot silently unprotect a file.
 
-### R11 — Same-model concurrent sessions share one lock identity
+### R11 — Same-model concurrent sessions could share one lock identity
 
-Baseline lock identity is model + host. Token sealing is opt-in: a sealed session (carrying
-`$env:BRAIN_LOCK_TOKEN` or passing `-Token`) prevents another same-model same-host session from
-silently re-acquiring, heartbeating, or releasing its lock, and pre-commit refuses coordination
-commits when both the lock and the session expose tokens that differ. Without a token, it falls back
-to model+host ownership for legacy/no-lockout behavior.
+Model + host alone cannot tell two sessions of the same model apart. Every acquire therefore prints
+a per-session token, and every heartbeat, release, ownership check and coordination commit requires
+that same token, so a second same-model same-host session cannot silently re-acquire, heartbeat,
+release, or commit under the first session's lock. A lock without a token (for example one written
+by an older version) proves nothing and needs explicit recovery. The residual risk is a session
+that loses its own token: it must treat the lock as not its own.
 
 ### R12 — The kernel enforces knowledge STORAGE, not knowledge USE
 
@@ -173,7 +183,8 @@ Why the obvious fix fails: "add a rule that says read X first" is what a contrac
 docs as background and skims them. More "remember" prose just adds another discretionary rule to the
 pile.
 
-Mitigation: the active recall gate (`bin/brain-recall.ps1` + `protocol/recall-gates.json`) matches
+Mitigation: the active recall gate (`bin/brain-recall.ps1` + `protocol/recall-gates.json`, reached
+through a configured `bin/hook-recall.ps1` prompt hook or the portable `bin/prepare-work.ps1`) matches
 assigned work against recurrence-counted traps and required reads before an agent advises, edits, or
 guides recovery. The full mechanism is specified in `specs/brain-active-recall.md` and maintained
 through `reference/action-recall-gates.md`. The gate forces surfacing, not obedience — see R13.
@@ -189,9 +200,10 @@ not-see, recurrence-counted, at action time" is the realistic ceiling.
 
 ## 4. Adopting this architecture
 
-Do not fork a private workspace wholesale. `bin/bootstrap-clone.ps1` scaffolds the adopter-owned live
-files (`STATE.md`, `DECISIONS.md`, the indexes, `inbox/`, and `protocol/recall-gates.json`) empty,
-arms the hooks, and runs the doctor. Replace the example recall gate with your own recurring traps,
+Do not fork a private workspace wholesale. `bin/setup-private.ps1` (through its internal
+`bin/bootstrap-clone.ps1` primitive) scaffolds the adopter-owned live files (`STATE.md`,
+`DECISIONS.md`, the indexes, `inbox/`, and `protocol/recall-gates.json`) empty, arms the hooks,
+and runs the doctor. Replace the example recall gate with your own recurring traps,
 keep the recurring-work gate, and let the repo — not the transcript — become the memory.
 
 ---

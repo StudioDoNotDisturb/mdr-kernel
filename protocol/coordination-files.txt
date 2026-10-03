@@ -31,6 +31,7 @@ bin/update-node-map.ps1
 bin/start-session.ps1
 bin/state-lock.ps1
 bin/state-budget.ps1
+bin/envelope-check.ps1
 bin/session-stop.ps1
 bin/sync-doors.ps1
 bin/bootstrap-clone.ps1
@@ -44,3 +45,14 @@ bin/waffle-party.ps1
 .githooks/pre-commit
 .githooks/prepare-commit-msg
 .githooks/pre-push
+bin/add-decision.ps1
+bin/check-decision-history.ps1
+bin/initialize-decision-authority.ps1
+bin/ratify-decision.ps1
+bin/build-rulings.ps1
+bin/hook-recall.ps1
+bin/prepare-work.ps1
+bin/test-staged.ps1
+protocol/decision-authority.json
+protocol/decision-ratifications.jsonl
+protocol/rulings.json

@@ -17,8 +17,8 @@ treating the repository — not the chat memory — as the canonical state.
 
 - **Severed State:** Agents wake up with no private memory. They trust the repository record over
   the chat history.
-- **Node-Map Routing:** Agents route through an explicit node map, preventing broad, erratic repo
-  crawls.
+- **Focused Reading:** STATE and the reference index select a small reading slice; generated
+  maps check link health.
 - **Active Recall:** Agents must verify their reasoning against past traps (the "Break Room")
   before implementing new objectives.
 - **Authoritative Commits:** Every change is attributed to a specific model, audited for security,
@@ -38,24 +38,44 @@ For the full philosophical mapping, see [FLOOR-GUIDE.md](FLOOR-GUIDE.md).
 ```
 mdr-kernel/
 |- README.md                  public orientation
+|- CHANGELOG.md               what changed per version (0.2.0 is prepared, not a release receipt)
+|- VERSION                    distribution source version
 |- protocol/CONTRACT.md       the model-facing contract, generated into front doors
 |- protocol/RUNBOOK.md        human startup and closeout workflow
-|- bin/start-session.ps1      canonical startup: doctor -> safe pull -> STATE readback
-|- bin/brain-doctor.ps1       health check for stale state, links, locks, hooks, secrets
-|- bin/brain-recall.ps1       active-recall gate for recurring mistakes
-|- bin/state-lock.ps1         heartbeat lock for coordination files
-|- bin/update-node-map.ps1    generated retrieval map and node-link checker
+|- protocol/coordination-files.txt  the files that need STATE.lock (pre-commit enforces it)
+|- protocol/recall-gates.example.json  example trap gates; setup seeds your own gate file
 |- bin/setup-private.ps1      the one adopter entry: verify private destination -> scaffold -> push
 |- bin/bootstrap-clone.ps1    internal scaffold/repair primitive (setup-private calls it)
-|- CLAUDE.md / AGENTS.md / GEMINI.md  phase-zero agent doors; setup regenerates them from the contract
+|- bin/start-session.ps1      canonical startup: doctor -> safe pull -> STATE readback
+|- bin/close-session.ps1      closeout: verify, commit the close set, push, release the lock
+|- bin/sync-private.ps1       the one push path (setup, close, offline recovery)
+|- bin/brain-doctor.ps1       health check for stale state, links, locks, hooks, secrets
+|- bin/state-lock.ps1         heartbeat lock for coordination files
+|- bin/brain-recall.ps1       active-recall gate authority for recurring mistakes
+|- bin/hook-recall.ps1        prompt-hook adapter around brain-recall (configured != fired)
+|- bin/prepare-work.ps1       portable manual recall fallback
+|- bin/add-decision.ps1       append a proposed or quoted operator-ruled decision
+|- bin/check-decision-history.ps1  append-only history and authority check (pre-commit runs it)
+|- bin/build-rulings.ps1      compile protocol/rulings.json for recall; never hand-edit it
+|- bin/ratify-decision.ps1    human-only, hash-bound ratification
+|- bin/initialize-decision-authority.ps1  one-time authority boundary (-PreserveLegacy for old logs)
+|- bin/test-staged.ps1        runs affected suites against the staged scripts (pre-commit)
+|- bin/update-node-map.ps1    generated link-health map and node-link checker
+|- bin/sync-doors.ps1         regenerate the front doors from the contract
+|- bin/write-approval.ps1     approval gate for new reference notes and skills
 |- bin/waffle-party.ps1       optional themed wrapper around brain-doctor
+|- CLAUDE.md / AGENTS.md / GEMINI.md  phase-zero agent doors; setup regenerates them from the contract
 |- maps/node-roots.json       registry of roots to scan
-|- maps/NODE-MAP.md           generated human routing dashboard
-|- maps/node-map.json         generated machine-readable routing database
-|- .githooks/                 pre-commit and commit-message enforcement
-|- specs/node-map.md          retrieval-layer contract
+|- maps/NODE-MAP.md           generated human link-health dashboard
+|- maps/node-map.json         generated machine-readable link inventory
+|- .githooks/                 pre-commit, commit-message and pre-push enforcement
+|- tests/*.ps1                regression suites; the doctor workflow runs the offline ones on Windows and Linux
+|- specs/node-map.md          node-map subsystem contract
 |- docs/adoption-guide.md     first-hour path for messy existing work
-|- docs/node-map-usage-guide.md practical routing workflow
+|- docs/upgrading.md          merge a new version into an existing private memory
+|- docs/decision-authority.md proposals, operator rulings, ratification, legacy migration
+|- docs/recall-hooks.md       wiring prompt recall per host, and how to prove it fired
+|- docs/node-map-usage-guide.md link-health workflow and what selects the reading slice
 |- docs/brand-manual.md       visual, voice, and terminal UX rules
 |- skills/mdr-kernel/         starter skill for adopting and operating the kernel
 |- _templates/                Markdown, handoff, and skill starters
@@ -77,16 +97,34 @@ logged; none is skippable.
    models, or any other CLI agent all start from the same rules.
 3. `bin/start-session.ps1` is the only startup path. It runs `brain-doctor`, refuses unsafe pulls
    from a dirty tree, and prints the full current `STATE.md`.
-4. `maps/NODE-MAP.md` and `maps/node-map.json` route the agent to the smallest relevant file set
-   before broad search.
-5. `bin/brain-recall.ps1` runs before assigned work. When an objective matches a known trap, the
+4. `STATE.md` and `reference/INDEX.md` choose the smallest relevant file set before broad search.
+   Generated node maps check link integrity.
+5. `bin/hook-recall.ps1` or the portable `bin/prepare-work.ps1` fallback runs before assigned work. When an objective matches a known trap, the
    agent must read the evidence before acting.
 6. `STATE.lock` protects coordination files. The pre-commit hook blocks protected edits unless
    the session holds the lock.
-7. Handoffs and decisions keep history useful without stuffing the live state file.
+7. Handoffs record work. Decisions distinguish proposals from quoted operator rulings; human
+   ratification binds exact entry bytes. Compiled rulings reach the next matching recall gate.
 
 Deliberately boring infrastructure: the point is not to make agents *sound* coordinated, but to
 make uncoordinated work difficult to commit.
+
+## Changes in 0.2.0
+
+Version 0.2.0 is prepared and tested in this source tree; the version number is not a release
+receipt. A release is a commit the maintainer publishes on this repository's `main`. Compared with
+0.1.x: every commit needs an explicit identity (`BRAIN_MODEL` or a `Brain-Model:` trailer), and
+every lock mutation also needs the session's own lock token; closeout commits
+only its own close set and refuses unrelated staged work; prompt recall validates its input,
+bounds its output and reports failures visibly; decisions keep proposals separate from quoted
+operator rulings, with staged history checks and human, hash-bound ratification; pre-commit runs
+the affected regression suites against the staged scripts. These are cooperative checks on a
+shared account, not a security sandbox. The July 0.1.x privacy and onboarding repairs are part of
+the earlier baseline, not new in 0.2.0.
+
+Existing 0.1 memories meet several deliberate refusals after upgrading; read the upgrade notes
+in [the upgrade guide](docs/upgrading.md) first. See also [CHANGELOG.md](CHANGELOG.md),
+[decision authority](docs/decision-authority.md), and [recall hooks](docs/recall-hooks.md).
 
 ## [ PRIVACY ] Start With Your Own Private Repository
 
@@ -170,15 +208,16 @@ setup does not require a separate human pass first.
 **Or set up by hand.** Inside the private repository you cloned, run:
 
 ```powershell
-pwsh -NoProfile -File bin/setup-private.ps1 -Model 'chad'
+pwsh -NoProfile -File bin/setup-private.ps1 -Model 'alex'
 ```
 
-`-Model` is the attribution name stamped on this clone's commits and locks — type it without
-angle brackets. Setting up by hand, no agent driving? Pick any short name yourself (your own
+`-Model` is the attribution name for setup's own lock and scaffold commit — type it without
+angle brackets. Setup does not store it; later sessions name themselves with `-Model` or
+`BRAIN_MODEL`. Setting up by hand, no agent driving? Pick any short name yourself (your own
 works fine). An AI agent running setup passes its real model id instead, and every agent that
 works here later identifies itself the same way.
 
-On macOS/Linux, run `./bin/setup-private -Model 'chad'`. Setup verifies that GitHub
+On macOS/Linux, run `./bin/setup-private -Model 'alex'`. Setup verifies that GitHub
 reports the destination private, pins it in local git config, arms hooks, creates the starter
 memory, and commits the scaffold. **Run setup once in every clone**, including a re-clone or a
 second computer: the destination approval and hooks intentionally live in that clone's local
@@ -202,6 +241,15 @@ pwsh -NoProfile -File bin/start-session.ps1 -Model '<your-model-id>'
 
 It should end with `STARTUP_STATUS=READY`. (An agent passes its real model id; a human uses
 the short name they chose at setup.)
+
+Every commit in a set-up clone needs an explicit identity. Committing by hand: set
+`$env:BRAIN_MODEL = '<name>'` or end the message with `Brain-Model: <name>`. A commit with
+neither, or with `unknown`, is refused. `git config brain.model` is display-only, and setup does
+not write it:
+
+```powershell
+$env:BRAIN_MODEL = 'alex'
+```
 
 If you must stop while offline, add `-OfflineCheckpoint` to the normal close-session command.
 This exception works only after private-remote setup: it commits locally, never tries to push,
@@ -274,7 +322,8 @@ should trust:
   missing; it never overwrites `bin/*`, `protocol/CONTRACT.md`, or any file your memory already
   has. If the public template improves after your private repo was created, you get those
   improvements only by deliberately merging them in yourself (e.g. add the template as a second
-  git remote and cherry-pick or merge) — there is no update command.
+  git remote and cherry-pick or merge) — there is no update command. `docs/upgrading.md` is the
+  checklist for that merge.
 - It is a **pattern, not a product.** No daemon, no service, no telemetry — just scripts, git, and
   a contract. You adapt it to your stack rather than installing it.
 

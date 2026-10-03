@@ -1,36 +1,34 @@
 Title: Node map usage guide
-Type: Operator Guide / Retrieval Workflow
-Context: Shows how humans and agents use the node map to route work without wasting context.
+Type: Operator Guide / Link-Health Workflow
+Context: Shows how the generated node map checks link health and where reading selection actually comes from.
 
 # Node map usage guide
 
-The node map is the retrieval layer. Use it before reading broadly. It is the compact directory
-of what the repo says each Markdown file is for, what it links to next, and which workflows should
-execute it.
-
-Agents that skip the node map and crawl the repo broadly are non-compliant. That is not a style
-preference. It is the mechanism that makes context budgets work.
+The node map is generated link-health evidence. It lists what each Markdown file's envelope says
+it is for, what it links to next, and which links or envelopes are broken. It is **not** the
+reading router: `STATE.md` plus `reference/INDEX.md` choose what an agent reads first.
 
 ## Agent workflow
 
-At startup, the model reads `STATE.md`. When assigned work, it consults `maps/NODE-MAP.md` or
-`maps/node-map.json` and picks the smallest relevant file set.
+At startup, the model reads the `STATE.md` that `bin/start-session.ps1` prints. When assigned
+work, it uses `STATE.md` plus `reference/INDEX.md` to pick the smallest relevant file set, states
+that selection, and expands only when the first slice proves insufficient.
 
 A compliant response looks like this:
 
 ```text
 Selected files:
 - STATE.md — live truth.
-- maps/NODE-MAP.md — routing layer.
+- reference/INDEX.md — points this objective at one reference note.
 - specs/node-map.md — objective touches map behavior.
 
 Not reading yet:
 - handoffs/ — STATE did not point to a session-specific handoff.
-- reference/ — map did not route this objective there.
+- maps/NODE-MAP.md — link-health evidence; consulted only when checking links.
 ```
 
-The model expands only when evidence shows the first slice is insufficient. Expanding without
-evidence is a non-compliance event.
+Consult `maps/NODE-MAP.md` or `maps/node-map.json` when the task is about link integrity, broken
+envelopes, or a missing node — not to decide what to read.
 
 ## Human workflow
 
@@ -41,22 +39,26 @@ pwsh -NoProfile -File bin/update-node-map.ps1
 pwsh -NoProfile -File bin/update-node-map.ps1 -Check
 ```
 
-`brain-doctor` runs the same exact parity check: it warns when tracked Markdown, JSON, the readable
-map, or the Obsidian bridge disagree. Regenerate before asking an agent to do wide analysis.
+`brain-doctor` runs the same parity check: it warns when tracked Markdown, JSON, the readable map,
+or the Obsidian bridge disagree. The generated map files are coordination files, so regenerate and
+commit them under your own `STATE.lock`.
 
-## Why this saves tokens
+## Why envelopes still save tokens
 
-Without a node map, agents open large files and indexes just to learn where to look. With the
-map, they route from a compact generated index:
+Every tracked Markdown file carries a `Title:`/`Type:`/`Context:` envelope and a terminal
+`SYSTEM NODE LINKS` block. That lets an index row or a map row say what a file is for without
+opening it:
 
 - titles and types identify authority level
 - contexts summarize why the file exists
 - terminal node links expose the next file and execution prompts
 - issue sections surface broken or off-shape nodes before they cause retrieval drift
 
-In the private system that produced this public template, compact map routing reduced one review
-bundle from 16,387 prompt tokens to 1,735 prompt tokens while keeping the relevant authority files
-in view. Treat that as evidence for the pattern, not a guaranteed ratio for every repo.
+In the private system that produced this template, an earlier map-routed workflow reduced one
+review bundle from 16,387 prompt tokens to 1,735 while keeping the relevant authority files in
+view. Treat that as evidence that compact envelope-based selection beats broad reading, not as a
+guaranteed ratio, and not as a reason to route through the map: selection now starts from
+`STATE.md` and `reference/INDEX.md`.
 
 ## Maintenance rules
 
@@ -76,5 +78,5 @@ in view. Treat that as evidence for the pattern, not a guaranteed ratio for ever
 
 Directory Path: docs/
 Next Sequential File: ../specs/node-map.md
-Related Workflows: ../maps/NODE-MAP.md, ../maps/node-map.json, ../bin/update-node-map.ps1
+Related Workflows: ../maps/node-roots.json, ../bin/update-node-map.ps1, ../reference/INDEX.md
 AI Execution Prompts: ../protocol/CONTRACT.md

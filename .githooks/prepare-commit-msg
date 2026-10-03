@@ -1,16 +1,35 @@
 #!/bin/sh
-# Backstop the per-model attribution trailer. If the commit message has no `Brain-Model:` line,
-# append one so every model's commits are attributable in `git log` even when the author forgot.
-# Identity resolution: $BRAIN_MODEL  ->  `git config brain.model`  ->  "unknown".
-#   - Set BRAIN_MODEL in each tool's environment (automated jobs export their own id).
-#   - Or, in a single-model clone only:  git config brain.model <id>
-#     (a shared clone should use BRAIN_MODEL so it reflects the actual session model)
-# Interactive agents include the trailer in their message per the contract; this hook only fills
-# the gap, so it never double-stamps.
+# Attribute commits only to an explicit session identity or an explicit message trailer.
+# Shared git config is display-only: it can belong to a different session.
+for tool in grep sed; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "X mdr-kernel attribution: required utility '$tool' is unavailable." >&2
+    exit 1
+  fi
+done
 msg_file="$1"
-grep -qi '^Brain-Model:' "$msg_file" 2>/dev/null && exit 0
-
-model="${BRAIN_MODEL:-$(git config brain.model 2>/dev/null)}"
-[ -z "$model" ] && model="unknown"
+[ -f "$msg_file" ] || exit 1
+model=$(printf '%s' "${BRAIN_MODEL:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+count=$(grep -ci '^Brain-Model:' "$msg_file")
+if [ "$count" -gt 1 ]; then
+  echo 'X mdr-kernel attribution: keep exactly one Brain-Model trailer.' >&2
+  exit 1
+fi
+if [ "$count" -eq 1 ]; then
+  trailer=$(sed -n 's/^[Bb][Rr][Aa][Ii][Nn]-[Mm][Oo][Dd][Ee][Ll]:[[:space:]]*//p' "$msg_file" | sed 's/[[:space:]]*$//')
+  if [ -z "$trailer" ] || [ "$trailer" = 'unknown' ]; then
+    echo 'X mdr-kernel attribution: Brain-Model must name the actual committing model.' >&2
+    exit 1
+  fi
+  if [ -n "$model" ] && [ "$model" != "$trailer" ]; then
+    echo 'X mdr-kernel attribution: Brain-Model disagrees with explicit BRAIN_MODEL; fix the identity.' >&2
+    exit 1
+  fi
+  exit 0
+fi
+if [ -z "$model" ] || [ "$model" = 'unknown' ]; then
+  echo 'X mdr-kernel attribution: set BRAIN_MODEL or include an explicit Brain-Model trailer.' >&2
+  exit 1
+fi
 printf '\nBrain-Model: %s\n' "$model" >> "$msg_file"
 exit 0

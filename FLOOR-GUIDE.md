@@ -32,7 +32,7 @@ The severed-floor image explains five real behaviors:
   memory.
 - **Single source of live truth.** `STATE.md` wins. If anything disagrees with it, `STATE.md` is
   correct and the stale source gets fixed.
-- **Small retrieval slice.** The node map tells the agent what to read before broad search.
+- **Small retrieval slice.** `STATE.md` and `reference/INDEX.md` tell the agent what to read first.
   Erratic repo crawls are a compliance failure, not a search strategy.
 - **Known-trap recall.** Recurring failures are brought back into view before action. The system
   makes the agent face prior evidence. It does not ask nicely.
@@ -67,8 +67,8 @@ labels, not replacements.
 | **The Floor** | Where executable refinement work happens. | `bin/` |
 | **The Protocol** | The canonical rules every full participant receives. | `protocol/` |
 | **The Intake** | Unrefined notes waiting to be classified and folded into state, reference, specs, or handoffs. | `inbox/` |
-| **The macrodata table** | The compact routing view used before broad reading. | `maps/NODE-MAP.md`, `maps/node-map.json` |
-| **The Break Room** | The active-recall gate that forces known mistakes back into view before action. | `bin/brain-recall.ps1` |
+| **The macrodata table** | The generated link-health view of every Markdown node (not the reading router). | `maps/NODE-MAP.md`, `maps/node-map.json` |
+| **The Break Room** | The active-recall gate that forces known mistakes back into view before action. | `bin/brain-recall.ps1` (via `bin/hook-recall.ps1` or `bin/prepare-work.ps1`) |
 | **The Perpetuity Wing** | The durable record of decisions and indexed handoffs. | `DECISIONS.md`, `handoffs/` |
 | **The elevator** | Session closeout: the worker exits, the record remains. | `handoffs/YYYY-MM-DD-topic.md`, `bin/close-session.ps1` |
 | **The waffle party** | Optional success flavor around a clean diagnostic. Narrow use only — never the formal workflow name. | `bin/waffle-party.ps1` |

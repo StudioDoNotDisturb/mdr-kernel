@@ -8,9 +8,9 @@ One file per topic. Superseded versions go in archive/.
 
 | Spec | File | Status | Updated |
 |---|---|---|---|
-| Brain architecture | brain-architecture.md | active | 2026-07-07 |
+| Brain architecture | brain-architecture.md | active | 2026-10-02 |
 | Brain active recall | brain-active-recall.md | active | 2026-07-07 |
-| Node map | node-map.md | active | 2026-07-06 |
+| Node map | node-map.md | active | 2026-10-02 |
 
 ---
 

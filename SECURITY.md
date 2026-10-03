@@ -28,8 +28,8 @@ example private-repo URLs in the public issue itself.
   verification on retry/recovery (`sync-private.ps1`, `-OfflineCheckpoint` recovery).
 - A secret-shaped string (API key, token, credential) that the pre-commit scan or
   `bin/secret-audit.ps1` fails to catch.
-- The exporter (`bin/export-brain-template.ps1`) writing outside its intended output root, or
-  shipping studio-private content into the public template.
+- The maintainer's export step (it does not ship in this repository) writing outside its intended
+  output root, or shipping private content into the public distribution.
 
 ## What is not a privacy bug
 
@@ -46,8 +46,8 @@ not a defense against a malicious actor with write access to your machine or rep
 ## Pull request checklist
 
 Before opening a PR that touches privacy/security-relevant code
-(`bin/remote-privacy.ps1`, `bin/setup-private.ps1`, `bin/secret-audit.ps1`, `.githooks/*`,
-`bin/export-brain-template.ps1`):
+(`bin/remote-privacy.ps1`, `bin/setup-private.ps1`, `bin/sync-private.ps1`,
+`bin/secret-audit.ps1`, `.githooks/*`):
 
 - [ ] `bin/brain-doctor.ps1` is green.
 - [ ] `tests/remote-privacy-unit.ps1` passes (hermetic; no live network needed).

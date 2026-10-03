@@ -1,6 +1,6 @@
 Title: mdr-kernel brand manual
 Type: Public Style Guide / Brand Manual
-Context: Defines the visual, written, and terminal-output style for mdr-kernel. Authoritative for all public-facing docs, UX copy, and visual assets.
+Context: Use when writing public-facing docs, UX copy, terminal output or visual assets for mdr-kernel; it is the authoritative style.
 
 # mdr-kernel brand manual
 

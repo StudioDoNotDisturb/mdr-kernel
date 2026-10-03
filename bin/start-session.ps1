@@ -28,12 +28,15 @@ $notes = [System.Collections.Generic.List[string]]::new()
 Write-Host "mdr-kernel canonical session start"
 Write-Host "ROOT=$root"
 Write-Host "MODEL_ID=$modelId"
-# Identity divergence is how commits silently misattribute: a session that starts as X but never
-# sets $BRAIN_MODEL will lock and commit as the clone's config fallback Y.
+# The clone's git config brain.model is display-only: lock, close and commit refuse it as identity.
+# A session started with -Model but no BRAIN_MODEL must seal its identity before mutating, and a
+# divergent display fallback is named so nobody mistakes it for this session.
 $fallbackModel = (git config brain.model 2>$null)
-if ($modelId -ne 'UNSET' -and $fallbackModel -and -not $env:BRAIN_MODEL -and ($modelId -ne $fallbackModel)) {
-  Write-Host "NOTE: session started as '$modelId' but this clone's fallback identity is '$fallbackModel'."
-  Write-Host "      Locks/commits without an explicit -Model will attribute to '$fallbackModel'. Seal this session:"
+if ($modelId -ne 'UNSET' -and -not $env:BRAIN_MODEL) {
+  if ($fallbackModel -and ($modelId -ne $fallbackModel)) {
+    Write-Host "NOTE: session started as '$modelId' but this clone's display-only fallback identity is '$fallbackModel'."
+  }
+  Write-Host "IDENTITY: locks/commits without an explicit -Model or BRAIN_MODEL are refused. Seal this session:"
   Write-Host "        `$env:BRAIN_MODEL = '$modelId'"
 }
 if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
@@ -98,7 +101,7 @@ if (Test-Path -LiteralPath $statePath) {
   Get-Content -Raw -LiteralPath $statePath | Write-Host
 } else {
   $status = 'BLOCKED'
-  $notes.Add("STATE.md is missing - first run: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-4-8'); repairing a clone that was already set up: bin/bootstrap-clone.ps1.")
+  $notes.Add("STATE.md is missing - first run: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-5'); repairing a clone that was already set up: bin/bootstrap-clone.ps1.")
   Write-Host 'MISSING: STATE.md'
 }
 

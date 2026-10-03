@@ -37,8 +37,9 @@ metadata:
 
 ## Inputs Needed
 
-- Current `STATE.md`, unless the clone has not been bootstrapped yet.
-- `maps/NODE-MAP.md` or `maps/node-map.json`, unless bootstrap must generate it first.
+- Current `STATE.md`, unless the clone has not been set up yet.
+- `reference/INDEX.md`, which with `STATE.md` selects the reading slice.
+- `maps/NODE-MAP.md` only when checking link health; it is generated evidence, not a router.
 - The operator's objective.
 - If organizing existing work: a short inventory of folders, repos, notes, tools, and pain points.
 
@@ -53,7 +54,8 @@ pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
 
    Pass your actual model id (`-LocalOnly` for memory with no remote backup). If the clone was
    set up before and the doctor reports unarmed hooks or missing scaffold files, repair with the
-   internal primitive instead:
+   internal primitive instead. It refuses a nonempty index and acquires `STATE.lock` (with your
+   explicit identity) before it writes:
 
 ```powershell
 pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model '<your model id>' -CommitScaffold
@@ -67,16 +69,19 @@ pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'
 
 Require `STARTUP_STATUS=READY` before proceeding.
 
-3. Before acting on assigned work, run active recall:
+3. Before acting on assigned work, run active recall. A configured prompt hook runs
+   `bin/hook-recall.ps1` automatically, but configuration is not proof that the host fired it.
+   Without a verified firing receipt, or when the hook reports DEGRADED, run the portable
+   fallback (see `docs/recall-hooks.md`):
 
 ```powershell
-pwsh -NoProfile -File bin/brain-recall.ps1 -Objective '<operator objective>'
+pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'
 ```
 
 If a gate matches, read the listed sources before giving implementation advice.
 
-4. Use `STATE.md` plus the node map to select the smallest relevant reading slice. State what you
-   selected and what you are intentionally not reading yet.
+4. Use `STATE.md` plus `reference/INDEX.md` to select the smallest relevant reading slice. State
+   what you selected and what you are intentionally not reading yet.
 
 5. If the operator is adopting existing work, follow `docs/adoption-guide.md`: inventory first,
    then bucket material into `STATE.md`, `reference/`, `specs/`, `skills/`, `handoffs/`, or
@@ -94,8 +99,10 @@ skills/<skill-name>/evals/trigger-queries.json
 7. Keep tools outside the kernel until they are real. Record a setup note in `reference/` before
    making a skill.
 
-8. For coordination-file edits, acquire `STATE.lock`; otherwise write a standalone handoff or
-   inbox note if the lock is held.
+8. For coordination-file edits, set `BRAIN_MODEL`, acquire `STATE.lock`, and carry the printed
+   token as `BRAIN_LOCK_TOKEN`; if another session holds the lock, write a standalone handoff or
+   inbox note instead. A stale heartbeat is not proof that the holder is gone. New decisions go
+   through `bin/add-decision.ps1` as `proposed` unless you can quote the operator's ruling.
 
 9. Regenerate the node map after Markdown structure changes:
 
@@ -111,14 +118,18 @@ pwsh -NoProfile -File bin/update-node-map.ps1 -Check
 - Do not ask a new user to install every tool in someone else's setup. Git and PowerShell are the
   load-bearing requirements; other tools are added when the user's work proves they are needed.
 - A clean doctor is necessary but not sufficient. The user still needs a real `STATE.md`.
-- If `brain-recall` matches a gate, read the listed sources before giving implementation advice.
+- If recall matches a gate, read the listed sources before giving implementation advice.
+- Every commit needs `BRAIN_MODEL` or an explicit `Brain-Model:` trailer; `git config
+  brain.model` is display-only and the commit-message hook refuses a commit without either.
+- Never run `bin/ratify-decision.ps1`; ratification is the human operator's act.
 
 ## Verification
 
 - `bin/setup-private.ps1 -Model '<actual model id>'` works in a fresh private clone (and
   `bin/bootstrap-clone.ps1 ... -CommitScaffold` repairs an already-set-up one).
 - `bin/start-session.ps1 -Model '<actual model id>'` reaches `STARTUP_STATUS=READY`.
-- `bin/brain-recall.ps1` prints useful traps for the example or newly created gate.
+- `bin/prepare-work.ps1 -Objective '<objective>'` prints useful traps for the example or newly
+  created gate, and `bin/brain-recall.ps1 -CheckGates` accepts the gate file.
 - The node map check passes.
 - The repo has no secret-shaped strings and no private operational paths.
 

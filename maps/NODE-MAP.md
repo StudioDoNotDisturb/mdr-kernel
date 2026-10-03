@@ -6,13 +6,13 @@ Context: Generated dashboard for Markdown retrieval envelopes and SYSTEM NODE LI
 
 Generated from `maps/node-roots.json` by `bin/update-node-map.ps1`.
 
-generatedUtc: 2026-07-13T16:44:38.0542171Z
+generatedUtc: 2026-10-03T14:23:40.3067723Z
 
 ## Root Counts
 
 | Root | Total | Strict Both | Legacy | Partial | Missing | Tracked | Untracked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mdr-kernel | 26 | 25 | 1 | 0 | 0 | 26 | 0 |
+| mdr-kernel | 30 | 29 | 1 | 0 | 0 | 30 | 0 |
 
 ## Indexed Files
 
@@ -31,7 +31,10 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 | mdr-kernel | [reference/action-recall-gates.md](../reference/action-recall-gates.md) | Action recall gates | strict | strict |  |
 | mdr-kernel | [protocol/RUNBOOK.md](../protocol/RUNBOOK.md) | RUNBOOK - how to start and end an mdr-kernel session | strict | strict |  |
 | mdr-kernel | [protocol/CONTRACT.md](../protocol/CONTRACT.md) | CONTRACT - the canonical mdr-kernel contract | strict | strict |  |
+| mdr-kernel | [docs/upgrading.md](../docs/upgrading.md) | Upgrade the kernel while preserving your memory | strict | strict |  |
+| mdr-kernel | [docs/recall-hooks.md](../docs/recall-hooks.md) | Prompt recall adapters and their verification limits | strict | strict |  |
 | mdr-kernel | [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md) | Node map usage guide | strict | strict |  |
+| mdr-kernel | [docs/decision-authority.md](../docs/decision-authority.md) | Decision authority and preserved history | strict | strict |  |
 | mdr-kernel | [docs/brand-manual.md](../docs/brand-manual.md) | mdr-kernel brand manual | strict | strict |  |
 | mdr-kernel | [docs/adoption-guide.md](../docs/adoption-guide.md) | Adoption guide | strict | strict |  |
 | mdr-kernel | [SECURITY.md](../SECURITY.md) | mdr-kernel security and privacy-bug reporting | strict | strict |  |
@@ -42,6 +45,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 | mdr-kernel | [employee-handbook.md](../employee-handbook.md) | Employee handbook | strict | strict |  |
 | mdr-kernel | [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributing to mdr-kernel | strict | strict |  |
 | mdr-kernel | [CLAUDE.md](../CLAUDE.md) | CLAUDE.md - mdr-kernel phase-zero door | strict | strict |  |
+| mdr-kernel | [CHANGELOG.md](../CHANGELOG.md) | mdr-kernel changes | strict | strict |  |
 | mdr-kernel | [_templates/markdown-file-template.md](../_templates/markdown-file-template.md) | <Document Title> | strict | legacy |  |
 | mdr-kernel | [_templates/skill-template.md](../_templates/skill-template.md) | <Skill Title> | strict | strict |  |
 

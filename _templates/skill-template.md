@@ -73,21 +73,24 @@ metadata:
 
 1. Run canonical startup: `pwsh -NoProfile -File bin/start-session.ps1 -Model '<actual model id>'`.
    Require `STARTUP_STATUS=READY` before proceeding.
-2. Run active recall: `pwsh -NoProfile -File bin/brain-recall.ps1 -Objective '<operator objective>'`.
+2. Run active recall. A verified prompt hook runs `bin/hook-recall.ps1` automatically; otherwise,
+   or when it reports DEGRADED, run
+   `pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'`.
    If a gate matches, read the listed sources before acting.
-3. Read the smallest relevant file set from `STATE.md` plus the node map. State what you selected
-   and what you are intentionally not reading yet.
+3. Read the smallest relevant file set chosen from `STATE.md` plus `reference/INDEX.md`. State what
+   you selected and what you are intentionally not reading yet.
 4. <First specific step of the actual workflow. Name the exact command or file operation.>
 5. <Continue with concrete executable steps. Each step is a command, a file operation, or a
    decision with a named outcome.>
 6. Verify the output against the Verification section below.
-7. Write durable results back into the repo. Acquire `STATE.lock` before editing coordination
-   files. Run `bin/update-node-map.ps1` if Markdown structure changed.
+7. Write durable results back into the repo. Set `BRAIN_MODEL`, acquire `STATE.lock` and carry its
+   token before editing coordination files. Run `bin/update-node-map.ps1` if Markdown structure
+   changed.
 
 ## Gotchas
 
 - <Known failure mode or edge case. Name the symptom and the correct response.>
-- <If brain-recall has a gate for this skill's domain, name it here.>
+- <If a recall gate covers this skill's domain, name it here.>
 
 ## Verification
 

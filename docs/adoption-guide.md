@@ -54,9 +54,15 @@ Inventory: <short list of active projects, notes folders, tools, and blockers>.
 Do not move files yet. Classify what belongs in STATE, reference, specs, handoffs, inbox, or skills.
 ```
 
-4. The participant acquires `STATE.lock`, replaces the scaffolded `STATE.md` with a short real
-   one, creates a handoff from `_templates/handoff-template.md`, updates `handoffs/INDEX.md`,
-   regenerates the node map, and runs closeout.
+4. The participant sets `BRAIN_MODEL`, acquires `STATE.lock` and carries the printed token as
+   `BRAIN_LOCK_TOKEN`, replaces the scaffolded `STATE.md` with a short real one, creates a handoff
+   from `_templates/handoff-template.md`, updates `handoffs/INDEX.md`, regenerates the node map,
+   and runs closeout.
+
+Every commit in this clone needs an explicit identity, including your own hand commits: set
+`$env:BRAIN_MODEL = '<name>'` or end the message with `Brain-Model: <name>`. A commit with
+neither, or with `unknown`, is refused. `git config brain.model` is display-only, and setup does
+not write it.
 
 The first real `STATE.md` should read like this:
 
@@ -78,6 +84,9 @@ Do not move a giant desktop, notes vault, source folder, cloud drive, or media a
 inbox/YYYY-MM-DD-existing-work-inventory.md
 ```
 
+Closeout never adopts `inbox/` folder-wide. When the session that wrote the inventory note wants it
+committed, it names the note explicitly: `-Also inbox/YYYY-MM-DD-existing-work-inventory.md`.
+
 For each existing item, choose one bucket:
 
 | Bucket | Put it here | Example |
@@ -90,7 +99,7 @@ For each existing item, choose one bucket:
 | Not ready yet | `inbox/<date>-<topic>.md` | "Messy notes to fold later." |
 
 If the material is large, private, binary, or changes constantly, keep it outside the repo and
-write a reference note that points to it. The repo holds authority and routing, not every asset.
+write a reference note that points to it. The repo holds authority and pointers, not every asset.
 A good reference note tells another agent where the material lives, what it is allowed to do
 there, and what not to touch.
 
@@ -113,6 +122,14 @@ is pending; the audit log is the durable record of what was approved. It is safe
 Add the `reference/INDEX.md` row in the same session so the index and the file land in one
 commit; when closing, name the new file with `-Also reference/<slug>.md` (multiple paths:
 `-Also 'a.md,b.md'`).
+
+## Existing decision logs
+
+If you bring an older `DECISIONS.md` along, do not paste it in and commit: the pre-commit history
+check expects every entry to carry an authority class. Follow the explicit migration in
+`docs/decision-authority.md` (`bin/initialize-decision-authority.ps1 -PreserveLegacy`, run under
+your own lock after the old log is committed unchanged). It preserves old entries without
+ratifying them; new entries go through `bin/add-decision.ps1`.
 
 ## External folders
 

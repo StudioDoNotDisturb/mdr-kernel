@@ -1,16 +1,16 @@
 {
-  "generatedUtc": "2026-07-13T16:44:38.0542171Z",
+  "generatedUtc": "2026-10-03T14:23:40.3067723Z",
   "roots": [
     {
       "name": "mdr-kernel",
       "path": ".",
       "counts": {
-        "total": 26,
-        "strictBoth": 25,
+        "total": 30,
+        "strictBoth": 29,
         "legacy": 1,
         "partial": 0,
         "missing": 0,
-        "tracked": 26,
+        "tracked": 30,
         "untracked": 0
       },
       "topDirs": [
@@ -60,7 +60,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+      "mtimeUtc": "2026-10-03T14:23:37.8941926Z"
     },
     {
       "root": "mdr-kernel",
@@ -97,14 +97,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+      "mtimeUtc": "2026-10-03T14:23:38.3215476Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "_templates/handoff-example.md",
       "title": "Handoff — 2026-01-15 — first recall gate for the deploy loop",
       "type": "Handoff / Session Closeout (EXAMPLE)",
-      "context": "Worked example of a filled handoff. Not a live handoff — do not place in handoffs/. Shows the expected shape, altitude, and completeness for an mdr-kernel closeout note.",
+      "context": "Use when writing a handoff and you want a worked example of the expected shape, altitude and completeness; it is not a live handoff, so never place it in handoffs/.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -134,14 +134,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+      "mtimeUtc": "2026-10-03T14:23:38.3165486Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "specs/node-map.md",
       "title": "Node map",
-      "type": "Spec / Retrieval Contract",
-      "context": "Defines the generated node-map subsystem that keeps mdr-kernel routing small, inspectable, and accurate.",
+      "type": "Spec / Link-Health Contract",
+      "context": "Defines the generated node-map subsystem that keeps mdr-kernel link health small, inspectable, and accurate.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -173,7 +173,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2699224Z"
     },
     {
       "root": "mdr-kernel",
@@ -206,14 +206,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2659224Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "specs/brain-architecture.md",
       "title": "Spec — mdr-kernel architecture: shared memory across model surfaces",
       "type": "Spec / Design Authority",
-      "context": "Design rationale for the shared-memory coordination kernel — the invariant, the surfaces, the guardrails, and the known residual failure modes. Verify live status against STATE.md and DECISIONS.md before acting.",
+      "context": "Use when you need the design rationale of the shared-memory kernel (invariant, surfaces, guardrails, residual failure modes); verify live status against STATE.md and DECISIONS.md before acting.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -245,14 +245,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3656376Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2599155Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "specs/brain-active-recall.md",
       "title": "Spec — mdr-kernel active recall: closing the storage-vs-use gap",
       "type": "Spec / Active Architecture",
-      "context": "Design rationale for the objective-time recall gate — why storing knowledge is not enough, what a valid fix must satisfy, and how the gate works. STATE.md and DECISIONS.md win for live status.",
+      "context": "Use when changing or explaining the objective-time recall gate: why storing knowledge is not enough, what a valid fix must satisfy and how the gate works (STATE.md and DECISIONS.md win for live status).",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -286,7 +286,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3587223Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2523855Z"
     },
     {
       "root": "mdr-kernel",
@@ -323,7 +323,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3515984Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2371144Z"
     },
     {
       "root": "mdr-kernel",
@@ -360,7 +360,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3460710Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2320977Z"
     },
     {
       "root": "mdr-kernel",
@@ -393,7 +393,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3443629Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2280963Z"
     },
     {
       "root": "mdr-kernel",
@@ -409,6 +409,7 @@
         "relatedWorkflows": [
           "protocol/recall-gates.example.json",
           "bin/brain-recall.ps1",
+          "docs/recall-hooks.md",
           "specs/brain-active-recall.md"
         ],
         "aiExecutionPrompts": [
@@ -421,6 +422,7 @@
         "relatedWorkflows": [
           "protocol/recall-gates.example.json",
           "bin/brain-recall.ps1",
+          "docs/recall-hooks.md",
           "specs/brain-active-recall.md"
         ],
         "aiExecutionPrompts": [
@@ -430,7 +432,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3335905Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2210965Z"
     },
     {
       "root": "mdr-kernel",
@@ -473,7 +475,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3335905Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2140935Z"
     },
     {
       "root": "mdr-kernel",
@@ -508,23 +510,101 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3276086Z"
+      "mtimeUtc": "2026-10-03T14:23:38.2025117Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/upgrading.md",
+      "title": "Upgrade the kernel while preserving your memory",
+      "type": "Operator Guide / Upgrade",
+      "context": "Provides a deliberate merge path for existing private memories without replacing their history, gates, or operator authority.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "decision-authority.md",
+        "relatedWorkflows": [
+          "CHANGELOG.md",
+          "docs/decision-authority.md",
+          "docs/recall-hooks.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "docs/decision-authority.md",
+        "relatedWorkflows": [
+          "CHANGELOG.md",
+          "docs/decision-authority.md",
+          "docs/recall-hooks.md",
+          "protocol/RUNBOOK.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-10-03T14:23:38.1955123Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/recall-hooks.md",
+      "title": "Prompt recall adapters and their verification limits",
+      "type": "Guide / Hook Integration",
+      "context": "Use when connecting a host's prompt event to the portable recall adapter, verifying its behavior, or falling back to explicit recall before assigned work.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "reference/action-recall-gates.md",
+        "relatedWorkflows": [
+          "bin/brain-recall.ps1",
+          "bin/hook-recall.ps1",
+          "bin/prepare-work.ps1",
+          "tests/recall.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "reference/action-recall-gates.md",
+        "relatedWorkflows": [
+          "bin/brain-recall.ps1",
+          "bin/hook-recall.ps1",
+          "bin/prepare-work.ps1",
+          "tests/recall.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-10-03T14:23:38.1885120Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "docs/node-map-usage-guide.md",
       "title": "Node map usage guide",
-      "type": "Operator Guide / Retrieval Workflow",
-      "context": "Shows how humans and agents use the node map to route work without wasting context.",
+      "type": "Operator Guide / Link-Health Workflow",
+      "context": "Shows how the generated node map checks link health and where reading selection actually comes from.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
         "directoryPath": "docs/",
         "nextSequentialFile": "../specs/node-map.md",
         "relatedWorkflows": [
-          "../maps/NODE-MAP.md",
-          "../maps/node-map.json",
-          "../bin/update-node-map.ps1"
+          "../maps/node-roots.json",
+          "../bin/update-node-map.ps1",
+          "../reference/INDEX.md"
         ],
         "aiExecutionPrompts": [
           "../protocol/CONTRACT.md"
@@ -534,9 +614,9 @@
         "directoryPath": "docs",
         "nextSequentialFile": "specs/node-map.md",
         "relatedWorkflows": [
-          "maps/NODE-MAP.md",
-          "maps/node-map.json",
-          "bin/update-node-map.ps1"
+          "maps/node-roots.json",
+          "bin/update-node-map.ps1",
+          "reference/INDEX.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -545,14 +625,57 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+      "mtimeUtc": "2026-10-03T14:23:38.1854578Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/decision-authority.md",
+      "title": "Decision authority and preserved history",
+      "type": "Operator Guide / Decision Integrity",
+      "context": "Exactly what the decision tools do: proposals, quoted rulings, human ratification, compiled recall, the hashing rule and explicit migration of an existing log.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "upgrading.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "bin/add-decision.ps1",
+          "bin/check-decision-history.ps1",
+          "bin/build-rulings.ps1",
+          "bin/ratify-decision.ps1",
+          "bin/initialize-decision-authority.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "docs/upgrading.md",
+        "relatedWorkflows": [
+          "protocol/CONTRACT.md",
+          "bin/add-decision.ps1",
+          "bin/check-decision-history.ps1",
+          "bin/build-rulings.ps1",
+          "bin/ratify-decision.ps1",
+          "bin/initialize-decision-authority.ps1"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-10-03T14:23:38.1814580Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "docs/brand-manual.md",
       "title": "mdr-kernel brand manual",
       "type": "Public Style Guide / Brand Manual",
-      "context": "Defines the visual, written, and terminal-output style for mdr-kernel. Authoritative for all public-facing docs, UX copy, and visual assets.",
+      "context": "Use when writing public-facing docs, UX copy, terminal output or visual assets for mdr-kernel; it is the authoritative style.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -584,7 +707,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+      "mtimeUtc": "2026-10-03T14:23:38.1774578Z"
     },
     {
       "root": "mdr-kernel",
@@ -623,7 +746,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3176582Z"
+      "mtimeUtc": "2026-10-03T14:23:38.1698790Z"
     },
     {
       "root": "mdr-kernel",
@@ -662,7 +785,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.2005217Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9425583Z"
     },
     {
       "root": "mdr-kernel",
@@ -703,7 +826,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9375276Z"
     },
     {
       "root": "mdr-kernel",
@@ -740,7 +863,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3966474Z"
+      "mtimeUtc": "2026-10-03T14:23:38.3325529Z"
     },
     {
       "root": "mdr-kernel",
@@ -777,7 +900,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9265474Z"
     },
     {
       "root": "mdr-kernel",
@@ -816,14 +939,14 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1927478Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9235479Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "employee-handbook.md",
       "title": "Employee handbook",
       "type": "Public Themed Layer / Onboarding Texture",
-      "context": "The emotional center of the mdr-kernel themed layer — corporate-polite lore, taste and humor rules, and the metaphor-to-mechanism intent. Not operational authority; STATE.md, the contract, the runbook, and the scripts win.",
+      "context": "Use when you need the lore, taste and humor rules or metaphor-to-mechanism intent of the mdr-kernel themed layer; it is not operational authority, and STATE.md, the contract, the runbook and the scripts win.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {
@@ -855,7 +978,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1914617Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9205471Z"
     },
     {
       "root": "mdr-kernel",
@@ -894,7 +1017,7 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9145417Z"
     },
     {
       "root": "mdr-kernel",
@@ -931,14 +1054,51 @@
       "issues": [],
       "waivedIssues": [],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.1768800Z"
+      "mtimeUtc": "2026-10-03T14:23:37.9003351Z"
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "CHANGELOG.md",
+      "title": "mdr-kernel changes",
+      "type": "Release Notes / Changelog",
+      "context": "Describes portable changes in the distribution without treating a source version as proof of publication or host runtime verification.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "./",
+        "nextSequentialFile": "docs/upgrading.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/upgrading.md",
+          ".github/workflows/doctor.yml"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "",
+        "nextSequentialFile": "docs/upgrading.md",
+        "relatedWorkflows": [
+          "README.md",
+          "docs/upgrading.md",
+          ".github/workflows/doctor.yml"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true,
+      "mtimeUtc": "2026-10-03T14:23:37.8986989Z"
     },
     {
       "root": "mdr-kernel",
       "relPath": "_templates/markdown-file-template.md",
       "title": "<Document Title>",
       "type": "<See type vocabulary below>",
-      "context": "<One sentence: why this file exists and what it is for. Written for a model that has never seen this file before.>",
+      "context": "<Use when ... - one sentence, at most 300 characters, for a model that has never seen this file.>",
       "envelopeTop": "strict",
       "nodeBlock": "legacy",
       "links": {
@@ -961,7 +1121,7 @@
         "note:AI Execution Prompts:Relative path to the contract or skill that governs agent behavior here."
       ],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+      "mtimeUtc": "2026-10-03T14:23:38.3255528Z"
     },
     {
       "root": "mdr-kernel",
@@ -998,7 +1158,7 @@
         "broken-link:skills/<skill-name>/"
       ],
       "tracked": true,
-      "mtimeUtc": "2026-07-13T16:44:36.3843258Z"
+      "mtimeUtc": "2026-10-03T14:23:38.3285526Z"
     }
   ]
 }

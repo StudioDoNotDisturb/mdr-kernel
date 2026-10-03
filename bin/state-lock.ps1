@@ -11,28 +11,28 @@
   - Per-session token: a session carries its lock token in $env:BRAIN_LOCK_TOKEN (or -Token). When a
     lock record has a token, "yours" means model(+host) AND token match — so a SECOND same-model
     session on the same host cannot silently re-acquire, heartbeat, or release the first session's
-    lock. Legacy tokenless locks still fall back to model+host during transition.
+    lock. Tokenless locks never prove ownership and require explicit recovery.
   - -Acquire -Wait polls every 5s until the lock frees (default budget -TimeoutSec 300), replacing
     ad-hoc sleep/monitor loops in sessions queued behind a live holder.
-  - Release/heartbeat verify ownership. -Force takes over a lock whose heartbeat is STALE (>120m,
-    the brain-doctor threshold) and refuses a fresh-heartbeat lock: a live partner's lock is never
-    destroyed on a hunch. MDR_FORCE_LIVE_LOCK=1 is the operator valve for a holder confirmed dead
-    despite a fresh heartbeat (e.g. a crash seconds after a commit).
+  - Every mutation and -CheckOwner require explicit identity. Forced recovery requires an
+    -AbandonmentReason recording independent evidence or operator direction; heartbeat age alone
+    never proves abandonment. A fresh heartbeat additionally requires MDR_FORCE_LIVE_LOCK=1.
   - Heartbeat is refreshed automatically by every commit the holder makes (.githooks/pre-commit),
     so staleness is judged by heartbeat age, not acquire age. Checkpoint commits keep it fresh.
   - pid is forensic only: each pwsh invocation is short-lived, so liveness cannot be inferred
-    from it; heartbeat age is the liveness signal.
+    from it; heartbeat age is a warning signal, not proof of abandonment.
 
   NOT a hard lock — a courtesy flag brain-doctor and pre-commit enforce cooperatively. STATE.lock
   is git-ignored (transient/local); cross-machine serialization happens through git pull/push.
 .EXAMPLE
   pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<your-model-id>' -Objective 'fold inbox into STATE'
   pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Wait -Model '<your-model-id>'   # queue behind a live holder
-  $env:BRAIN_LOCK_TOKEN='<token printed by -Acquire>'   # seal same-model concurrency
-  pwsh -NoProfile -File bin/state-lock.ps1 -Heartbeat
-  pwsh -NoProfile -File bin/state-lock.ps1 -Release
-  pwsh -NoProfile -File bin/state-lock.ps1 -Release -Token '<your token>'   # own lock from a fresh shell
-  pwsh -NoProfile -File bin/state-lock.ps1 -Release -Force   # take over a STALE lock only (heartbeat >120m)
+  $env:BRAIN_LOCK_TOKEN='<token printed by -Acquire>'   # required for every mutation
+  pwsh -NoProfile -File bin/state-lock.ps1 -Heartbeat -Model '<your-model-id>'
+  pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model '<your-model-id>'
+  pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model '<your-model-id>' -Token '<your token>'   # own lock from a fresh shell
+  pwsh -NoProfile -File bin/state-lock.ps1 -CheckOwner -Model '<your-model-id>' -Token '<your token>'
+  pwsh -NoProfile -File bin/state-lock.ps1 -Release -Force -Model '<your-model-id>' -AbandonmentReason '<independent evidence or operator direction>'
   pwsh -NoProfile -File bin/state-lock.ps1                   # status
 #>
 [CmdletBinding()]
@@ -40,7 +40,9 @@ param(
   [switch]$Acquire,
   [switch]$Release,
   [switch]$Heartbeat,
+  [switch]$CheckOwner,
   [switch]$Force,
+  [string]$AbandonmentReason,
   [switch]$Wait,          # with -Acquire: poll until the lock frees (or -TimeoutSec elapses)
   [int]$TimeoutSec = 300, # -Wait budget; ~5 min default keeps one tool call sufficient
   [string]$Model,
@@ -78,12 +80,21 @@ else {
 }
 if (-not $model) { $model = 'unknown' }
 $hostName = [Environment]::MachineName
-# Per-session token carrier: -Token wins, else $env:BRAIN_LOCK_TOKEN, else none (legacy).
+# Per-session token carrier: -Token wins, else $env:BRAIN_LOCK_TOKEN, else none (ownership unproven).
 $sessionToken = if ($Token) { $Token.Trim() } elseif ($env:BRAIN_LOCK_TOKEN) { ([string]$env:BRAIN_LOCK_TOKEN).Trim() } else { $null }
 $sessionObjective = if ($Objective) { $Objective.Trim() } elseif ($env:BRAIN_OBJECTIVE) { ([string]$env:BRAIN_OBJECTIVE).Trim() } else { $null }
-# Heartbeat older than this is a dead session (same threshold brain-doctor reports as stale).
-# Below it, a holder must be presumed ALIVE and its lock is never force-released without the valve.
+# Staleness is a reason to investigate, never proof that the session ended.
 $staleAfterMinutes = 120
+
+$actions = @($Acquire, $Release, $Heartbeat, $CheckOwner) | Where-Object { $_ }
+if ($actions.Count -gt 1 -or ($Force -and -not $Release)) {
+  Write-Host 'state-lock: choose one action; -Force is only valid with -Release'
+  exit 1
+}
+if ($actions.Count -and ($modelSource -notin @('param', 'env') -or $model -eq 'unknown')) {
+  Write-Host "state-lock: refusing ownership operation — identity resolved from '$modelSource' ('$model'), not from this session. Pass -Model or set BRAIN_MODEL."
+  exit 1
+}
 
 function Read-Lock {
   if (-not (Test-Path $lock)) { return $null }
@@ -130,17 +141,14 @@ function Describe([object]$l) {
 function Test-BaseMatch([object]$l) {
   ($l.model -eq $model) -and ((-not $l.host) -or ($l.host -eq $hostName))
 }
-# "Mine" = base match AND, for a sealed lock, explicit token match.
+# Every ownership operation requires a session token and explicit identity.
 function Is-Mine([object]$l) {
-  if (-not (Test-BaseMatch $l)) { return $false }
-  if ($l.token) { return [bool]$sessionToken -and ($l.token -eq $sessionToken) }
-  return $true
+  (Test-BaseMatch $l) -and $modelSource -in @('param', 'env') -and
+    [bool]$sessionToken -and [bool]$l.token -and ($l.token -ceq $sessionToken)
 }
 # A DIFFERENT session of the same model: base matches, but the sealed lock token is absent here or disagrees.
 function Is-SameModelOtherSession([object]$l) {
-  if (-not (Test-BaseMatch $l)) { return $false }
-  if (-not $l.token) { return $false }
-  return ((-not $sessionToken) -or ($l.token -ne $sessionToken))
+  (Test-BaseMatch $l) -and -not (Is-Mine $l)
 }
 
 function New-Body([object]$AcquiredAt, [string]$Token, [string]$ExistingObjective) {
@@ -162,15 +170,6 @@ function New-Body([object]$AcquiredAt, [string]$Token, [string]$ExistingObjectiv
 }
 
 if ($Acquire) {
-  # An acquire is a claim of NEW exclusive ownership — the identity must be explicit.
-  # Status/-Release/-Heartbeat keep the config fallback; only the claim itself is fail-closed.
-  if ($modelSource -notin @('param', 'env')) {
-    Write-Host "state-lock: refusing -Acquire — identity resolved from '$modelSource' ('$model'), not from this session."
-    Write-Host 'On a shared clone the config fallback can name another surface. Pass identity explicitly:'
-    Write-Host "  PowerShell:  pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<model-id>' -Objective '<objective>'"
-    Write-Host "  bash:        BRAIN_MODEL=<model-id> pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Objective '<objective>'"
-    exit 1
-  }
   $tok = if ($sessionToken) { $sessionToken } else { [guid]::NewGuid().ToString('N') }
   $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Max(5, $TimeoutSec))
   $announced = $false
@@ -219,14 +218,14 @@ if ($Acquire) {
         Write-Host '  your own lock?      re-run with -Token <token>   (printed by YOUR -Acquire; if you cannot produce it, treat the lock as not yours)'
         Write-Host '  waiting your turn?  re-run with -Acquire -Wait   (polls every 5s until the holder releases)'
         if ($isStale) {
-          Write-Host "  holder dead?        heartbeat is ${age}m old (stale past ${staleAfterMinutes}m). If brain-doctor agrees: bin/state-lock.ps1 -Release -Force, then -Acquire"
+          Write-Host "  heartbeat is ${age}m old (stale past ${staleAfterMinutes}m), but abandonment is NOT PROVEN. Obtain independent evidence or operator direction before recovery."
         } else {
           Write-Host "  holder dead?        NOT PROVEN — heartbeat is $(if ($null -ne $age) { "only ${age}m" } else { 'not readable as' }) old. The holder is presumed ALIVE; -Release -Force refuses fresh-heartbeat locks. Queue with -Wait instead."
         }
       } else {
         Write-Host "STATE.lock already held -> $(if ($l) { Describe $l } else { '(unreadable)' })"
         if ($isStale) {
-          Write-Host "heartbeat is ${age}m old — likely a dead session. If brain-doctor agrees, take it over with: bin/state-lock.ps1 -Release -Force, then -Acquire"
+          Write-Host "heartbeat is ${age}m old — stale, not proof of abandonment. Obtain independent evidence or operator direction before recovery."
         } elseif (-not $Wait) {
           Write-Host 'to queue for it instead of failing: re-run with -Acquire -Wait'
         }
@@ -235,6 +234,13 @@ if ($Acquire) {
       exit 1
     }
   }
+}
+
+if ($CheckOwner) {
+  $l = Read-Lock
+  if ($l -and (Is-Mine $l)) { Write-Host 'LOCK_OWNER=VERIFIED'; exit 0 }
+  Write-Host 'LOCK_OWNER=UNPROVEN — carry YOUR acquired token and explicit model identity; never copy a token from the lock file'
+  exit 1
 }
 
 if ($Heartbeat) {
@@ -252,36 +258,37 @@ if ($Heartbeat) {
 
 if ($Release) {
   $l = Read-Lock
-  if (-not $l) { Write-Host 'no STATE.lock to release'; exit 0 }
+  if (-not (Test-Path -LiteralPath $lock)) { Write-Host 'no STATE.lock to release'; exit 0 }
   if (Is-Mine $l) {
     Remove-Item -LiteralPath $lock
     Write-Host 'released STATE.lock'
     exit 0
   }
   if ($Force) {
-    # Force is dead-session recovery, not a tiebreaker: refuse while the heartbeat says the
-    # holder is alive (2026-07-12 drive: a bare -Release -Force destroyed a live partner's
-    # 21-second-old lock). An unreadable heartbeat cannot prove liveness, so it stays forcible.
+    if ([string]::IsNullOrWhiteSpace($AbandonmentReason)) {
+      Write-Host 'refusing -Release -Force: -AbandonmentReason must record independent evidence or operator direction. Age, model name, and a short-lived PID do not prove abandonment.'
+      exit 1
+    }
     $age = Heartbeat-AgeMinutes $l
     if ($null -ne $age -and $age -le $staleAfterMinutes -and $env:MDR_FORCE_LIVE_LOCK -ne '1') {
       Write-Host "refusing -Release -Force: heartbeat is only ${age}m old (stale threshold ${staleAfterMinutes}m) — the holder is presumed ALIVE:"
       Write-Host "  $(Describe $l)"
       Write-Host '  queue instead:      bin/state-lock.ps1 -Acquire -Wait'
       Write-Host '  your own lock?      bin/state-lock.ps1 -Release -Token <token>   (printed by YOUR -Acquire)'
-      Write-Host '  holder confirmed dead despite the fresh heartbeat (crash after a commit)? set MDR_FORCE_LIVE_LOCK=1 and re-run.'
+      Write-Host '  abandonment independently established despite the fresh heartbeat? set MDR_FORCE_LIVE_LOCK=1 and supply -AbandonmentReason.'
       exit 1
     }
     Remove-Item -LiteralPath $lock
-    Write-Host "FORCE-released STATE.lock held by $(Describe $l) — make sure that session was dead"
+    Write-Host "FORCE-released STATE.lock. Recorded recovery reason: $AbandonmentReason"
     exit 0
   }
   if (Is-SameModelOtherSession $l) {
     Write-Host "STATE.lock held by another $model session (token mismatch) — not releasing."
-    Write-Host 'Set BRAIN_LOCK_TOKEN / pass -Token <token> to release your own, or -Force if that session is dead.'
+    Write-Host 'Set BRAIN_LOCK_TOKEN / pass -Token <token> to release your own; recovery requires independent evidence or operator direction.'
     exit 1
   }
   Write-Host "STATE.lock held by $(Describe $l) — not yours ($model@$hostName)."
-  Write-Host 'If brain-doctor reports it stale/dead, re-run with -Force.'
+  Write-Host 'Wait for the holder. Forced recovery requires independent evidence or operator direction recorded with -AbandonmentReason.'
   exit 1
 }
 
@@ -290,6 +297,7 @@ $l = Read-Lock
 if ($l) {
   Write-Host "STATE.lock held -> $(Describe $l)"
   $age = Heartbeat-AgeMinutes $l
-  if ($null -ne $age -and $age -gt $staleAfterMinutes) { Write-Host "heartbeat is ${age}m old — likely stale; see brain-doctor" }
-} else { Write-Host 'STATE.lock: free' }
+  if ($null -ne $age -and $age -gt $staleAfterMinutes) { Write-Host "heartbeat is ${age}m old — stale, not proof of abandonment; see brain-doctor" }
+} elseif (Test-Path -LiteralPath $lock) { Write-Host 'STATE.lock: held but unreadable; ownership and abandonment are unproven' }
+else { Write-Host 'STATE.lock: free' }
 exit 0

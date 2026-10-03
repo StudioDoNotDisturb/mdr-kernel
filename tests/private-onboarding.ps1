@@ -26,6 +26,13 @@ $clone = Join-Path $sandbox 'clone'
 $secondClone = Join-Path $sandbox 'second-clone'
 $peer = Join-Path $sandbox 'peer'
 $localClone = Join-Path $sandbox 'local-only'
+# The caller's session identity must not leak into fixtures: several rows assert what happens
+# WITHOUT an explicit identity or token. Restore the caller's values at the end.
+$savedEnvironment = @{}
+foreach ($name in 'BRAIN_MODEL','BRAIN_LOCK_TOKEN','BRAIN_OBJECTIVE','MDR_FORCE_LIVE_LOCK') {
+  $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+  Remove-Item -LiteralPath "Env:\$name" -ErrorAction SilentlyContinue
+}
 try {
   New-Item -ItemType Directory -Path $sandbox | Out-Null
   & git clone -q --bare $root $bareA
@@ -91,6 +98,9 @@ try {
   }
   if ($fullDoorsOk) { Write-Host '[PASS] setup regenerated the phase-zero doors into full contract doors' }
   else { Write-Host '[FAIL] a door still lacks the contract block after setup'; $failures++ }
+  # 0.2: git config brain.model is display-only, so setup/bootstrap must never write it (0.1 did).
+  if (-not (& git -C $clone config --get brain.model)) { Write-Host '[PASS] setup leaves git config brain.model unset (display-only)' }
+  else { Write-Host '[FAIL] setup wrote git config brain.model'; $failures++ }
 
   # Approval and hooks live in .git/config, so every clone must run setup once. Prove both a
   # second-machine-style clone and an idempotent rerun before continuing the close battery.
@@ -163,14 +173,14 @@ try {
   $beforeOffline = (& git --git-dir=$bareA rev-parse main).Trim()
   $approvedBeforeOffline = (& git -C $clone config --local --get brain.approvedRemote)
   & git -C $clone config --local --unset-all brain.approvedRemote
-  $missingPinOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -OfflineCheckpoint -DryRun 2>&1)
+  $missingPinOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Model 'test-model' -OfflineCheckpoint -DryRun 2>&1)
   $missingPinExit = $LASTEXITCODE
   if ($missingPinExit -eq 1 -and ($missingPinOut | Out-String) -match 'requires a destination approved earlier') {
     Write-Host '[PASS] offline checkpoint refuses a clone without prior destination approval'
   } else { Write-Host '[FAIL] offline checkpoint accepted missing destination approval'; $failures++ }
   & git -C $clone config --local brain.approvedRemote $approvedBeforeOffline
   & git -C $clone remote set-url origin 'https://github.com/example/private-memory.git'
-  $swappedOfflineOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -OfflineCheckpoint -DryRun 2>&1)
+  $swappedOfflineOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Model 'test-model' -OfflineCheckpoint -DryRun 2>&1)
   $swappedOfflineExit = $LASTEXITCODE
   if ($swappedOfflineExit -eq 1 -and ($swappedOfflineOut | Out-String) -match 'origin changed since approval' -and
       ($swappedOfflineOut | Out-String) -notmatch 'REMOTE_PRIVACY_STATUS=') {
@@ -264,7 +274,7 @@ try {
   } else { Write-Host '[FAIL] autostash conflict crossed the push/lock boundary'; $failures++ }
   $env:BRAIN_MODEL = 'test-model'
   $env:MDR_FORCE_LIVE_LOCK = '1'   # harness cleanup: the holder is a finished test step, not a live partner
-  & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force | Out-Null
+  & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -AbandonmentReason 'Test harness finished the isolated fixture operation' | Out-Null
   Remove-Item Env:\MDR_FORCE_LIVE_LOCK -ErrorAction SilentlyContinue
   if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue } else { $env:BRAIN_MODEL = $oldModel }
   & git -C $clone reset --hard -q origin/main
@@ -337,6 +347,14 @@ try {
   # write-approval propose/approve, INDEX row, close with -Also; the audit JSONL rides itself.
   $draft = Join-Path $sandbox 'battery-note-draft.md'
   Set-Content -LiteralPath $draft -Value 'Battery reference note body.'
+  # 0.2: a proposal or approval is attributed to an explicit session identity only; without
+  # BRAIN_MODEL the tool refuses before any proposal directory is written.
+  $waNoIdOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -Propose -Target 'reference/battery-note.md' -Source $draft -Reason 'battery flow' 2>&1)
+  $waNoIdExit = $LASTEXITCODE
+  $waProposalDirs = @(Get-ChildItem -LiteralPath (Join-Path $clone '.write-proposals') -Directory -ErrorAction SilentlyContinue).Count
+  if ($waNoIdExit -eq 1 -and (($waNoIdOut | Out-String) -match '\[FAIL\] .*BRAIN_MODEL') -and $waProposalDirs -eq 0) {
+    Write-Host '[PASS] write-approval refuses to propose without an explicit session identity'
+  } else { $waNoIdOut | Out-Host; Write-Host "[FAIL] write-approval accepted a proposal without identity (exit $waNoIdExit)"; $failures++ }
   $env:BRAIN_MODEL = 'test-model'
   try {
     $proposeOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -Propose -Target 'reference/battery-note.md' -Source $draft -Reason 'battery flow' 2>&1)
@@ -387,10 +405,15 @@ try {
   Remove-Item -LiteralPath (Join-Path $clone 'reference/rogue-note.md') -ErrorAction SilentlyContinue
 
   # Drive round 3, F5: a session claiming one identity over a different clone fallback gets told.
+  # The kernel no longer writes brain.model; simulate a 0.1-era or hand-set value. It stays set for
+  # the CP2 config-identity refusals below, which must name 'config' as the refused source.
+  & git -C $clone config brain.model 'test-model'
   $divergeOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/start-session.ps1') -Model 'someone-else' 2>&1)
-  if ($LASTEXITCODE -eq 0 -and (($divergeOut | Out-String) -match "fallback identity is 'test-model'")) {
+  $divergeText = ($divergeOut | Out-String)
+  if ($LASTEXITCODE -eq 0 -and $divergeText -match "fallback identity is 'test-model'" -and
+      $divergeText -match 'are refused' -and $divergeText -match [regex]::Escape("`$env:BRAIN_MODEL = 'someone-else'")) {
     Write-Host '[PASS] startup names the identity divergence and the exact seal command'
-  } else { Write-Host '[FAIL] identity divergence was silent'; $failures++ }
+  } else { $divergeOut | Out-Host; Write-Host '[FAIL] identity divergence was silent'; $failures++ }
 
   # Conflicting concurrent edits fail closed: abort the rebase, keep the lock, and leave a named
   # recovery path instead of looping or guessing at conflict resolution.
@@ -421,9 +444,31 @@ try {
   } else { Write-Host '[FAIL] conflict safe-failure invariant'; $failures++ }
   $env:BRAIN_MODEL = 'test-model'
   $env:MDR_FORCE_LIVE_LOCK = '1'   # harness cleanup: the holder is a finished test step, not a live partner
-  & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force | Out-Null
+  & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -AbandonmentReason 'Test harness finished the isolated fixture operation' | Out-Null
   Remove-Item Env:\MDR_FORCE_LIVE_LOCK -ErrorAction SilentlyContinue
   if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue } else { $env:BRAIN_MODEL = $oldModel }
+  & git -C $clone reset --hard -q origin/main
+  & git -C $clone config --local --unset-all brain.pendingSync 2>$null
+
+  # A push the approved remote rejects (not a conflict) must also keep the lock: the commit exists
+  # only locally, so releasing would let another session build on a checkpoint nobody can see.
+  $rejectHook = Join-Path $bareA 'hooks/pre-receive'
+  [IO.File]::WriteAllText($rejectHook, "#!/bin/sh`necho 'fixture remote rejects pushes' >&2`nexit 1`n", [Text.UTF8Encoding]::new($false))
+  if (-not $IsWindows) { & chmod +x $rejectHook }
+  Add-Content -LiteralPath $statePath -Value "`nPush rejection battery marker."
+  $pushFailOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Model 'test-model' 2>&1)
+  $pushFailExit = $LASTEXITCODE
+  $pushFailText = ($pushFailOut | Out-String)
+  $pushFailToken = if ($pushFailText -match '(?m)^session token:\s*(\S+)') { $Matches[1] } else { '' }
+  $aheadAfterFail = [int]((& git -C $clone rev-list --count origin/main..HEAD | Out-String).Trim())
+  if ($pushFailExit -eq 1 -and $pushFailText -match 'STATE.lock kept' -and (Test-Path -LiteralPath $testLock) -and
+      $aheadAfterFail -ge 1 -and (& git -C $clone config --local --get brain.pendingSync) -eq 'true') {
+    Write-Host '[PASS] rejected push keeps the lock, the local commit, and loud pending sync'
+  } else { $pushFailOut | Out-Host; Write-Host "[FAIL] rejected-push close kept-lock invariant (exit $pushFailExit)"; $failures++ }
+  Remove-Item -LiteralPath $rejectHook
+  $recover = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Model 'test-model' -Token $pushFailToken 2>&1)
+  if ($LASTEXITCODE -eq 0 -and -not (Test-Path -LiteralPath $testLock)) { Write-Host '[PASS] kept lock is released by the token close printed' }
+  else { $recover | Out-Host; Write-Host '[FAIL] kept lock could not be released with its own token'; $failures++ }
   & git -C $clone reset --hard -q origin/main
   & git -C $clone config --local --unset-all brain.pendingSync 2>$null
 
@@ -469,7 +514,7 @@ try {
     $cfgAcqOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Acquire -Objective 'cp2 battery' 2>&1)
     $cfgAcqExit = $LASTEXITCODE
     $cfgAcqText = ($cfgAcqOut | Out-String)
-    if ($cfgAcqExit -eq 1 -and $cfgAcqText -match 'refusing -Acquire' -and
+    if ($cfgAcqExit -eq 1 -and $cfgAcqText -match 'refusing ownership operation' -and
         $cfgAcqText -match "identity resolved from 'config'" -and -not (Test-Path $cloneLock)) {
       Write-Host '[PASS] acquire refuses a config-fallback identity and creates no lock'
     } else { $cfgAcqOut | Out-Host; Write-Host "[FAIL] config-fallback acquire refusal (exit $cfgAcqExit)"; $failures++ }
@@ -513,7 +558,7 @@ try {
   }
   $lockAfter = $null
   if (Test-Path $cloneLock) { try { $lockAfter = (Get-Content -Raw $cloneLock | ConvertFrom-Json) } catch {} }
-  if ($adoptExit -eq 1 -and (($adoptOut | Out-String) -match "another 'test-model' session \(token mismatch\)") -and
+  if ($adoptExit -eq 1 -and (($adoptOut | Out-String) -match 'LOCK_OWNER=UNPROVEN') -and
       $lockAfter -and $lockAfter.token -eq $lockJson.token) {
     Write-Host '[PASS] close refuses to adopt a live same-model lock token'
   } else { $adoptOut | Out-Host; Write-Host "[FAIL] same-model token adoption refusal (exit $adoptExit)"; $failures++ }
@@ -578,13 +623,12 @@ try {
   } else { $forceLiveOut | Out-Host; Write-Host "[FAIL] live-lock Force refusal (exit $forceLiveExit)"; $failures++ }
   $env:MDR_FORCE_LIVE_LOCK = '1'
   try {
-    Expect-Exit 'MDR_FORCE_LIVE_LOCK=1 valve force-releases a fresh lock' 0 {
-      & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -Model 'test-model'
+    Expect-Exit 'fresh-lock recovery requires valve plus independent abandonment evidence' 0 {
+      & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -Model 'test-model' -AbandonmentReason 'Test harness owns and has finished this fixture operation'
     }
   } finally { Remove-Item Env:\MDR_FORCE_LIVE_LOCK -ErrorAction SilentlyContinue }
 
-  # A stale heartbeat (>120m) is dead-session recovery: the refusal switches to the takeover
-  # recipe and Force works with no valve.
+  # A stale heartbeat (>120m) is a warning, not proof that the holder died.
   & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Acquire -Model 'test-model' -Objective 'drive2 stale battery' | Out-Null
   $staleRaw = Get-Content -Raw -LiteralPath $cloneLock
   $staleIso = [DateTimeOffset]::UtcNow.AddHours(-3).ToUniversalTime().ToString('o')
@@ -593,11 +637,14 @@ try {
   Remove-Item Env:\BRAIN_LOCK_TOKEN -ErrorAction SilentlyContinue
   $staleRefuse = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Acquire -Model 'test-model' 2>&1)
   $staleText = ($staleRefuse | Out-String)
-  if ($staleText -match 'stale past 120m' -and $staleText -match '-Release -Force, then -Acquire') {
-    Write-Host '[PASS] stale same-model refusal surfaces the takeover recipe'
+  if ($staleText -match 'stale past 120m' -and $staleText -match 'NOT PROVEN' -and $staleText -match 'independent evidence') {
+    Write-Host '[PASS] stale same-model refusal requires independent evidence'
   } else { $staleRefuse | Out-Host; Write-Host '[FAIL] stale refusal guidance'; $failures++ }
-  Expect-Exit 'stale lock force-releases without the valve' 0 {
+  Expect-Exit 'stale lock refuses force without evidence' 1 {
     & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -Model 'test-model'
+  }
+  Expect-Exit 'stale lock recovers with independent evidence and no live valve' 0 {
+    & pwsh -NoProfile -File (Join-Path $clone 'bin/state-lock.ps1') -Release -Force -Model 'test-model' -AbandonmentReason 'Test harness owns and has finished this fixture operation'
   }
 
   # -Wait is the queue primitive: it times out against a live holder and acquires after release.
@@ -808,6 +855,9 @@ try {
     & pwsh -NoProfile -File (Join-Path $clone 'bin/brain-doctor.ps1') -HardOnly
   }
 } finally {
+  foreach ($name in $savedEnvironment.Keys) {
+    [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')
+  }
   if (Test-Path -LiteralPath $sandbox) { Remove-Item -LiteralPath $sandbox -Recurse -Force }
 }
 

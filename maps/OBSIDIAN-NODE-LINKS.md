@@ -8,7 +8,7 @@ Generated from `maps/node-map.json` by `bin/update-node-map.ps1`. Do not hand-ed
 
 This file gives Markdown graph tools real links for the node map. The source files remain canonical; this generated bridge exists so graph views, backlinks, and outgoing links can see the retrieval structure.
 
-generatedUtc: 2026-07-13T16:44:38.0542171Z
+generatedUtc: 2026-10-03T14:23:40.3067723Z
 
 ## [AGENTS.md](../AGENTS.md)
 
@@ -17,6 +17,15 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 - Context: Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.
 - Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 - Related Workflows: [README.md](../README.md), [bin/setup-private.ps1](../bin/setup-private.ps1), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [CHANGELOG.md](../CHANGELOG.md)
+
+- Title: mdr-kernel changes
+- Type: Release Notes / Changelog
+- Context: Describes portable changes in the distribution without treating a source version as proof of publication or host runtime verification.
+- Next Sequential File: [docs/upgrading.md](../docs/upgrading.md)
+- Related Workflows: [README.md](../README.md), [docs/upgrading.md](../docs/upgrading.md), [.github/workflows/doctor.yml](../.github/workflows/doctor.yml)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [CLAUDE.md](../CLAUDE.md)
@@ -41,7 +50,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: Employee handbook
 - Type: Public Themed Layer / Onboarding Texture
-- Context: The emotional center of the mdr-kernel themed layer — corporate-polite lore, taste and humor rules, and the metaphor-to-mechanism intent. Not operational authority; STATE.md, the contract, the runbook, and the scripts win.
+- Context: Use when you need the lore, taste and humor rules or metaphor-to-mechanism intent of the mdr-kernel themed layer; it is not operational authority, and STATE.md, the contract, the runbook and the scripts win.
 - Next Sequential File: [FLOOR-GUIDE.md](../FLOOR-GUIDE.md)
 - Related Workflows: [FLOOR-GUIDE.md](../FLOOR-GUIDE.md), [docs/brand-manual.md](../docs/brand-manual.md), [README.md](../README.md), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
@@ -104,18 +113,45 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: mdr-kernel brand manual
 - Type: Public Style Guide / Brand Manual
-- Context: Defines the visual, written, and terminal-output style for mdr-kernel. Authoritative for all public-facing docs, UX copy, and visual assets.
+- Context: Use when writing public-facing docs, UX copy, terminal output or visual assets for mdr-kernel; it is the authoritative style.
 - Next Sequential File: [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md)
 - Related Workflows: [README.md](../README.md), [FLOOR-GUIDE.md](../FLOOR-GUIDE.md), [bin/brain-doctor.ps1](../bin/brain-doctor.ps1), [bin/waffle-party.ps1](../bin/waffle-party.ps1)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [docs/decision-authority.md](../docs/decision-authority.md)
+
+- Title: Decision authority and preserved history
+- Type: Operator Guide / Decision Integrity
+- Context: Exactly what the decision tools do: proposals, quoted rulings, human ratification, compiled recall, the hashing rule and explicit migration of an existing log.
+- Next Sequential File: [docs/upgrading.md](../docs/upgrading.md)
+- Related Workflows: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/add-decision.ps1](../bin/add-decision.ps1), [bin/check-decision-history.ps1](../bin/check-decision-history.ps1), [bin/build-rulings.ps1](../bin/build-rulings.ps1), [bin/ratify-decision.ps1](../bin/ratify-decision.ps1), [bin/initialize-decision-authority.ps1](../bin/initialize-decision-authority.ps1)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md)
 
 - Title: Node map usage guide
-- Type: Operator Guide / Retrieval Workflow
-- Context: Shows how humans and agents use the node map to route work without wasting context.
+- Type: Operator Guide / Link-Health Workflow
+- Context: Shows how the generated node map checks link health and where reading selection actually comes from.
 - Next Sequential File: [specs/node-map.md](../specs/node-map.md)
-- Related Workflows: [maps/NODE-MAP.md](../maps/NODE-MAP.md), [maps/node-map.json](../maps/node-map.json), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [bin/update-node-map.ps1](../bin/update-node-map.ps1), [reference/INDEX.md](../reference/INDEX.md)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [docs/recall-hooks.md](../docs/recall-hooks.md)
+
+- Title: Prompt recall adapters and their verification limits
+- Type: Guide / Hook Integration
+- Context: Use when connecting a host's prompt event to the portable recall adapter, verifying its behavior, or falling back to explicit recall before assigned work.
+- Next Sequential File: [reference/action-recall-gates.md](../reference/action-recall-gates.md)
+- Related Workflows: [bin/brain-recall.ps1](../bin/brain-recall.ps1), [bin/hook-recall.ps1](../bin/hook-recall.ps1), [bin/prepare-work.ps1](../bin/prepare-work.ps1), [tests/recall.ps1](../tests/recall.ps1)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [docs/upgrading.md](../docs/upgrading.md)
+
+- Title: Upgrade the kernel while preserving your memory
+- Type: Operator Guide / Upgrade
+- Context: Provides a deliberate merge path for existing private memories without replacing their history, gates, or operator authority.
+- Next Sequential File: [docs/decision-authority.md](../docs/decision-authority.md)
+- Related Workflows: [CHANGELOG.md](../CHANGELOG.md), [docs/decision-authority.md](../docs/decision-authority.md), [docs/recall-hooks.md](../docs/recall-hooks.md), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [protocol/CONTRACT.md](../protocol/CONTRACT.md)
@@ -142,7 +178,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 - Type: Reference / Active-Recall Protocol
 - Context: How to author and maintain objective-time recall gates so an agent surfaces recurrence-counted prior traps before acting.
 - Next Sequential File: [reference/INDEX.md](../reference/INDEX.md)
-- Related Workflows: [protocol/recall-gates.example.json](../protocol/recall-gates.example.json), [bin/brain-recall.ps1](../bin/brain-recall.ps1), [specs/brain-active-recall.md](../specs/brain-active-recall.md)
+- Related Workflows: [protocol/recall-gates.example.json](../protocol/recall-gates.example.json), [bin/brain-recall.ps1](../bin/brain-recall.ps1), [docs/recall-hooks.md](../docs/recall-hooks.md), [specs/brain-active-recall.md](../specs/brain-active-recall.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [reference/INDEX.md](../reference/INDEX.md)
@@ -176,7 +212,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: Spec — mdr-kernel active recall: closing the storage-vs-use gap
 - Type: Spec / Active Architecture
-- Context: Design rationale for the objective-time recall gate — why storing knowledge is not enough, what a valid fix must satisfy, and how the gate works. STATE.md and DECISIONS.md win for live status.
+- Context: Use when changing or explaining the objective-time recall gate: why storing knowledge is not enough, what a valid fix must satisfy and how the gate works (STATE.md and DECISIONS.md win for live status).
 - Next Sequential File: [specs/INDEX.md](../specs/INDEX.md)
 - Related Workflows: [specs/brain-architecture.md](../specs/brain-architecture.md), [STATE.md](../STATE.md), [DECISIONS.md](../DECISIONS.md), [reference/action-recall-gates.md](../reference/action-recall-gates.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
@@ -185,7 +221,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: Spec — mdr-kernel architecture: shared memory across model surfaces
 - Type: Spec / Design Authority
-- Context: Design rationale for the shared-memory coordination kernel — the invariant, the surfaces, the guardrails, and the known residual failure modes. Verify live status against STATE.md and DECISIONS.md before acting.
+- Context: Use when you need the design rationale of the shared-memory kernel (invariant, surfaces, guardrails, residual failure modes); verify live status against STATE.md and DECISIONS.md before acting.
 - Next Sequential File: [specs/INDEX.md](../specs/INDEX.md)
 - Related Workflows: [specs/brain-active-recall.md](../specs/brain-active-recall.md), [STATE.md](../STATE.md), [DECISIONS.md](../DECISIONS.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
@@ -202,8 +238,8 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 ## [specs/node-map.md](../specs/node-map.md)
 
 - Title: Node map
-- Type: Spec / Retrieval Contract
-- Context: Defines the generated node-map subsystem that keeps mdr-kernel routing small, inspectable, and accurate.
+- Type: Spec / Link-Health Contract
+- Context: Defines the generated node-map subsystem that keeps mdr-kernel link health small, inspectable, and accurate.
 - Next Sequential File: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [maps/NODE-MAP.md](../maps/NODE-MAP.md), [maps/node-map.json](../maps/node-map.json), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
@@ -212,7 +248,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: Handoff — 2026-01-15 — first recall gate for the deploy loop
 - Type: Handoff / Session Closeout (EXAMPLE)
-- Context: Worked example of a filled handoff. Not a live handoff — do not place in handoffs/. Shows the expected shape, altitude, and completeness for an mdr-kernel closeout note.
+- Context: Use when writing a handoff and you want a worked example of the expected shape, altitude and completeness; it is not a live handoff, so never place it in handoffs/.
 - Next Sequential File: [_templates/handoff-template.md](../_templates/handoff-template.md)
 - Related Workflows: [STATE.md](../STATE.md), [DECISIONS.md](../DECISIONS.md), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
@@ -230,7 +266,7 @@ generatedUtc: 2026-07-13T16:44:38.0542171Z
 
 - Title: <Document Title>
 - Type: <See type vocabulary below>
-- Context: <One sentence: why this file exists and what it is for. Written for a model that has never seen this file before.>
+- Context: <Use when ... - one sentence, at most 300 characters, for a model that has never seen this file.>
 - Next Sequential File: none recorded
 - Related Workflows: none recorded
 - AI Execution Prompts: none recorded

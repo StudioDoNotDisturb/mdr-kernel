@@ -68,10 +68,13 @@ function Test-ApprovedTarget([string]$RepoPath) {
 }
 
 function Get-Model {
-  if ($env:BRAIN_MODEL) { return $env:BRAIN_MODEL }
-  $configured = (git -C $root config brain.model 2>$null)
-  if ($configured) { return $configured.Trim() }
-  return 'unknown'
+  # A proposal or approval is attributed to an explicit session identity only. git config
+  # brain.model is display-only and 'unknown' is refused, the same rule locks and commits apply.
+  $explicit = if ($env:BRAIN_MODEL) { ([string]$env:BRAIN_MODEL).Trim() } else { '' }
+  if (-not $explicit -or $explicit -eq 'unknown') {
+    throw 'write-approval needs an explicit session identity: set $env:BRAIN_MODEL before -Propose or -Approve (git config brain.model is display-only and is not used).'
+  }
+  return $explicit
 }
 
 function New-Slug([string]$Text) {
@@ -213,6 +216,7 @@ if ($Propose) {
   if (-not $Target -or -not $Source -or -not $Reason) {
     throw '-Propose requires -Target, -Source, and -Reason.'
   }
+  $actor = Get-Model   # refuse before any proposal directory is written
   $targetRel = To-RepoPath $Target
   if (-not (Test-ApprovedTarget $targetRel)) {
     throw "Target is not gated by this workflow: $targetRel"
@@ -233,7 +237,7 @@ if ($Propose) {
     source = $sourceFull
     content_sha256 = $hash
     reason = $Reason
-    proposed_by = Get-Model
+    proposed_by = $actor
     proposed_at = [DateTimeOffset]::UtcNow.ToString('o')
   }
 
@@ -252,6 +256,7 @@ if ($Propose) {
 
 if ($Approve) {
   if (-not $ProposalId -or -not $Reason) { throw '-Approve requires -ProposalId and -Reason.' }
+  $actor = Get-Model   # refuse before the target or the audit log is touched
   $dir = Get-ProposalDir $ProposalId
   $meta = Read-Metadata $dir
   $targetRel = [string]$meta.target
@@ -272,7 +277,7 @@ if ($Approve) {
     action = 'approve'
     proposal_id = $ProposalId
     target = $targetRel
-    approved_by = Get-Model
+    approved_by = $actor
     approved_at = [DateTimeOffset]::UtcNow.ToString('o')
     reason = $Reason
     content_sha256 = $hash

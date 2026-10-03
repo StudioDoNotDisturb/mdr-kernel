@@ -7,7 +7,7 @@ Context: Documents how the public mdr-kernel export was sanitized and verified.
 This repository is a **sanitized, fresh-history** export of the coordination pattern from a private
 studio system. It was produced mechanically by an exporter, not hand-copied.
 
-## How it was produced (2026-07-13)
+## How it was produced (2026-10-03)
 
 - **Two content sources:** purpose-built public files (a cold-clone-passing doctor, a
   de-studio-ified contract/runbook, a bootstrap that scaffolds your own memory, the README +
@@ -15,11 +15,12 @@ studio system. It was produced mechanically by an exporter, not hand-copied.
   still-generic private files that have not yet been templated, copied through a sanitize map.
 - **Sanitize map** genericizes machine, user, brand, network, owner, email, and host strings to
   placeholders like `C:\Users\<you>` and `<your-github>`.
-- **Hard post-scan:** the export is DELETED if any forbidden personal/operational string survives,
-  so a bad edit cannot silently leak. This export passed the scan.
+- **Hard post-scan:** the initial commit is refused if any forbidden personal/operational string
+  survives. Failed candidates remain local for inspection and must not be published. Only a
+  successful exporter exit marks this candidate as ready for release review.
 - **Fresh history:** the private commit log is discarded. This repo starts at one commit.
-- **No secret values:** no credential-shaped strings are present; the pre-commit secret scan and a
-  standalone scan both pass.
+- **Secret checks:** scanner coverage and a standalone secret scan must pass before the initial
+  commit is created.
 
 ## What is NOT included
 

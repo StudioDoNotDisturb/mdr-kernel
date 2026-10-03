@@ -1,5 +1,5 @@
 #!/bin/sh
-# mdr-kernel pre-commit. Five gates:
+# mdr-kernel pre-commit. Six gates:
 #   1. canonical-root check  -> WARNING for ordinary commits; coordination files staged from a
 #                               non-canonical clone are BLOCKED in gate 5. A linked worktree of
 #                               the canonical repo counts as canonical.
@@ -10,9 +10,25 @@
 #   5. coordination lock     -> BLOCK if coordination files are staged (added, modified,
 #                               deleted, OR renamed away) without STATE.lock, or with
 #                               a mismatched lock token when the session is sealed
+#   5b. envelope length     -> BLOCK if a staged .md has Title > 100 chars or Context > 300 chars
+#                               or more than one sentence (a ratchet: older files are fixed on touch)
 # Override (rare, after review): git commit --no-verify
 
-repo=$(git rev-parse --show-toplevel 2>/dev/null)
+# A skipped gate is not a successful gate. Check tools before using pipelines whose final
+# command could otherwise hide a missing executable.
+for tool in git grep sed awk head tr cut dirname pwsh; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "X mdr-kernel pre-commit: required utility '$tool' is unavailable; no gates were bypassed." >&2
+    exit 1
+  fi
+done
+repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+for helper in bin/state-lock.ps1 bin/write-approval.ps1 bin/sync-doors.ps1 bin/envelope-check.ps1 bin/check-decision-history.ps1 bin/build-rulings.ps1 bin/test-staged.ps1 protocol/coordination-files.txt; do
+  if [ ! -f "$repo/$helper" ]; then
+    echo "X mdr-kernel pre-commit: required gate '$helper' is missing; restore it before committing." >&2
+    exit 1
+  fi
+done
 
 # --- 1) canonical-root WARNING -------------------------------------------------
 # A linked git worktree of the canonical repo is canonical for coordination purposes:
@@ -79,7 +95,7 @@ if git diff --cached --name-only -- '.brain-root' | grep -q .; then
   exit 1
 fi
 
-# --- 3) doors-in-sync with the contract (BLOCK when checkable, WARN otherwise) --
+# --- 3) doors-in-sync with the contract (BLOCK) ---------------------------------
 door_paths='
 protocol/CONTRACT.md
 AGENTS.md
@@ -111,9 +127,9 @@ if [ -n "$staged_doors" ]; then
       exit 1
     fi
   else
-    echo "WARN: pwsh unavailable - front-door drift check skipped while door/contract files are staged." >&2
-    echo "      verify from a pwsh-capable clone before merging/publishing. Staged:" >&2
+    echo "X mdr-kernel pre-commit: required front-door check is unavailable. Staged:" >&2
     printf '%s' "$staged_doors" | sed '/^$/d; s/^/        /' >&2
+    exit 1
   fi
 fi
 
@@ -134,20 +150,21 @@ if command -v pwsh >/dev/null 2>&1; then
     exit 1
   fi
 else
-  echo "WARN: pwsh unavailable - write-approval gate skipped." >&2
+  echo "X mdr-kernel pre-commit: required write-approval check is unavailable." >&2
+  exit 1
 fi
 
 # --- 5) coordination files require STATE.lock (BLOCK) ---------------------------
 # The authoritative list lives in protocol/coordination-files.txt so docs and enforcement cannot
-# drift. Minimal built-in fallback if the list file is ever missing.
+# drift. Missing policy is a failure, never a smaller built-in policy.
 coord_file="$repo/protocol/coordination-files.txt"
 if [ -f "$coord_file" ]; then
-  coord_paths=$(grep -v '^[[:space:]]*#' "$coord_file" | grep -v '^[[:space:]]*$' | tr -d '\r')
+  # Keep protections from all three views. An unstaged or staged policy deletion cannot
+  # hide a protected path while that policy change is being committed.
+  coord_paths=$({ cat "$coord_file"; git show :protocol/coordination-files.txt 2>/dev/null; git show HEAD:protocol/coordination-files.txt 2>/dev/null; } | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | tr -d '\r')
 else
-  echo "WARN: protocol/coordination-files.txt missing - using minimal built-in coordination list" >&2
-  coord_paths='STATE.md
-DECISIONS.md
-protocol/CONTRACT.md'
+  echo "X mdr-kernel pre-commit: protocol/coordination-files.txt is missing." >&2
+  exit 1
 fi
 coord_paths="
 $coord_paths
@@ -185,10 +202,10 @@ if [ -f "$lock" ]; then
   lock_token=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$lock" | head -n1)
   [ -z "$holder" ] && holder=$(awk 'NR==1{print $1}' "$lock" 2>/dev/null)
 fi
-model=${BRAIN_MODEL:-$(git config brain.model 2>/dev/null)}
-token_ok=1
-if [ -n "$lock_token" ] && { [ -z "$BRAIN_LOCK_TOKEN" ] || [ "$lock_token" != "$BRAIN_LOCK_TOKEN" ]; }; then
-  token_ok=0
+model=${BRAIN_MODEL:-}
+token_ok=0
+if [ -n "$lock_token" ] && [ -n "$BRAIN_LOCK_TOKEN" ] && [ "$lock_token" = "$BRAIN_LOCK_TOKEN" ]; then
+  token_ok=1
 fi
 
 if [ -n "$staged_coord" ]; then
@@ -217,8 +234,8 @@ if [ -n "$staged_coord" ]; then
 
   if [ -z "$model" ]; then
     echo "" >&2
-    echo "X mdr-kernel pre-commit: STATE.lock is held by '$holder', but BRAIN_MODEL/git config brain.model is unset." >&2
-    echo "  Set BRAIN_MODEL for this shell/session, or set git config brain.model for this surface." >&2
+    echo "X mdr-kernel pre-commit: STATE.lock is held by '$holder', but explicit BRAIN_MODEL is unset." >&2
+    echo "  Set BRAIN_MODEL for this shell/session; shared git config cannot prove session identity." >&2
     echo "  Env vars do NOT persist between separate tool shells - set it inline with the commit:" >&2
     echo '    PowerShell:  $env:BRAIN_MODEL='"'"'<model-id>'"'"'; git commit ...' >&2
     echo '    bash:        BRAIN_MODEL=<model-id> git commit ...' >&2
@@ -238,6 +255,52 @@ if [ -n "$staged_coord" ]; then
     echo "X mdr-kernel pre-commit: coordination files are staged but BRAIN_LOCK_TOKEN does not match STATE.lock." >&2
     echo "  Use the token printed by bin/state-lock.ps1 -Acquire, or wait for the holder to release the lock." >&2
     echo "" >&2
+    exit 1
+  fi
+  # The same authority checks token, explicit identity and recorded host. Shell string checks
+  # above provide concise diagnostics; they are never a substitute for sealed ownership.
+  if ! pwsh -NoProfile -File "$repo/bin/state-lock.ps1" -CheckOwner -Model "$model" >&2; then
+    echo "X mdr-kernel pre-commit: STATE.lock ownership is unproven; carry your own acquire token." >&2
+    exit 1
+  fi
+fi
+
+# --- Decision authority uses index bytes and HEAD history -----------------------
+if git cat-file -e :DECISIONS.md 2>/dev/null || git cat-file -e HEAD:DECISIONS.md 2>/dev/null; then
+  if ! pwsh -NoProfile -File "$repo/bin/check-decision-history.ps1" -FromIndex >&2; then
+    echo "X mdr-kernel pre-commit: staged decision history/authority is invalid." >&2
+    exit 1
+  fi
+  if ! pwsh -NoProfile -File "$repo/bin/build-rulings.ps1" -Check -FromIndex >&2; then
+    echo "X mdr-kernel pre-commit: compile rulings and stage the output with its sources." >&2
+    exit 1
+  fi
+fi
+# Tests execute the staged scripts, even when a different working-tree copy would pass. The runner
+# itself executes from the working tree, so it must be byte-identical to the copy being committed.
+if ! git diff --quiet -- bin/test-staged.ps1; then
+  echo "X mdr-kernel pre-commit: bin/test-staged.ps1 differs from its staged copy; stage or restore it first." >&2
+  exit 1
+fi
+if ! pwsh -NoProfile -File "$repo/bin/test-staged.ps1" >&2; then
+  echo "X mdr-kernel pre-commit: staged regression checks failed." >&2
+  exit 1
+fi
+
+# --- 5b) Markdown envelope length (BLOCK) ----------------------------------------
+# Title is a name (<= 100 chars); Context is one sentence (<= 300 chars) saying when to use the
+# file. Reads the staged blobs, so only files being committed must comply; doctor counts the rest.
+if git diff --cached --name-only --diff-filter=ACMR | grep -q '\.md$'; then
+  if command -v pwsh >/dev/null 2>&1; then
+    if ! pwsh -NoProfile -File "$repo/bin/envelope-check.ps1" -Staged >&2; then
+      echo "" >&2
+      echo "X mdr-kernel pre-commit: shorten the staged Markdown envelope(s) above." >&2
+      echo "  Move provenance, approvals, evidence and caveats into the body (reference/markdown-system-node-standard.md)." >&2
+      echo "" >&2
+      exit 1
+    fi
+  else
+    echo "X mdr-kernel pre-commit: required envelope check is unavailable." >&2
     exit 1
   fi
 fi

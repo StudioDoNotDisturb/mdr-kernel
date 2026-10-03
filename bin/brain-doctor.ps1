@@ -13,7 +13,8 @@
   a fresh clone should reach a clean doctor, or tell you exactly which one command fixes it.
 
   -HardOnly: run only the cheap tree checks plus the hazard gates that can actually fail
-  (git working tree, canonical startup wiring, tracked-secret scan). close-session uses this —
+  (git working tree, canonical startup wiring, Git hooks, recall schema, decision history and
+  rulings freshness, tracked-secret scan). close-session uses this —
   it only consumes the exit code; the full advisory sweep belongs to session START.
 #>
 [CmdletBinding()]
@@ -135,7 +136,7 @@ if ($pendingSync -eq 'true' -or ($null -ne $aheadCount -and $aheadCount -gt 0)) 
 $idEnv = $env:BRAIN_MODEL
 $idCfg = (git config brain.model 2>$null)
 if ($idEnv) { Ok "Brain-Model identity = $idEnv (from `$BRAIN_MODEL)" }
-elseif ($idCfg) { Warn "Brain-Model fallback = $idCfg (git config brain.model): commits and locks will attribute to '$idCfg' regardless of which model is actually running. Fine for a human at the keyboard; each AI session should pass its own -Model or set `$BRAIN_MODEL." }
+elseif ($idCfg) { Warn "Brain-Model fallback = $idCfg (git config brain.model): display only; locks and commits require an explicit session identity. Pass -Model or set `$BRAIN_MODEL." }
 else { Warn "Brain-Model identity unset - set `$BRAIN_MODEL for this process before lock/commit." }
 
 # 5) Doors in sync with the contract (advisory - skipped by -HardOnly; pre-commit still blocks
@@ -177,27 +178,58 @@ if (Test-Path $contractPath) {
 if ($startupProblems.Count -eq 0) { Ok 'canonical startup wiring present (start-session + session-stop + contract)' }
 else { Fail "canonical startup wiring broken: $($startupProblems -join '; ')" }
 
-$claudeSettings = Join-Path $root '.claude/settings.json'
-$codexHooks = Join-Path $root '.codex/hooks.json'
-if ((Test-Path $claudeSettings) -or (Test-Path $codexHooks)) { Ok 'per-tool SessionStart hook adapter(s) present' }
-else { Warn 'no .claude/ or .codex/ SessionStart adapter - fine for CLI-only use; add one to auto-run startup for your tool' }
-
-if (-not $HardOnly) {  # ---- advisory region (recall wiring, node map, indexes), skipped by -HardOnly ----
-# 5c) Active recall gate. Storage guardrails are not enough: recurring/stuck work must surface
-# the prior traps at objective time. Requires the script + gates data + the reference doc.
-$recallScript = Join-Path $root 'bin/brain-recall.ps1'
-$recallData = Join-Path $root 'protocol/recall-gates.json'
-$recallProblems = @()
-if (-not (Test-Path $recallScript)) { $recallProblems += 'bin/brain-recall.ps1 missing' }
-if (-not (Test-Path $recallData)) { $recallProblems += 'protocol/recall-gates.json missing (copy protocol/recall-gates.example.json, or run bin/bootstrap-clone.ps1)' }
-if (Test-Path $contractPath) {
-  if ((Get-Content -Raw $contractPath) -notmatch 'bin/brain-recall\.ps1') { $recallProblems += 'CONTRACT does not require bin/brain-recall.ps1' }
+# Presence/configuration is not evidence that a host actually fired its prompt hook.
+foreach ($hook in 'pre-commit','prepare-commit-msg','pre-push') {
+  $hp = Join-Path $root ".githooks/$hook"
+  if (-not (Test-Path -LiteralPath $hp -PathType Leaf)) { Fail "required Git hook missing: $hook"; continue }
+  if (-not $IsWindows) {
+    # [IO.File]::GetUnixFileMode needs .NET 7 (PowerShell 7.3+); the documented floor is 7.0, so
+    # older hosts ask POSIX test(1) instead of failing the whole doctor on a missing method.
+    if ([IO.File].GetMethod('GetUnixFileMode', [type[]]@([string]))) {
+      $executable = ([int][IO.File]::GetUnixFileMode($hp) -band 0x49) -ne 0  # u+x, g+x, o+x
+    } else { & test -x $hp; $executable = $LASTEXITCODE -eq 0 }
+    if (-not $executable) { Fail "Git hook is not executable: $hook (chmod +x .githooks/$hook)" }
+  }
 }
-if ($recallProblems.Count -eq 0) { Ok 'active recall gate present (script + gates + contract wiring)' }
-else { Warn "active recall gate incomplete: $($recallProblems -join '; ')" }
+$recallScript = Join-Path $root 'bin/brain-recall.ps1'
+foreach ($helper in 'brain-recall','hook-recall','prepare-work','check-decision-history','build-rulings','test-staged') {
+  if (-not (Test-Path -LiteralPath (Join-Path $root "bin/$helper.ps1"))) { Fail "required safeguard missing: bin/$helper.ps1" }
+}
+if ((Test-Path $recallScript) -and (Test-Path (Join-Path $root 'protocol/recall-gates.json'))) {
+  $gateCheck = @(& pwsh -NoProfile -File $recallScript -CheckGates 2>&1)
+  if ($LASTEXITCODE -ne 0) { Fail ("recall schema invalid: " + ($gateCheck -join ' ')) }
+  else { Ok 'recall schema valid' }
+}
+# build-rulings -Check runs check-decision-history first and fails on either, so one child
+# process covers history integrity and rulings freshness (HardOnly runs this at every close).
+$rulingsHelper = Join-Path $root 'bin/build-rulings.ps1'
+if ((Test-Path (Join-Path $root 'DECISIONS.md')) -and (Test-Path $rulingsHelper)) {
+  $result = (@(& pwsh -NoProfile -File $rulingsHelper -Check 2>&1) -join ' ') -replace "`e\[[0-9;]*m", ''
+  if ($LASTEXITCODE -ne 0) { Fail "decision authority: $result" }
+  else { Ok "decision authority: $result" }
+}
+if (-not $HardOnly) {  # ---- advisory region (hook config, node map, indexes) ----
+$adapterFound = $false
+foreach ($config in '.claude/settings.json','.codex/hooks.json') {
+  $cp = Join-Path $root $config
+  if (-not (Test-Path $cp)) { continue }
+  try {
+    $cfg = [IO.File]::ReadAllText($cp) | ConvertFrom-Json -ErrorAction Stop
+    if ($cfg.hooks.UserPromptSubmit -and [IO.File]::ReadAllText($cp) -match 'hook-recall\.ps1') {
+      $adapterFound = $true; Ok "prompt recall CONFIGURED in $config"
+    }
+  } catch { Warn "invalid host hook config: $config" }
+}
+if (-not $adapterFound) { Warn 'prompt recall not configured; run bin/prepare-work.ps1 for each objective. See docs/recall-hooks.md.' }
+else {
+  # Three separate claims: configured (above), adapter tested (this probe), fired (never observable here).
+  $probe = @('{"prompt":"mdr doctor adapter probe"}' | & pwsh -NoProfile -File (Join-Path $root 'bin/hook-recall.ps1') 2>&1) -join ' '
+  if ($LASTEXITCODE -eq 0 -and $probe -notmatch 'RECALL_HOOK_STATUS=DEGRADED') { Ok 'prompt recall adapter TESTED: bin/hook-recall.ps1 answered a probe prompt' }
+  else { Warn "prompt recall adapter DEGRADED on a probe prompt: $probe" }
+  Warn 'prompt recall FIRING UNVERIFIED: configuration and the adapter probe do not prove your host runs the hook; see docs/recall-hooks.md'
+}
 
-# 5d) Node map retrieval layer. This is the compact routing database agents use with STATE.md to
-# choose a narrow reading slice before broad search.
+# 5d) Generated node map checks link health. STATE + reference/INDEX select the reading slice.
 $nodeScript = Join-Path $root 'bin/update-node-map.ps1'
 $nodeRoots = Join-Path $root 'maps/node-roots.json'
 $nodeJson = Join-Path $root 'maps/node-map.json'
@@ -208,7 +240,7 @@ if (-not (Test-Path $nodeRoots)) { $nodeProblems += 'maps/node-roots.json missin
 if (Test-Path $contractPath) {
   $contractText = Get-Content -Raw $contractPath
   if ($contractText -notmatch 'maps/NODE-MAP\.md' -and $contractText -notmatch 'maps/node-map\.json') {
-    $nodeProblems += 'CONTRACT does not route startup through the node map'
+    $nodeProblems += 'CONTRACT does not describe the generated link-health map'
   }
 }
 if ($nodeProblems.Count) {
@@ -229,6 +261,20 @@ if ($nodeProblems.Count) {
   } catch {
     Warn "node map unreadable - regenerate with: pwsh -NoProfile -File bin/update-node-map.ps1"
   }
+}
+
+# 5e) Envelope length. A check that only tests whether Title/Type/Context exist lets headers grow
+# into paragraphs; pre-commit blocks a staged .md over the limits (a ratchet) and this counts the rest.
+$envelopeScript = Join-Path $root 'bin/envelope-check.ps1'
+$preCommit = Join-Path $root '.githooks/pre-commit'
+if (-not (Test-Path $envelopeScript) -or -not (Test-Path $preCommit) -or
+    -not (Select-String -LiteralPath $preCommit -SimpleMatch 'bin/envelope-check.ps1" -Staged' -Quiet)) {
+  Warn 'envelope length ratchet UNARMED: .githooks/pre-commit does not run bin/envelope-check.ps1 -Staged'
+} else {
+  $envelopeCount = & pwsh -NoProfile -File $envelopeScript -Count 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $envelopeCount) { Warn 'envelope length check failed to run (bin/envelope-check.ps1)' }
+  elseif ($envelopeCount -match 'over=0 ') { Ok "$envelopeCount (Title <= 100, Context <= 300 chars / 1 sentence)" }
+  else { Warn "$envelopeCount - fix with: pwsh -NoProfile -File bin/envelope-check.ps1 -Count -List (pre-commit enforces on touch)" }
 }
 
 # 6) Indexes match directories - every .md has a row, and every row names a real file.
@@ -328,13 +374,13 @@ if (Test-Path $inbox) {
 $coordList = Join-Path $root 'protocol/coordination-files.txt'
 if (Test-Path $coordList) {
   $entries = @(Get-Content $coordList | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
-  $missingCoord = @($entries | Where-Object { -not (Test-Path (Join-Path $root $_)) })
+  $missingCoord = @($entries | Where-Object { $_ -ne 'protocol/decision-ratifications.jsonl' -and -not (Test-Path (Join-Path $root $_)) })
   # Files bin/bootstrap-clone.ps1 scaffolds are expected to be absent on a pristine (pre-bootstrap)
   # clone. If ONLY those are missing, point at bootstrap (consistent with the STATE.md / recall-gates
   # checks above); reserve the stern "fix the list" wording for a genuine list-vs-repo mismatch.
   $bootstrapScaffolded = @('.brain-root','STATE.md','DECISIONS.md','handoffs/INDEX.md','specs/INDEX.md',
     'reference/INDEX.md','inbox/README.md','protocol/recall-gates.json','protocol/advisory.md',
-    'CLAUDE.md','AGENTS.md','GEMINI.md')
+    'CLAUDE.md','AGENTS.md','GEMINI.md','protocol/decision-authority.json','protocol/rulings.json')
   $realMissing = @($missingCoord | Where-Object { $bootstrapScaffolded -notcontains $_ })
   if ($missingCoord.Count -eq 0) { Ok "coordination-files.txt: all $($entries.Count) protected paths exist" }
   elseif ($realMissing.Count -eq 0) { Warn "coordination-files.txt lists $($missingCoord.Count) not-yet-scaffolded file(s) - run bin/bootstrap-clone.ps1" }
@@ -359,7 +405,7 @@ if (Test-Path $lock) {
     $objective = if ($l.objective) { $l.objective } else { 'MISSING' }
     $who = "$($l.model) on $($l.host) (objective: $objective)"
     if ($null -ne $age -and $age -gt 120) {
-      Warn "STATE.lock heartbeat ${age}m old - likely a dead session: $who. Release with bin/state-lock.ps1 -Release -Force"
+      Warn "STATE.lock heartbeat ${age}m old - stale, not proof of abandonment: $who. Verify your own token or obtain independent recovery evidence."
     } else {
       Warn "STATE.lock held (heartbeat ${age}m ago): $who - coordination files are single-writer; do not edit them unless this is your lock"
     }
@@ -379,7 +425,7 @@ foreach ($wtLine in @(git worktree list --porcelain 2>$null | Where-Object { $_ 
   if ($null -ne $idleH -and $idleH -le 48) {
     Ok "linked worktree present (recent - likely a live session): $wtPath"
   } else {
-    Warn "linked worktree likely from a dead session: $wtPath (idle ${idleH}h) - verify clean, then: git worktree remove '$wtPath'"
+    Warn "linked worktree idle; verify ownership before cleanup: $wtPath (idle ${idleH}h) - verify clean, then: git worktree remove '$wtPath'"
   }
 }
 

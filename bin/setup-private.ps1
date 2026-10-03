@@ -23,7 +23,7 @@ function Ok([string]$message) { Write-Host "[ ok ] $message" -ForegroundColor Gr
 
 Write-Host "mdr-kernel private setup - $root`n"
 if ([string]::IsNullOrWhiteSpace($Model)) {
-  Fail "missing -Model: the attribution name stamped on this clone's commits and locks. An agent passes its own model id; a human setting up by hand picks any short name (no angle brackets), for example: pwsh -NoProfile -File bin/setup-private.ps1 -Model 'chad'"
+  Fail "missing -Model: the attribution name stamped on this clone's commits and locks. An agent passes its own model id; a human setting up by hand picks any short name (no angle brackets), for example: pwsh -NoProfile -File bin/setup-private.ps1 -Model 'alex'"
 }
 if (-not (git rev-parse --is-inside-work-tree 2>$null)) { Fail 'run this inside the repository you created from the mdr-kernel template' }
 $branch = (git branch --show-current 2>$null)

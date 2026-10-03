@@ -24,7 +24,7 @@ context. The safe first run is one setup command, then one startup:
 
    For memory with no remote backup, add `-LocalOnly`. Setup verifies the destination is
    private, pins it, arms hooks, scaffolds the memory, regenerates the front doors, commits, and
-   pushes the first checkpoint.
+   pushes the first checkpoint (a `-LocalOnly` memory commits without pushing).
 3. **Run the one startup and require readiness:**
 
    ```powershell

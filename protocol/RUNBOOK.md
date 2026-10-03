@@ -37,7 +37,7 @@ pwsh -NoProfile -File bin/start-session.ps1  -Model '<your model id>'
 ```
 
 (`-Model` is the attribution identity: an agent passes its real model id, e.g.
-`-Model 'claude-opus-4-8'`; a human driving by hand picks any short name, e.g. `-Model 'chad'`.)
+`-Model 'claude-opus-5'`; a human driving by hand picks any short name, e.g. `-Model 'alex'`.)
 
 After setup, `brain-doctor` should report the verified private destination and `main`. The public
 template, a public repository, a fork, a changed remote, or unverifiable GitHub visibility blocks
@@ -79,18 +79,20 @@ The script runs the complete sequence: doctor, safe pull/rebase, then full STATE
 model then reports Right now, blockers, and the top next action and waits unless you already
 assigned work.
 
-For assigned work, the model uses `STATE.md` plus `maps/NODE-MAP.md` or `maps/node-map.json` to
-pick the smallest relevant reading slice before broad search. This is the token-saving routing
-layer. If the doctor says the map is missing or stale, regenerate it:
+For assigned work, the model uses `STATE.md` plus `reference/INDEX.md` to pick the smallest
+relevant reading slice. The generated node map checks links. If it is missing or stale,
+regenerate it under your coordination lock:
 
 ```powershell
 pwsh -NoProfile -File bin/update-node-map.ps1
 ```
 
-When you assign work, the model runs active recall before acting:
+When you assign work, a verified prompt hook runs recall automatically. Until the host firing
+is verified, or if it reports DEGRADED, run the portable fallback before acting
+(see `docs/recall-hooks.md`):
 
 ```powershell
-pwsh -NoProfile -File bin/brain-recall.ps1 -Objective '<operator objective>'
+pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'
 ```
 
 If a gate matches, it reads the listed sources and states how the surfaced traps change the next
@@ -103,8 +105,9 @@ id in the session process:
 $env:BRAIN_MODEL = '<your model id>'
 ```
 
-`git config brain.model` is only a fallback and may reflect another surface that used the same
-working copy.
+Committing by hand: set `$env:BRAIN_MODEL = '<name>'` or end the message with
+`Brain-Model: <name>`. A commit with neither, or with `unknown`, is refused. `git config
+brain.model` is display-only (setup does not write it); it may describe a different session.
 
 ## Close prompt
 
@@ -122,10 +125,11 @@ That script verifies the closeout and commits with the `Brain-Model` trailer. Wh
 depends on the memory's mode: a private-remote memory re-verifies and pushes the approved
 `origin/main`, releasing `STATE.lock` only after the push succeeds (a failed push keeps the lock);
 a local-only memory commits and releases the lock without attempting a push, by design. See below
-for the offline exception. It stages only coordination files, the current handoff, Markdown inbox
-notes, maps, and paths named
-with `-Also` (multiple paths: `-Also 'a.md,b.md'`); unrelated files are listed and left
-untouched. New `reference/*.md` files and skills go through `bin/write-approval.ps1` first (see
+for the offline exception. It stages only coordination files, the current handoff, generated
+maps, and paths named with `-Also` (multiple paths: `-Also 'a.md,b.md'`); unrelated files are
+listed and left untouched. Inbox notes are never adopted folder-wide: name the notes this session
+owns with `-Also`. Unrelated staged work blocks the close and stays staged. New `reference/*.md`
+files and skills go through `bin/write-approval.ps1` first (see
 `docs/adoption-guide.md`); their audit entry rides the close automatically, and the close refuses
 to commit an INDEX row whose target would be left behind.
 
@@ -163,6 +167,9 @@ If a model is going to edit those files, it must hold the lock:
 
 ```powershell
 pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<your model id>' -Objective '<short objective>'
+$env:BRAIN_MODEL = '<your model id>'
+$env:BRAIN_LOCK_TOKEN = '<token printed by your own acquire>'
+pwsh -NoProfile -File bin/state-lock.ps1 -CheckOwner
 pwsh -NoProfile -File bin/state-lock.ps1 -Release
 ```
 
@@ -173,12 +180,21 @@ If `brain-doctor` says another live session holds the lock, do not ask a second 
 coordination files. It can still do research or write a standalone `inbox/` note; one session
 folds notes into `STATE.md` later.
 
-If the lock heartbeat is stale for more than two hours, treat it as a dead session:
+A heartbeat older than two hours is a reason to investigate. It does not prove the owner died.
+On your own resume, carry your original token, run `-CheckOwner`, and then `-Heartbeat`.
+For another holder, establish independent abandonment evidence or obtain operator direction.
+Only then recover with explicit identity and `-Release -Force -AbandonmentReason '<evidence>'`.
+The tool requires a further `MDR_FORCE_LIVE_LOCK=1` override for a fresh heartbeat; that override
+is never evidence by itself. Never retrieve someone else's token from the lock file.
 
-```powershell
-pwsh -NoProfile -File bin/state-lock.ps1 -Release -Force
-pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<your model id>'
-```
+## Decisions and upgrades
+
+Use `bin/add-decision.ps1` for new proposals and quoted operator rulings. Work reports belong in
+handoffs. The human alone performs hash-bound ratification in their own terminal. Read
+`docs/decision-authority.md` before migrating an existing log: no historical entry is ratified
+just because the software was upgraded, and an old entry that already quotes an operator ruling
+compiles as one, so review it first. Follow `docs/upgrading.md` to preserve private memory, local
+hooks and history while merging distribution changes.
 
 ## Mental model
 

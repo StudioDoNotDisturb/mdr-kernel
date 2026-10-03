@@ -1,21 +1,21 @@
 Title: Node map
-Type: Spec / Retrieval Contract
-Context: Defines the generated node-map subsystem that keeps mdr-kernel routing small, inspectable, and accurate.
+Type: Spec / Link-Health Contract
+Context: Defines the generated node-map subsystem that keeps mdr-kernel link health small, inspectable, and accurate.
 
 # Node map
 
-The node map is the retrieval layer for `mdr-kernel`. It turns the Markdown envelope standard into
-two generated artifacts:
+The node map is the generated link-health layer for `mdr-kernel`. It turns the Markdown envelope
+standard into two generated artifacts:
 
 - `maps/node-map.json` for tools and scripts.
 - `maps/NODE-MAP.md` for humans and agents.
 
-Before an agent reads broadly, it inspects a compact map of titles, types, contexts, and node
-links, then selects the smallest relevant file set. This reduces prompt load and improves accuracy
-because the agent starts from the repo's declared structure — not from filenames, guesswork, or
-stale chat memory.
+It records every registered file's title, type, context and node links, and surfaces broken,
+ambiguous or off-shape nodes. It does not choose what an agent reads: `STATE.md` plus
+`reference/INDEX.md` select the reading slice. The map is evidence that the declared structure is
+intact, so an index row or a node link can be trusted without opening the file.
 
-The envelope is the schema. The node map is the index.
+The envelope is the schema. The node map is the link-health index.
 
 ## Source files
 
@@ -74,22 +74,21 @@ pwsh -NoProfile -File bin/update-node-map.ps1 -Repair -Path README.md
 pwsh -NoProfile -File bin/update-node-map.ps1 -Repair -Path README.md -Apply
 ```
 
-## Startup contract
+## Startup contract and link resolution
 
 Links are resolved from their source file first and then from the registered root. The JSON keeps
 both author-facing link text and resolved root coordinates; the Obsidian bridge uses the resolved
 coordinates so a source-relative link cannot be reinterpreted from `maps/` and escape the repo.
 
-`close-session.ps1` stages only the Markdown in its owned close set before regeneration. This
-ensures new documents enter retrieval truth as tracked files without sweeping another lane's work.
+`close-session.ps1` stages only its owned close set and then regenerates the map, staging the
+generated outputs with it. This keeps new documents in link-health truth as tracked files without
+sweeping another session's work.
 
-The startup contract requires agents to use `STATE.md` plus `maps/NODE-MAP.md` or
-`maps/node-map.json` to select a narrow reading slice before broad search. `brain-doctor` warns
-if the generated outputs are not in exact parity with tracked Markdown, and bootstrap regenerates
-them when a fresh clone creates its starter memory files.
-
-An agent that does not consult the node map before reading broadly is not compliant with the
-startup contract.
+The startup contract selects the reading slice from `STATE.md` plus `reference/INDEX.md`; the
+node map is not the router. `brain-doctor` warns if the generated outputs are not in exact parity
+with tracked Markdown, and bootstrap regenerates them when a fresh clone creates its starter
+memory files. The generated map files are coordination files, so regenerate and commit them under
+your own `STATE.lock`.
 
 ---
 

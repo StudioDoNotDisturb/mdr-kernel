@@ -1,17 +1,19 @@
 Title: <Document Title>
 Type: <See type vocabulary below>
-Context: <One sentence: why this file exists and what it is for. Written for a model that has never seen this file before.>
+Context: <Use when ... - one sentence, at most 300 characters, for a model that has never seen this file.>
 
 # <Document Title>
 
 <!--
   RETRIEVAL ENVELOPE — fill in the three header fields above before writing anything else.
-  They are parsed by bin/update-node-map.ps1 to build the routing index.
+  They are parsed by bin/update-node-map.ps1 to build the generated link-health map, and they let
+  STATE.md and the INDEX files describe this file without opening it.
 
-  Title:   The document's plain name. Matches the H1 heading.
+  Title:   The document's plain name, at most 100 characters. Matches the H1 heading.
   Type:    One of the standard type vocabulary entries (see below).
-  Context: One sentence that answers "why does this file exist and what does it contain?"
-           Write it for a model arriving cold with no prior context.
+  Context: ONE sentence, at most 300 characters, saying when a model arriving cold should use
+           this file ("Use when ..."). Bylines, dates, approvals and caveats go in the body.
+           Pre-commit blocks a staged file over these limits (bin/envelope-check.ps1).
 
   TYPE VOCABULARY
   ---------------

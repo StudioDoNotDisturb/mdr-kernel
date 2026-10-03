@@ -18,7 +18,17 @@ Type: <document class / operational role>
 Context: <one-sentence retrieval context explaining when an agent should use this file>
 ```
 
-Do not hide this information in prose. Keep each value short enough to scan quickly.
+Do not hide this information in prose. The envelope is a label, not a summary:
+
+- **Title** is a name of at most **100 characters**.
+- **Context** is **one sentence** of at most **300 characters** saying when an agent should use
+  the file - "Use when ..." is the reliable shape.
+- Provenance, bylines, approval quotes, evidence lists, dates and caveats go in the body, e.g. an
+  `> **About this file:** ...` note under the H1.
+
+`.githooks/pre-commit` runs `bin/envelope-check.ps1 -Staged` and blocks any staged `.md` over these
+limits (a ratchet: older files are fixed when next touched, and the doctor reports the remaining
+count). Generators and templates that write an envelope must produce compliant values.
 
 Markdown files that already require YAML front matter, such as skill files, use the front-matter
 variant instead:
@@ -57,7 +67,7 @@ references.
 Plain path values are valid and easiest for local and frontier models to parse. If a node field
 uses Markdown links (`[STATE](STATE.md)`) or wikilinks (`[[STATE]]`), `bin/update-node-map.ps1`
 normalizes them back to the same path values for node-map checks. After node edits, regenerate the
-map so the routing layer and any graph view stay accurate:
+map so the link-health evidence and any graph view stay accurate:
 
 ```powershell
 pwsh -NoProfile -File bin/update-node-map.ps1

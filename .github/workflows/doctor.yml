@@ -27,7 +27,9 @@ jobs:
   cold-clone-doctor:
     name: brain-doctor on a cold clone (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # 0.2 runs eight suites; windows-latest needed about 17 minutes in the private rehearsal
+    # (2026-10-03), so 15 cancelled the job mid-suite. 30 keeps a bound with headroom.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -38,19 +40,27 @@ jobs:
       - name: PowerShell is preinstalled (pwsh)
         run: pwsh --version
 
-      - name: Run hermetic privacy, onboarding, retrieval, and skill-structure batteries
+      # One explicit shell on both runners. Windows' default pwsh step checks only the LAST
+      # command's exit code, so a failing suite earlier in a plain list would pass silently.
+      - name: Run hermetic privacy, onboarding, retrieval, skill, envelope, decision, recall, and session batteries
+        shell: pwsh
         run: |
-          pwsh -NoProfile -File tests/remote-privacy-unit.ps1
-          pwsh -NoProfile -File tests/private-onboarding.ps1
-          pwsh -NoProfile -File tests/node-map-retrieval.ps1
-          pwsh -NoProfile -File tests/skill-structure.ps1
+          $failed = @()
+          foreach ($suite in 'remote-privacy-unit','private-onboarding','node-map-retrieval','skill-structure',
+                             'envelope-check','decision-authority','recall','session-safety') {
+            pwsh -NoProfile -File "tests/$suite.ps1"
+            if ($LASTEXITCODE -ne 0) { $failed += "$suite (exit $LASTEXITCODE)" }
+          }
+          if ($failed) { throw "failed suites: $($failed -join ', ')" }
 
       - name: Arm the git hooks
+        shell: bash
         run: |
           git config core.hooksPath .githooks
           git remote remove origin
 
       - name: One-command local-only setup (scaffold create-your-own files)
+        shell: bash
         run: |
           git config user.name "mdr-kernel CI"
           git config user.email "ci@example.invalid"

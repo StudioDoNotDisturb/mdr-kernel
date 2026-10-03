@@ -1,6 +1,6 @@
 Title: Employee handbook
 Type: Public Themed Layer / Onboarding Texture
-Context: The emotional center of the mdr-kernel themed layer — corporate-polite lore, taste and humor rules, and the metaphor-to-mechanism intent. Not operational authority; STATE.md, the contract, the runbook, and the scripts win.
+Context: Use when you need the lore, taste and humor rules or metaphor-to-mechanism intent of the mdr-kernel themed layer; it is not operational authority, and STATE.md, the contract, the runbook and the scripts win.
 
 # Employee handbook
 

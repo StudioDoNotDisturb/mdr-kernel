@@ -16,7 +16,7 @@
   "should_not_trigger": [
     {
       "query": "Implement the login form in my app.",
-      "why": "Ordinary coding should route through STATE and the node map to project files."
+      "why": "Ordinary coding selects project files from STATE and reference/INDEX.md, not this skill."
     },
     {
       "query": "Explain what PowerShell is.",

@@ -27,7 +27,7 @@ if (Test-Path $lock) {
   $holder = $null
   $raw = Get-Content -Raw $lock -ErrorAction SilentlyContinue
   if ($raw) { try { $holder = ($raw | ConvertFrom-Json).model } catch { $holder = ($raw.Trim() -split '\s+')[0] } }
-  $msgs += "STATE.lock is still held by '$holder' — fine mid-session; release after close-out: pwsh -NoProfile -File bin/state-lock.ps1 -Release."
+  $msgs += "STATE.lock is still held by '$holder' — fine mid-session; close-session releases it after a successful push; a lock you hold outside close: pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model <your-model-id> -Token <your acquired token>."
 }
 
 if ($msgs.Count) {

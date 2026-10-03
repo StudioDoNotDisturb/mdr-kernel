@@ -1,6 +1,6 @@
 Title: Handoff — 2026-01-15 — first recall gate for the deploy loop
 Type: Handoff / Session Closeout (EXAMPLE)
-Context: Worked example of a filled handoff. Not a live handoff — do not place in handoffs/. Shows the expected shape, altitude, and completeness for an mdr-kernel closeout note.
+Context: Use when writing a handoff and you want a worked example of the expected shape, altitude and completeness; it is not a live handoff, so never place it in handoffs/.
 
 # Handoff — 2026-01-15 — first recall gate for the deploy loop
 
@@ -21,8 +21,8 @@ Context: Worked example of a filled handoff. Not a live handoff — do not place
 - Wired the tool-time banner into `bin/deploy.sh` so it prints the gate header at invocation via
   `bin/brain-recall.ps1 -GateId DEPLOY-CONTAINER -Header`.
 - Recorded the choice as a `DECISIONS.md` entry (newest on top).
-- Verified the gate matches: `bin/brain-recall.ps1 -Objective 'the deploy is stuck again'` returned
-  `MATCHED` and listed the trap and required reads.
+- Verified the gate matches: `bin/prepare-work.ps1 -Objective 'the deploy is stuck again'` returned
+  `RECALL_STATUS=MATCHED` and listed the trap and required reads.
 
 ## Current state
 

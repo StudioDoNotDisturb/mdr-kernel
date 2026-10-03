@@ -9,17 +9,17 @@
       clone has the hook files but they are inactive until armed
     - scaffolds the "grow your own memory" files so brain-doctor passes on a cold clone
     - writes the .brain-root marker
-    - confirms model identity (or configures a single-model fallback)
+    - requires explicit session identity and sealed lock ownership before any writes
     - optionally commits the scaffold under STATE.lock so start-session begins from a clean tree
     - runs brain-doctor
 
   Idempotent: existing files are never overwritten. Safe to re-run.
 
 .EXAMPLE
-  pwsh -NoProfile -File bin/setup-private.ps1 -Model 'claude-opus-4-8'   # the adopter entry point
-  pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model 'claude-opus-4-8' -CommitScaffold  # repair
-  pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model 'claude-opus-4-8' # inspect scaffold before committing
-  pwsh -NoProfile -File bin/bootstrap-clone.ps1            # keep existing brain.model
+  pwsh -NoProfile -File bin/setup-private.ps1 -Model 'claude-opus-5'   # the adopter entry point
+  pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model 'claude-opus-5' -CommitScaffold  # repair
+  pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model 'claude-opus-5' # inspect scaffold before committing
+  pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model '<actual-model-id>' # repair
 #>
 [CmdletBinding()]
 param(
@@ -34,20 +34,42 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 function Ok  ([string]$m) { Write-Host "[ ok ] $m" }
 function Warn([string]$m) { Write-Host "[warn] $m" }
 function Step([string]$m) { Write-Host "`n== $m ==" }
-function Read-SharedLockToken {
-  $lockCommon = (git -C $root rev-parse --path-format=absolute --git-common-dir 2>$null)
-  if (-not $lockCommon) { $lockCommon = (git -C $root rev-parse --git-common-dir 2>$null) }
-  $lockFile = if ($lockCommon -and (Test-Path -LiteralPath (Split-Path -Parent $lockCommon))) {
-    Join-Path (Split-Path -Parent $lockCommon) 'STATE.lock'
-  } else { Join-Path $root 'STATE.lock' }
-  if (-not (Test-Path -LiteralPath $lockFile)) { return $null }
-  try { return [string]((Get-Content -Raw -LiteralPath $lockFile | ConvertFrom-Json).token) } catch { return $null }
-}
 
 Write-Host "mdr-kernel bootstrap - $root"
 if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
   throw 'This folder is not a git working tree. ZIP/no-git copies are unsupported for bootstrap; use git clone (preferred) or git init first.'
 }
+
+# Bootstrap writes shared files even without -CommitScaffold. Explicit identity and sealed
+# ownership are required before the first mutation; shared config is never promoted to identity.
+$current = if ($Model -and $Model.Trim()) { $Model.Trim() } elseif ($env:BRAIN_MODEL -and $env:BRAIN_MODEL.Trim()) { $env:BRAIN_MODEL.Trim() } else { '' }
+if (-not $current) { throw 'Bootstrap requires explicit -Model or process BRAIN_MODEL before writing; git config brain.model is display-only.' }
+$env:BRAIN_MODEL = $current
+$scaffoldPaths = @('STATE.md','DECISIONS.md','handoffs/INDEX.md','reference/INDEX.md','specs/INDEX.md',
+  'inbox/README.md','protocol/recall-gates.json','CLAUDE.md','AGENTS.md','GEMINI.md','protocol/advisory.md',
+  'protocol/decision-authority.json','protocol/rulings.json','maps/node-map.json','maps/NODE-MAP.md','maps/OBSIDIAN-NODE-LINKS.md')
+$preStaged = @(git diff --cached --name-only)
+# Existing staged work has an owner, even when its path resembles a scaffold output.
+if ($preStaged.Count -gt 0) { throw ('Bootstrap refuses a nonempty index; commit or unstage your own work first: ' + ($preStaged -join ', ')) }
+$lockScript = Join-Path $root 'bin/state-lock.ps1'
+$originalLockToken = $env:BRAIN_LOCK_TOKEN
+$ownedBefore = $false
+if ($originalLockToken) {
+  & pwsh -NoProfile -File $lockScript -CheckOwner -Model $current *> $null
+  $ownedBefore = $LASTEXITCODE -eq 0
+}
+$acquireOutput = @(& pwsh -NoProfile -File $lockScript -Acquire -Model $current -Objective 'initialize or repair mdr-kernel memory scaffold' 2>&1)
+$acquireCode = $LASTEXITCODE
+$acquireOutput | ForEach-Object { Write-Host $_ }
+if ($acquireCode -ne 0) { throw 'could not acquire STATE.lock before bootstrap writes' }
+$acquiredToken = @($acquireOutput | ForEach-Object { if ([string]$_ -match '^session token: ([a-f0-9]+)$') { $Matches[1] } })
+# Acquire prints no token when it sealed the caller's BRAIN_LOCK_TOKEN into a free lock; the
+# -CheckOwner proof below then verifies that this invocation's acquire holds it.
+if ($acquiredToken.Count -eq 1) { $env:BRAIN_LOCK_TOKEN = $acquiredToken[0] }
+elseif (-not $ownedBefore -and -not $env:BRAIN_LOCK_TOKEN) { throw 'Acquire did not return a session token; no bootstrap writes performed.' }
+& pwsh -NoProfile -File $lockScript -CheckOwner -Model $current
+if ($LASTEXITCODE -ne 0) { throw 'Bootstrap ownership proof failed; no bootstrap writes performed.' }
+try {
 
 # 1) Arm hooks for this clone -----------------------------------------------------
 Step 'arm git hooks'
@@ -70,7 +92,7 @@ if (-not $originUrl) {
 } else {
   & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'remote-privacy.ps1') -RequireApproved
   if ($LASTEXITCODE -ne 0) {
-    throw "remote privacy is not verified and approved - run the adopter entry point: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-4-8')"
+    throw "remote privacy is not verified and approved - run the adopter entry point: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-5')"
   }
   Ok 'private remote verified and approved'
 }
@@ -153,7 +175,8 @@ Context: Append-only decision log; newer entries supersede older ones and explai
 # Decisions
 
 Append-only. Newest at the top. Don't edit old entries - if a decision changes, add a new one
-that says "supersedes #N". Each entry answers: what, why, what it rules out.
+with `bin/add-decision.ps1` and an explicit supersession field. Each entry answers: what, why,
+what it rules out. A proposal does not bind; an operator ruling includes the operator's words.
 
 ---
 
@@ -265,6 +288,21 @@ elseif (Test-Path $recallExample) {
   Ok 'created: protocol/recall-gates.json (from example)'
 } else { Warn 'protocol/recall-gates.example.json missing - cannot seed recall gates' }
 
+# An empty new log has no legacy to classify. Never infer authority for an existing log.
+$authorityPath = Join-Path $root 'protocol/decision-authority.json'
+if (-not (Test-Path -LiteralPath $authorityPath)) {
+  $logText = [IO.File]::ReadAllText((Join-Path $root 'DECISIONS.md'))
+  if ($logText -match '(?m)^## D\d+\b') {
+    Warn 'Existing decision history needs explicit migration: see docs/decision-authority.md.'
+  } else {
+    New-IfMissing 'protocol/decision-authority.json' '{"schema_version":1,"authority_from":1}'
+  }
+}
+if (Test-Path -LiteralPath $authorityPath) {
+  & pwsh -NoProfile -File (Join-Path $root 'bin/build-rulings.ps1')
+  if ($LASTEXITCODE -ne 0) { throw 'Could not compile decision rulings.' }
+}
+
 # 2b) Generate the model front doors from the contract -----------------------------
 Step 'generate front doors'
 $syncDoors = Join-Path $root 'bin/sync-doors.ps1'
@@ -278,28 +316,9 @@ if (-not $CommitScaffold) {
   Invoke-NodeMap
 }
 
-# 3) Model identity ---------------------------------------------------------------
+# 3) Identity is already explicit and lock-proven above.
 Step 'model identity'
-$configured = (git config brain.model 2>$null)
-$current = $null
-if ($env:BRAIN_MODEL) {
-  $current = $env:BRAIN_MODEL
-  Ok "using process BRAIN_MODEL = $current"
-} elseif ($Model) {
-  git config brain.model $Model
-  Ok "set single-model fallback git config brain.model = $Model"
-  $current = $Model
-} elseif ($configured) {
-  $current = $configured
-  Warn "using fallback git config brain.model = $current; shared clones should set process BRAIN_MODEL"
-} else {
-  # Never Read-Host here (D244): this kernel's primary users are non-interactive AI agents, and
-  # a prompt hangs them forever — [Environment]::UserInteractive is TRUE inside most agent
-  # harnesses, so "am I interactive" cannot be detected reliably on Windows. Identity is
-  # enforced where it matters (lock/commit time, by pre-commit and the doctor), not at scaffold
-  # time; the -Model param, BRAIN_MODEL, and git config remain the three supported paths.
-  Warn "brain.model unset and no -Model given - single-model clone: git config brain.model <id>; shared clone: set BRAIN_MODEL per session (or re-run bootstrap with -Model <id>)"
-}
+Ok "using process BRAIN_MODEL = $current"
 
 # 4) Optional scaffold checkpoint -------------------------------------------------
 # Bootstrap deliberately creates local coordination files. start-session refuses a dirty tree so
@@ -312,11 +331,6 @@ if ($CommitScaffold) {
   if ($dirty.Count -eq 0) {
     Ok 'nothing to commit; scaffold already checkpointed'
   } else {
-    if ($current -and -not $env:BRAIN_MODEL) {
-      $env:BRAIN_MODEL = $current
-      Ok "set process BRAIN_MODEL = $current for lock/commit"
-    }
-
     $userName = (git config user.name 2>$null)
     $userEmail = (git config user.email 2>$null)
     if (-not $userName) {
@@ -328,29 +342,28 @@ if ($CommitScaffold) {
       Ok 'set local git user.email for bootstrap commit'
     }
 
-    $lockScript = Join-Path $root 'bin/state-lock.ps1'
-    $originalLockToken = $env:BRAIN_LOCK_TOKEN
-    & pwsh -NoProfile -File $lockScript -Acquire -Objective 'initialize mdr-kernel memory scaffold'
-    if ($LASTEXITCODE -ne 0) { throw 'could not acquire STATE.lock for scaffold commit' }
-    try {
-      $lockToken = Read-SharedLockToken
-      if ($lockToken) { $env:BRAIN_LOCK_TOKEN = $lockToken }
       # Stage only the scaffold outputs bootstrap owns. Clone metadata like .brain-root stays
       # local-only and is intentionally left out of the checkpoint.
       git add -- STATE.md DECISIONS.md handoffs/INDEX.md reference/INDEX.md specs/INDEX.md inbox/README.md protocol/recall-gates.json CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md
       if ($LASTEXITCODE -ne 0) { throw 'git add failed for scaffold commit' }
+      git add -- protocol/decision-authority.json protocol/rulings.json
+      if ($LASTEXITCODE -ne 0) { throw 'git add failed for authority scaffold' }
       Step 'generate node map'
       Invoke-NodeMap -Required
       git add -- maps/node-map.json maps/NODE-MAP.md maps/OBSIDIAN-NODE-LINKS.md
       if ($LASTEXITCODE -ne 0) { throw 'git add failed for generated node maps' }
-      git commit -m 'Initialize mdr-kernel memory scaffold'
-      if ($LASTEXITCODE -ne 0) { throw 'git commit failed for scaffold commit' }
-      Ok 'committed scaffold checkpoint'
-    } finally {
-      & pwsh -NoProfile -File $lockScript -Release | ForEach-Object { Write-Host "  $_" }
-      if ($null -eq $originalLockToken) { Remove-Item Env:\BRAIN_LOCK_TOKEN -ErrorAction SilentlyContinue }
-      else { $env:BRAIN_LOCK_TOKEN = $originalLockToken }
-    }
+      $foreign = @(git diff --cached --name-only | Where-Object { $_ -notin $scaffoldPaths })
+      if ($foreign.Count) { throw ('Foreign staged paths appeared during bootstrap; leaving index intact: ' + ($foreign -join ', ')) }
+      # Untracked work belonging to someone else makes the tree dirty without giving bootstrap
+      # anything to commit; an empty scaffold stage is "already checkpointed", not a failure.
+      if (-not @(git diff --cached --name-only).Count) {
+        Ok 'nothing to commit; scaffold already checkpointed (unrelated paths left untouched)'
+      } else {
+        git commit -m 'Initialize mdr-kernel memory scaffold'
+        if ($LASTEXITCODE -ne 0) { throw 'git commit failed for scaffold commit' }
+        Ok 'committed scaffold checkpoint'
+      }
+
   }
 } else {
   Warn 'bootstrap created local scaffold files; commit them before start-session, or rerun with -CommitScaffold'
@@ -366,4 +379,13 @@ if (-not $CommitScaffold) {
   Write-Host "  # checkpoint scaffold first, or run bootstrap again with -CommitScaffold"
 }
 Write-Host "  pwsh -NoProfile -File bin/start-session.ps1 -Model '$Model'"
+} finally {
+  # A caller that already owned this lock keeps it. Release only the lock this invocation acquired.
+  if (-not $ownedBefore) {
+    & pwsh -NoProfile -File $lockScript -Release -Model $current | ForEach-Object { Write-Host "  $_" }
+    if ($LASTEXITCODE -ne 0) { Write-Warning 'Bootstrap lock release failed; inspect ownership before recovery.' }
+  }
+  if ($null -eq $originalLockToken) { Remove-Item Env:\BRAIN_LOCK_TOKEN -ErrorAction SilentlyContinue }
+  else { $env:BRAIN_LOCK_TOKEN = $originalLockToken }
+}
 exit $doctorExit

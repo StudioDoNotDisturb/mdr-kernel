@@ -61,10 +61,6 @@ function Read-LockState([string]$Path) {
   if (-not $raw) { return $null }
   try { return ($raw | ConvertFrom-Json) } catch { return $null }
 }
-function Set-SessionLockToken([string]$Path) {
-  $lockState = Read-LockState $Path
-  if ($lockState -and $lockState.token) { $env:BRAIN_LOCK_TOKEN = [string]$lockState.token }
-}
 
 # Committing identity must be explicit (-Model or process BRAIN_MODEL). The clone's git config
 # brain.model stays a display fallback only: on a shared clone it can name another surface, and a
@@ -78,6 +74,7 @@ if (-not $model) { $model = 'unknown' }
 if ($modelSource -notin @('param', 'env')) {
   Fail "close-out identity must be explicit (resolved from '$modelSource': '$model') — pass -Model '<model-id>' or set `$env:BRAIN_MODEL for this session; git config brain.model can name another surface"
 }
+if ($fail) { exit 1 }
 # Children (state-lock -Acquire, git commit's pre-commit gate) read BRAIN_MODEL from this process,
 # so a -Model given only as a parameter must be exported for the duration of the close.
 $originalBrainModel = $env:BRAIN_MODEL
@@ -90,6 +87,7 @@ if ($modelSource -eq 'param') { $env:BRAIN_MODEL = $model }
 $paramToken = if ($Token) { $Token.Trim() } else { '' }
 if ($paramToken) { $env:BRAIN_LOCK_TOKEN = $paramToken }
 
+try {
 Write-Host "mdr-kernel close-session — $root (model: $model)`n"
 
 # A remote-backed memory has one boring canonical path: its approved PRIVATE origin/main.
@@ -144,6 +142,47 @@ if ($hasRemote) {
   }
 }
 
+# 0) Close set and foreign-staging refusal BEFORE any side effect (lock acquire, handoff repair,
+# staging). Another workstream's staged paths are never unstaged, committed, or locked over.
+$utcToday   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
+$localToday = (Get-Date).ToString('yyyy-MM-dd')
+$dateCandidates = if ($SessionDate) { @($SessionDate) } else {
+  @(
+    $utcToday
+    $localToday
+    (Get-Date).ToUniversalTime().AddDays(-1).ToString('yyyy-MM-dd')
+    (Get-Date).ToUniversalTime().AddDays(1).ToString('yyyy-MM-dd')
+  ) | Select-Object -Unique
+}
+function Test-InCloseSet([string]$path, [string[]]$coordPaths, [string[]]$handoff, [string[]]$alsoSpecs) {
+  $n = $path.Replace('\', '/')
+  if ($coordPaths -contains $n) { return $true }
+  if ($n -like 'maps/*') { return $true }
+  # The write-approval audit is the gate's own artifact and must ride the close that commits an
+  # approved file (pre-commit gate 4 requires them staged together).
+  if ($n -eq 'inbox/write-approval-audit.jsonl') { return $true }
+  if ($handoff -and ($handoff -contains $n)) { return $true }
+  foreach ($a in $alsoSpecs) {
+    $an = $a.Replace('\', '/').TrimEnd('/')
+    if ($n -eq $an -or $n -like "$an/*") { return $true }
+  }
+  return $false
+}
+# pwsh -File binds "-Also a,b" as ONE literal string (comma splitting only happens in full
+# command parsing), so the documented multi-path form silently matched nothing. Split here.
+$Also = @($Also | ForEach-Object { ([string]$_) -split ',' } |
+  ForEach-Object { ($_.Trim() -replace '^[''\"]+', '' -replace '[''\"]+$', '').Trim() } | Where-Object { $_ })
+$coordList = Join-Path $root 'protocol/coordination-files.txt'
+if (-not (Test-Path -LiteralPath $coordList)) { Fail 'coordination policy is missing; restore protocol/coordination-files.txt'; exit 1 }
+$coordPaths = @(Get-Content $coordList | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
+$handoffCandidates = if ($Topic -and -not $NoHandoff) { @($dateCandidates | ForEach-Object { "handoffs/$_-$Topic.md" }) } else { @() }
+$earlyForeign = @(git diff --cached --name-only | Where-Object { -not (Test-InCloseSet $_ $coordPaths $handoffCandidates $Also) })
+if ($earlyForeign.Count) {
+  Fail 'staged paths outside this close set belong to another workstream; nothing unstaged or committed'
+  $earlyForeign | ForEach-Object { Write-Host "    $_" }
+  exit 1
+}
+
 # 1) Resolve shared STATE.lock path.
 # Shared lock across canonical + worktrees (dirname(--git-common-dir)); a per-tree lock would
 # break single-writer when a session runs from a linked worktree.
@@ -158,19 +197,27 @@ if (Test-Path $lockFile) {
   $preHeldLockState = Read-LockState $lockFile
   if ($preHeldLockState) { $holder = $preHeldLockState.model } else { $holder = ((Get-Content -Raw $lockFile).Trim() -split '\s+')[0] }
 }
-# Never adopt a live same-model lock's token: sharing a model NAME is not proof of being the same
-# SESSION — copying the token out of the lock let a second same-model process close over (and
-# release) a live partner's lock. Ownership proof is the token this session already carries, or a
-# legacy tokenless lock. The auto-acquire path below may still read the token it just created,
-# because an atomic CreateNew acquire proves exclusive ownership.
-if ($holder -and $holder -ne $model) {
-  Fail "STATE.lock held by '$holder', not '$model' — do not close out coordination files; write an inbox note or standalone handoff and report the pending integration"
-} elseif ($holder -and $preHeldLockState -and $preHeldLockState.token) {
-  if (([string]$env:BRAIN_LOCK_TOKEN).Trim() -eq [string]$preHeldLockState.token) { Ok "STATE.lock held by this session ($model)" }
+# Prove ownership before any handoff repair or staging. Capture only the token returned by OUR
+# atomic acquire; reading another session's token out of STATE.lock never proves ownership.
+if ($fail) { exit 1 }
+if (-not (Test-Path -LiteralPath $lockFile)) {
+  if ($DryRun) { Warn 'STATE.lock free — a real close would acquire it' }
   else {
-    Fail "STATE.lock is held by another '$model' session (token mismatch) — do not close over a live partner. Your own lock from another shell? re-run with -Token '<token printed by your -Acquire>' (shell-safe; or set BRAIN_LOCK_TOKEN). Otherwise queue with bin/state-lock.ps1 -Acquire -Wait, or (dead session per brain-doctor, heartbeat >120m) bin/state-lock.ps1 -Release -Force"
+    $acquireOutput = @(& pwsh -NoProfile -File (Join-Path $root 'bin/state-lock.ps1') -Acquire -Model $model -Objective "session close: $Topic" 2>&1)
+    $acquireExit = $LASTEXITCODE
+    $acquireOutput | Out-Host
+    if ($acquireExit -ne 0) { Fail 'could not acquire STATE.lock; wait for the holder'; exit 1 }
+    $autoAcquiredLock = $true
+    $holder = $model
+    $tokenLine = @($acquireOutput | Where-Object { $_ -match '^session token:\s*(\S+)' }) | Select-Object -First 1
+    if ($tokenLine -and $tokenLine -match '^session token:\s*(\S+)') { $env:BRAIN_LOCK_TOKEN = $Matches[1] }
   }
-} elseif ($holder) { Ok "STATE.lock held by $model (legacy tokenless lock)" }
+}
+if (Test-Path -LiteralPath $lockFile) {
+  & pwsh -NoProfile -File (Join-Path $root 'bin/state-lock.ps1') -CheckOwner -Model $model | Out-Host
+  if ($LASTEXITCODE -ne 0) { Fail 'STATE.lock ownership unproven — carry YOUR acquired token with -Token, or wait for the holder'; exit 1 }
+  Ok "STATE.lock owned by this $model session (token verified)"
+}
 
 # 2) Session handoff + INDEX row.
 # UTC is the system's default date (state-lock, node-map, STATE headers), but a session closing in
@@ -179,16 +226,6 @@ if ($holder -and $holder -ne $model) {
 # renamed the handoff (file, title, INDEX row) into the demanded date until the check passed.
 # Accept the first existing match among UTC today / local today / UTC±1 and say which was used;
 # -SessionDate stays the explicit override for anything outside that window.
-$utcToday   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
-$localToday = (Get-Date).ToString('yyyy-MM-dd')
-$dateCandidates = if ($SessionDate) { @($SessionDate) } else {
-  @(
-    $utcToday
-    $localToday
-    (Get-Date).ToUniversalTime().AddDays(-1).ToString('yyyy-MM-dd')
-    (Get-Date).ToUniversalTime().AddDays(1).ToString('yyyy-MM-dd')
-  ) | Select-Object -Unique
-}
 $today = $dateCandidates[0]
 $handoffRel = $null
 if ($NoHandoff) { Warn 'NoHandoff: skipping the handoff check (explicit opt-out)' }
@@ -216,9 +253,12 @@ else {
       $handoffText.TrimEnd() -match '(?m)^## SYSTEM NODE LINKS\r?\n\r?\nDirectory Path: [^\r\n]+\r?\nNext Sequential File: [^\r\n]+\r?\nRelated Workflows: [^\r\n]+\r?\nAI Execution Prompts: [^\r\n]+\s*\z'
     ) {
       $repaired = [regex]::Replace($handoffText, '(?s)\r?\n\s*(## SYSTEM NODE LINKS\b)', "`n`n---`n`n`$1", 1)
-      Set-Content -LiteralPath $handoffPath -Value $repaired -NoNewline
-      $handoffText = Get-Content -Raw -LiteralPath $handoffPath
-      Ok 'handoff envelope auto-repaired: inserted the missing `---` separator before SYSTEM NODE LINKS'
+      $handoffText = $repaired
+      if ($DryRun) { Warn 'DryRun: would insert missing handoff separator' }
+      else {
+        Set-Content -LiteralPath $handoffPath -Value $repaired -NoNewline
+        Ok 'handoff envelope auto-repaired: inserted the missing `---` separator before SYSTEM NODE LINKS'
+      }
     }
 
     $nonEmpty = @($handoffText -split "`r?`n" | Where-Object { $_.Trim() })
@@ -263,7 +303,6 @@ $notes = @(Get-InboxNotes (Join-Path $root 'inbox'))
 if ($notes.Count) { Warn "inbox/ has $($notes.Count) unfolded note(s) — fold them or say in the handoff why they wait" }
 else { Ok 'inbox/ empty' }
 
-try {
   # 5) Doctor: only its hard failures (e.g. committed secret) block a close, so run just the
   # hazard gates (-HardOnly) — the full advisory sweep already ran at session start and its
   # output is discarded here anyway.
@@ -271,7 +310,7 @@ try {
   if ($LASTEXITCODE -ne 0) { Fail 'brain-doctor reports a hard failure — run it and fix before closing' }
   else { Ok 'brain-doctor: no hard failures' }
 
-  # Close-set staging: coordination files, this handoff, Markdown inbox notes, generated maps,
+  # Close-set staging: coordination files, this handoff, generated maps,
   # and paths explicitly named with -Also. Stray downloads and another session's work stay out.
   # --untracked-files=all: plain porcelain collapses a fully-untracked directory into one 'dir/'
   # entry, so an -Also naming a file INSIDE it matched nothing and the file silently missed the
@@ -283,24 +322,6 @@ try {
       $p.Trim('"')
     })
   }
-  function Test-InCloseSet([string]$path, [string[]]$coordPaths, [string]$handoff, [string[]]$alsoSpecs) {
-    $n = $path.Replace('\', '/')
-    if ($coordPaths -contains $n) { return $true }
-    if ($n -like 'maps/*') { return $true }
-    # The write-approval audit is the gate's own artifact and must ride the close that commits an
-    # approved file (pre-commit gate 4 requires them staged together).
-    if ($n -eq 'inbox/write-approval-audit.jsonl') { return $true }
-    if ($n -like 'inbox/*') { return ($n -like '*.md') }
-    if ($handoff -and $n -eq $handoff) { return $true }
-    foreach ($a in $alsoSpecs) {
-      $an = $a.Replace('\', '/').TrimEnd('/')
-      if ($n -eq $an -or $n -like "$an/*") { return $true }
-    }
-    return $false
-  }
-  # pwsh -File binds "-Also a,b" as ONE literal string (comma splitting only happens in full
-  # command parsing), so the documented multi-path form silently matched nothing. Split here.
-  $Also = @($Also | ForEach-Object { ([string]$_) -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   # A typo'd -Also path silently stages nothing and the session believes its file rode the close.
   # Name every spec that matches no pending change so the miss is loud before the commit.
   function Write-UnmatchedAlso([string[]]$alsoSpecs, [string[]]$pending) {
@@ -321,11 +342,13 @@ try {
       }
     }
   }
-  $coordList = Join-Path $root 'protocol/coordination-files.txt'
-  $coordPaths = if (Test-Path -LiteralPath $coordList) {
-    @(Get-Content $coordList | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
-  } else { @('STATE.md','DECISIONS.md','protocol/CONTRACT.md') }
   $pendingPaths = Get-PendingPaths
+  $foreignStaged = @(git diff --cached --name-only | Where-Object { -not (Test-InCloseSet $_ $coordPaths $handoffRel $Also) })
+  if ($foreignStaged.Count) {
+    Fail 'staged paths outside this close set belong to another workstream; nothing unstaged or committed'
+    $foreignStaged | ForEach-Object { Write-Host "    $_" }
+    exit 1
+  }
   if ($DryRun) {
     Write-Host "`n-- DryRun: would stage (close set) --"
     Write-UnmatchedAlso $Also $pendingPaths
@@ -338,17 +361,8 @@ try {
   }
   if ($fail) { Write-Host "`nclose-session: $fail failing check(s) — nothing committed."; exit 1 }
 
-  if (-not $holder) {
-    & pwsh -NoProfile -File (Join-Path $root 'bin/state-lock.ps1') -Acquire -Model $model | Out-Host
-    if ($LASTEXITCODE -ne 0) { Fail 'could not acquire STATE.lock'; exit 1 }
-    $autoAcquiredLock = $true
-    $holder = $model
-    Set-SessionLockToken $lockFile
-    Ok "STATE.lock acquired by $model"
-  }
-
   # 6) Stage + commit (trailer explicit; prepare-commit-msg backstops, never double-stamps).
-  if ($pendingPaths.Count) {
+  if (@($pendingPaths | Where-Object { Test-InCloseSet $_ $coordPaths $handoffRel $Also }).Count) {
     # Retrieval truth is defined over git-tracked Markdown. Pre-stage only Markdown already in
     # this session's close set, then generate; unrelated lanes remain untouched and unindexed.
     $preMapMarkdown = @($pendingPaths | Where-Object {
@@ -396,7 +410,8 @@ try {
     } else { Ok 'close set already clean — nothing to commit' }
   } else {
     Write-UnmatchedAlso $Also @()
-    Ok 'tree already clean — nothing to commit'
+    Ok 'close set already clean — nothing to commit'
+    if ($pendingPaths.Count) { Warn "left $($pendingPaths.Count) unrelated path(s) untouched" }
   }
 
   # 7) Push when a remote exists. OfflineCheckpoint is an explicit escape hatch: it commits
@@ -419,6 +434,7 @@ try {
     Ok 'pushed'
   }
   & pwsh -NoProfile -File (Join-Path $root 'bin/state-lock.ps1') -Release | Out-Host
+  if ($LASTEXITCODE -ne 0) { Fail 'could not release this session lock'; exit 1 }
   $releasedLock = $true
 
   # Untracked-files=no: this close intentionally leaves stray untracked paths behind (another
