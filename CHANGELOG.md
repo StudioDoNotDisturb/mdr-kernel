@@ -6,6 +6,18 @@ Context: Describes portable changes in the distribution without treating a sourc
 
 ## Unreleased on main (after 0.2.0)
 
+- The generated contract block is cut from 10.3 KB to about 3.3 KB, so a set-up door costs about
+  2k fewer tokens per session. It keeps startup, STATE wins, the never-rules (secrets, operator
+  rulings, STATE.lock, machine-local lock), recall, the least-code ladder, checkpoint commits,
+  the Markdown envelope, context budget and close. Mechanics that hooks and scripts enforce are
+  left to them. A new Rule detail section in `protocol/CONTRACT.md` points each rule to the doc
+  that explains it in full. If you edited your contract, expect a larger merge when upgrading.
+- `bin/start-session.ps1` prints doctor warnings, failures, the lock line and the verdict, and
+  counts the `[ ok ]` lines instead of printing them. `-FullDoctor` or
+  `BRAIN_STARTUP_FULL_DOCTOR=1` prints the full output.
+- `bin/update-node-map.ps1` now really sorts the file list (the sort keys did not read the
+  dictionary records) and no longer stores file modification times, so regenerating the map
+  without a Markdown change leaves `maps/` unchanged.
 - `docs/upgrading.md` is now an exact, rehearsed 0.1-to-0.2 walkthrough for template copies and
   retained-history clones: read-only release fetch, path-by-path copy with three-way merges of
   your edits, decision-log preflight before the new hooks arrive, explicit authority migration,

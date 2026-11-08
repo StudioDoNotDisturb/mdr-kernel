@@ -275,7 +275,14 @@ if ((git config --local --get brain.mode) -eq 'private-remote') {
   pwsh -NoProfile -File bin/remote-privacy.ps1 -RequireApproved; Must 'privacy verifier'
   pwsh -NoProfile -File bin/sync-private.ps1; Must 'private sync'
 }
-Remove-Item -Recurse -Force $work
+$upgradeTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+$upgradeWorkPath = [IO.Path]::GetFullPath($work).TrimEnd([IO.Path]::DirectorySeparatorChar)
+$upgradePathComparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+if (-not $upgradeWorkPath.StartsWith($upgradeTempRoot, $upgradePathComparison) -or
+    [IO.Path]::GetFileName($upgradeWorkPath) -notmatch '^mdr-upgrade-[0-9a-f]{32}$') {
+  throw 'STOP: upgrade cleanup path is outside the generated temporary workspace'
+}
+Remove-Item -LiteralPath $upgradeWorkPath -Recurse -Force
 pwsh -NoProfile -File bin/start-session.ps1 -Model $model; Must 'start-session'
 ```
 

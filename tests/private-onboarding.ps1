@@ -722,7 +722,7 @@ try {
   # Finding 8a: a partially staged contract/door set is in-sync on disk but drifted in the commit
   # snapshot; the staged-blob check must catch what the working-tree check cannot.
   $cp2Contract = Join-Path $clone 'protocol/CONTRACT.md'
-  $contractMut = (Get-Content -Raw $cp2Contract) -replace 'How to start/end a session:', 'CP2 staged-drift marker. How to start/end a session:'
+  $contractMut = (Get-Content -Raw $cp2Contract) -replace 'mdr-kernel contract - every model follows this', 'CP2 staged-drift marker. mdr-kernel contract - every model follows this'
   [IO.File]::WriteAllText($cp2Contract, $contractMut, (New-Object Text.UTF8Encoding($false)))
   & pwsh -NoProfile -File (Join-Path $clone 'bin/sync-doors.ps1') | Out-Null
   & git -C $clone add protocol/CONTRACT.md

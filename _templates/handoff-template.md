@@ -17,7 +17,8 @@ Context: End-of-session transfer note that lets another full participant resume 
 
   Quality bar:
   - Every section that applies must be filled in. Do not leave placeholder bullets.
-  - "Current state" must match STATE.md exactly. If they diverge, STATE.md is wrong — fix it.
+  - "Current state" must match STATE.md. STATE wins live conflicts; correct stale handoff text.
+    Integrate new verified evidence into STATE only while holding your own STATE.lock.
   - "Next actions" must be concrete enough to execute without clarification.
   - Do not write a session narrative. Write outcomes, decisions, and resume instructions.
 
@@ -38,12 +39,14 @@ Include the specific files, commands, or decisions that are now in the record.)
 ## Current state
 
 (One cold-resumable paragraph. Answer: what is true right now, what is working, what is not.
-This must match STATE.md. If STATE.md disagrees, fix STATE.md before committing this handoff.)
+This must match STATE.md. Correct stale handoff text when they disagree; update STATE only
+to integrate new verified evidence under your own lock.)
 
 ## Decisions made
 
-(Each real decision also gets an entry in DECISIONS.md — append-only, newest on top.
-Do not skip DECISIONS.md. That is where the next agent looks for architectural choices.)
+(Quoted operator rulings and durable proposals use bin/add-decision.ps1 with the appropriate
+authority. Proposals are not rules. Work reports and session choices stay in this handoff;
+label choices "Session choices (not rulings)". Never write the human ratification ledger.)
 
 -
 

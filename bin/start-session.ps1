@@ -14,7 +14,8 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Model = $env:BRAIN_MODEL
+  [string]$Model = $env:BRAIN_MODEL,
+  [switch]$FullDoctor
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,7 +60,19 @@ if ($modelId -eq 'UNSET') {
 Write-Host "`n== 1. brain-doctor =="
 $doctorOutput = & pwsh -NoProfile -File (Join-Path $root 'bin/brain-doctor.ps1') 2>&1
 $doctorExit = $LASTEXITCODE
-$doctorOutput | ForEach-Object { Write-Host $_ }
+# Compact by default: this report enters every model's context. [ ok ] lines are counted, not
+# printed; warnings, failures, the lock line and the verdict always print.
+if ($FullDoctor -or $env:BRAIN_STARTUP_FULL_DOCTOR -eq '1') {
+  $doctorOutput | ForEach-Object { Write-Host $_ }
+} else {
+  $okHidden = 0
+  foreach ($line in $doctorOutput) {
+    $s = "$line"
+    if ($s -match '^\[ ok \]' -and $s -notmatch 'STATE\.lock') { $okHidden++; continue }
+    if ($s.Trim()) { Write-Host $s }
+  }
+  Write-Host "($okHidden ok checks passed, not shown; full output: pwsh -NoProfile -File bin/brain-doctor.ps1)"
+}
 if ($doctorExit -ne 0) {
   $status = 'BLOCKED'
   $notes.Add("brain-doctor exited $doctorExit; resolve the reported hazard before working.")

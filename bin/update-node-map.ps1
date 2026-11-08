@@ -742,7 +742,6 @@ function Parse-NodeFile {
 
   $rel = Get-RelativePath $RootPath $FilePath
   $issues = [System.Collections.Generic.List[string]]::new()
-  $mtime = (Get-Item -LiteralPath $FilePath).LastWriteTimeUtc.ToString('o')
   try {
     $raw = [System.IO.File]::ReadAllText($FilePath)
     $text = ($raw.TrimStart([char]0xFEFF) -replace "`r`n", "`n" -replace "`r", "`n")
@@ -761,7 +760,6 @@ function Parse-NodeFile {
       issues = @($issues)
       waivedIssues = @()
       tracked = $Tracked
-      mtimeUtc = $mtime
     }
   }
 
@@ -780,7 +778,6 @@ function Parse-NodeFile {
     issues = @($issues)
     waivedIssues = @()
     tracked = $Tracked
-    mtimeUtc = $mtime
   }
 }
 
@@ -871,7 +868,9 @@ function Get-NodeData {
     foreach ($record in $records) { $allFiles.Add($record) }
   }
 
-  $sorted = @($allFiles | Sort-Object @{ Expression = 'root'; Ascending = $true }, @{ Expression = 'relPath'; Ascending = $true })
+  # Records are [ordered] dictionaries: a property-name sort key resolves to nothing on them and
+  # leaves input order, which reshuffled every regenerated map. Script-block keys read the entries.
+  $sorted = @($allFiles | Sort-Object { $_.root }, { $_.relPath })
   return [ordered]@{
     generatedUtc = (Get-Date).ToUniversalTime().ToString('o')
     roots = @($rootSummaries)
@@ -921,7 +920,7 @@ function New-ObsidianNodeLinksMarkdown($Data) {
   $lines.Add("generatedUtc: $($Data.generatedUtc)")
   $lines.Add('')
 
-  $localFiles = @($Data.files | Sort-Object root, relPath)
+  $localFiles = @($Data.files | Sort-Object { $_.root }, { $_.relPath })
   foreach ($file in $localFiles) {
     $lines.Add("## $(New-ObsidianFileLink $file.relPath $file.relPath)")
     $lines.Add('')

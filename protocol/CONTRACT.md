@@ -9,135 +9,80 @@ is generated into the model-facing doors (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`)
 `bin/sync-doors.ps1`. **Edit it here, then run sync.** A pre-commit check blocks commits where a
 door has drifted from this source._
 
-<!-- BEGIN BRAIN-CONTRACT v1 -->
+<!-- BEGIN BRAIN-CONTRACT v2 -->
 <!-- Canonical source: protocol/CONTRACT.md. In the front-door files this block is generated -
      edit the source and run bin/sync-doors.ps1; do not edit the generated copies. -->
 
 ## mdr-kernel contract - every model follows this
 
-You are working in a shared project/engineering memory. Every AI agent - Claude, Codex, Gemini,
-a local model - obeys this one contract. **The repo is the only shared brain: anything another
-model needs is a file here, never in a model's private memory.**
+This repo is a shared project memory for every AI agent that works in it: Claude, Codex, Gemini or
+a local model. **The repo is the only shared brain: anything another model needs is a file here,
+never a model's private memory.** Hooks and scripts enforce most rules: when one refuses, or a
+recall banner appears, read it and do what it says. Rule specifics: `protocol/CONTRACT.md`
+§ Rule detail. Procedures: `protocol/RUNBOOK.md`.
 
-**Start of session - one canonical sequence for every full participant:**
-1. Run `pwsh -NoProfile -File bin/start-session.ps1 -Model '<actual model id>'`. This runs
-   `brain-doctor`, refuses unsafe pulls from a dirty tree, runs `git pull --rebase`, then prints
-   the complete current `STATE.md`. Do not recreate these steps from memory.
-2. Resolve every `NOTE=` and require `STARTUP_STATUS=READY` before writing. If `STATE.lock` is held
-   by another session, **do not edit coordination files** until the lock is free or you hold it.
-3. Treat the printed `STATE.md` as live truth. If any other doc disagrees, **STATE wins**; then fix
-   the other doc. For assigned work, use `STATE.md` plus `reference/INDEX.md` to choose
-   the smallest relevant file set. The generated `maps/NODE-MAP.md` checks link health; it is
-   not the reading router. Read that slice first, state what you selected and why, and say what
-   you are intentionally not reading yet. Expand only when evidence shows the first slice is insufficient.
-   Report Right now / blockers / top next action and wait unless work was assigned.
+**Start:** run `pwsh -NoProfile -File bin/start-session.ps1 -Model '<actual model id>'`. It runs
+the doctor, pulls, and prints `STATE.md`. Never rebuild those steps from memory. Resolve every
+`NOTE=`, and write nothing until `STARTUP_STATUS=READY`. `STATE.md` is live truth: when another
+doc disagrees, STATE wins, and you fix the other doc. With no PowerShell or no writable clone,
+you are not a full participant: read `STATE.md` and return an inbox-ready note.
 
-No PowerShell or no writable clone means the surface is not a full participant: read current
-`STATE.md` (created by `bin/setup-private.ps1` on the repo's first run) and return an
-inbox-ready note instead of writing.
+**Never:**
+- Put a secret value in a tracked file. Keep secrets outside the repo and reference them by name.
+- Treat your own choice as a ruling. **Only the operator's rulings bind.** Add decisions only
+  with `bin/add-decision.ps1`. Only the human runs `bin/ratify-decision.ps1`, in their own
+  terminal.
+- Edit a file listed in `protocol/coordination-files.txt` without holding `STATE.lock` yourself
+  (`bin/state-lock.ps1`; RUNBOOK § Lock rules), or force-recover another session's lock
+  without independent evidence or the operator's direction. The lock is machine-local: two
+  clones never share it, so keep sessions on different clones sequential.
 
 **While working:**
-- **Run the active-recall gate before acting on assigned work.** When the operator assigns an
-  objective, a configured prompt hook runs `bin/hook-recall.ps1`. Without a verified firing
-  hook, run `bin/prepare-work.ps1 -Objective '<operator objective>'` before implementation or
-  advice; both use `bin/brain-recall.ps1`. Hook configuration and passing adapter tests do not
-  prove a host fired it. A degraded hook requires the manual fallback before acting. If gates
-  match, read the required sources, state the matched traps and recurrence counts, and say how
-  they change the next action. Always run it when the operator says
-  recurring/stuck/same-loop/amnesia. Do not replace this with a memory note.
-- **Before writing code, walk the least-code ladder.** Stop and check, in order: does this need to
-  exist at all? -> is it already in the codebase (grep first)? -> does the stdlib or platform
-  already do it? -> does an installed dependency? -> is it one line? -> only then write the minimum
-  that works. The best code is the code you didn't write - but trust-boundary validation, data-loss
-  handling, security, and accessibility are **never** on the chopping block.
-- **Keep context spend bounded.** Startup already printed `STATE.md` - do not re-read it unless
-  git changed it or you need one precise section. Keep one coherent workstream per conversation;
-  start fresh for unrelated objectives. Search narrow paths first and keep command output concise;
-  expand deliberately only when a narrow excerpt would hide the cause. Never read or dump a whole
-  append-only log (`DECISIONS.md`, `handoffs/INDEX.md`) or a large command log into the
-  conversation: grep for your domain terms plus the newest entries, and write bulky evidence to a
-  file, quoting only the relevant excerpt. Lifecycle scripts print everything they verified - do
-  not re-run them to re-learn what they already told you.
-- **Only the operator's rulings bind.** Append real decisions with `bin/add-decision.ps1`;
-  newest on top, never rewrite history. Each entry has `**Authority:** proposed` or
-  `**Authority:** operator-ruled` with the operator's own words and surface/date. Proposals are
-  not rules. Work reports belong in handoffs. Replacement uses explicit `Supersedes`,
-  `Supersedes in part`, or `Retires` stamps; a proposal cannot replace a ruling.
-  The human alone runs `bin/ratify-decision.ps1` in their own terminal. Agents never drive
-  that command or write its hash-bound ledger. Compiled `protocol/rulings.json` feeds recall;
-  never hand-edit it. Full rules and required sources must be read when recalled. Existing
-  histories need the explicit migration in `docs/decision-authority.md`; upgrades ratify nothing.
-- **Identify the actual committing model.** Set `BRAIN_MODEL` in the session process before
-  acquiring `STATE.lock` or committing, or write the explicit `Brain-Model:` trailer. The
-  commit-message hook refuses a commit with neither.
-  `git config brain.model` is display-only and never proves session identity or lock ownership.
+- **Run recall before acting on assigned work.** A prompt hook runs `bin/hook-recall.ps1` only
+  if you configured one (`docs/recall-hooks.md`). Without a hook you have seen fire, run
+  `bin/prepare-work.ps1 -Objective '<operator objective>'`, which calls `bin/brain-recall.ps1`.
+  When gates match, read their sources, state the traps and their counts, and say how they
+  change your next step.
+- **Walk the least-code ladder before writing any code.** Go in order and stop at the first rung
+  that holds: is it needed at all? Is it already in the repo (grep)? Does the stdlib or the
+  platform do it? Does an installed dependency? Is it one line? Only then write the minimum that
+  works. Never cut trust-boundary validation, data-loss handling, security or accessibility.
+- Commit and push each unit of work as it lands.
+- Every tracked `.md` file starts with `Title:`, `Type:` and `Context:` lines and ends with a
+  `SYSTEM NODE LINKS` block. Start new files from `_templates/markdown-file-template.md`.
+- Don't re-read what startup printed. Read narrow slices. Never paste `DECISIONS.md`,
+  `handoffs/INDEX.md` or large logs into the conversation.
+
+**Close:** update `STATE.md` and write your handoff, then run
+`pwsh -NoProfile -File bin/close-session.ps1 -Topic <topic> -Model '<model-id>'`. It checks both,
+regenerates `maps/NODE-MAP.md`, commits, pushes when the memory has a private remote, and
+releases the lock.
+<!-- END BRAIN-CONTRACT -->
+
+---
+
+## Rule detail
+
+This section is **not** generated into the doors. The summary above keeps each rule short; the
+full explanation of each one lives in the file listed here. Read it when the rule applies.
+
+| Rule | Full explanation |
+|---|---|
+| Startup, the reading slice, the report after startup | `protocol/RUNBOOK.md` § Full-participant kickoff; `bin/start-session.ps1` prints the reporting rule at the end of every startup |
+| Recall gates, hooks and the manual fallback | `docs/recall-hooks.md`; gate format in `protocol/recall-gates.example.json` |
+| Decisions: proposals, rulings, Supersedes/Retires stamps, ratification, migrating an older log | `docs/decision-authority.md` |
+| `STATE.lock`: acquire, session token, resume, stale heartbeat, forced recovery | `protocol/RUNBOOK.md` § Lock rules |
+| Model identity and the `Brain-Model:` trailer | `protocol/RUNBOOK.md` § Full-participant kickoff; enforced by `.githooks/prepare-commit-msg` |
+| Close: private remote vs local-only, offline checkpoint, owned paths | `protocol/RUNBOOK.md` § Close prompt |
+| Markdown envelope and the generated node map (`maps/NODE-MAP.md`) | `_templates/markdown-file-template.md`; `docs/node-map-usage-guide.md` |
+| Upgrading from an earlier release | `docs/upgrading.md` |
+
+Two rules have no other home:
+
 - **Prefer appending over rewriting.** Background or high-volume work writes atomic notes into
-  `inbox/` instead of editing `STATE.md`; one session folds `inbox/` into STATE.
-- **Commit in checkpoints, not only at close.** When a unit of work lands (a fix, a script, a doc),
-  commit and push it then - under the lock if coordination files are staged. Small pushed commits
-  cap the loss if a session dies mid-flight, and every commit under `STATE.lock` refreshes its
-  heartbeat.
-- **`STATE.lock` is a coordination lock, not decoration.** Before editing any coordination file
-  (STATE, DECISIONS, the indexes, contract/doors, protocol scripts and hooks - the authoritative
-  list is `protocol/coordination-files.txt`, which pre-commit enforces), run
-  `bin/state-lock.ps1 -Acquire -Model '<model-id>' -Objective '<short objective>'` and respect the
-  result. Acquire is fail-closed: it refuses a config-fallback identity, and a live same-model
-  lock refuses a second session instead of silently handing over its token. Carry the token
-  printed by your own successful acquire as `BRAIN_LOCK_TOKEN` in every tool shell. Resume with
-  `-CheckOwner`, then heartbeat; never copy a token from the lock file. If another
-  live session holds the lock, do not touch those files; put your result in a uniquely named
-  handoff or `inbox/` note and retry later, or use `-Acquire -Wait`. A heartbeat older than two
-  hours is stale, not proof of abandonment. Establish abandonment independently or obtain
-  operator direction before forced recovery; record that evidence with `-AbandonmentReason`.
-  `STATE.lock` is git-ignored and machine-local: it only serializes sessions on the same clone.
-  Two clones (two machines, or a second checkout) never share a live lock - they coordinate only
-  through git push/pull, so keep sessions against the same clone sequential when they might touch
-  the same coordination files.
-- The integrating session takes the lock first, performs the STATE/index/decision integration,
-  commits/pushes, then releases it. The pre-commit hook blocks staged coordination-file commits
-  unless `STATE.lock` is held by the committing model.
-- Shared facts, procedures, and evidence live in this repo (`STATE.md`, `reference/`, `specs/`,
-  `DECISIONS.md`, scripts, handoffs). Never depend on a model's private memory or prior chat for
-  anything another model needs.
+  `inbox/` instead of editing `STATE.md`; one session at a time folds `inbox/` into STATE.
 - **Durable artifacts need durable tools.** A document's regeneration command must point to a
   tracked script or a durable project tool, never a disposable scratch directory.
-- **Markdown creation standard.** Tracked `.md` files use a retrieval envelope: `Title:`, `Type:`,
-  and `Context:` near the top, plus a terminal `SYSTEM NODE LINKS` block (`Directory Path`,
-  `Next Sequential File`, `Related Workflows`, `AI Execution Prompts`). Start new docs from
-  `_templates/markdown-file-template.md`. After changing Markdown structure, run
-  `bin/update-node-map.ps1` so `maps/NODE-MAP.md` and `maps/node-map.json` stay current.
-- **Never put a secret value in a tracked file.** Keep secrets outside the repo and reference them
-  by name. A pre-commit scan enforces this.
-
-**End of session:**
-1. Acquire `STATE.lock` before changing `STATE.md`, the indexes, `DECISIONS.md`, or contract/door
-   files. If another session holds it, write a standalone handoff or `inbox/` note instead.
-2. Update `STATE.md` to match reality - keep it scannable (Right now / Active work / Blockers /
-   Next actions) and within the doctor's size budget. Check size with **one** run of
-   `bin/state-budget.ps1`: byte-exact headroom, plus the per-section / fattest-line breakdown
-   when over - one targeted trim, not edit/measure/re-read cycles.
-3. Write a handoff `handoffs/YYYY-MM-DD-<topic>.md` and add a row to `handoffs/INDEX.md`.
-4. If Markdown files changed, regenerate the node map with `bin/update-node-map.ps1`.
-5. Commit `STATE.md` + `DECISIONS.md` + the handoff together, with a trailer naming the model you
-   actually are (e.g. `Brain-Model: your-model-id`). Push if this memory has a private remote.
-   Release `STATE.lock`. Leave the working tree clean.
-
-`pwsh -NoProfile -File bin/close-session.ps1 -Topic <topic> -Model '<model-id>'` automates the
-mechanical tail: it verifies the handoff + INDEX row + STATE freshness, checks/acquires the lock,
-and commits the close set with your trailer: coordination files, your current handoff,
-generated maps, and explicit `-Also` paths. Inbox notes ride only when this session owns them
-and names them with `-Also`; there is no folder-wide adoption. Foreign staged paths cause
-refusal without unstaging them. Not every close pushes: a private-remote memory pushes and releases
-`STATE.lock` only after the push succeeds (a failed push keeps the lock so nothing else lands on
-top of it); a local-only memory commits and releases the lock without attempting a push, by
-design; `-OfflineCheckpoint` commits, records a loud pending-sync warning, and releases the lock
-without pushing, as a deliberate offline escape hatch for a private-remote memory (recover with
-`bin/sync-private.ps1` once connectivity returns). The committing identity must be explicit
-(`-Model` or `BRAIN_MODEL`); the clone's `git config brain.model` is a display fallback only.
-Prefer it over a hand-rolled close.
-
-How to start/end a session: `protocol/RUNBOOK.md`. Full layout & rules: `README.md`.
-<!-- END BRAIN-CONTRACT -->
 
 ---
 
@@ -158,7 +103,7 @@ local machine. Act as a planning and reasoning advisor only.
 - The source of truth is **STATE.md**, which the user pastes when grounding is needed. If you do
   not have current STATE, **ask for it before any claim about project status - never invent it.**
 - Reason from the smallest provided file set instead of requesting a broad dump.
-- Don't assume you can read files, run commands, or commit. Produce text the user can act on.
+- Produce text the user can act on.
 - When you produce something worth keeping (a decision, finding, or draft), format it as a short
   self-contained Markdown note the user can drop into the repo's `inbox/`. Use the envelope: first
   lines `Title:`, `Type:`, `Context:`, then the body, then `SYSTEM NODE LINKS`.

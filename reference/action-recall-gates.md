@@ -113,10 +113,12 @@ not more context at boot.
 
 ## Two seams
 
-1. **Objective-time.** `bin/brain-recall.ps1 -Objective '…'` is required before assigned work and
-   always when the operator says recurring, stuck, same loop, or amnesia. For large objectives, pipe
-   the complete text to `-FromStdin`; the 131,072-character limit rejects overflow rather than matching
-   only a prefix. `-Brief` emits nothing on healthy `CLEAR` and compact mandatory gate information on
+1. **Objective-time.** A verified prompt hook or `bin/prepare-work.ps1 -Objective '…'` is required
+   before assigned work and always when the operator says recurring, stuck, same loop, or amnesia.
+   `brain-recall.ps1` is the matching authority used by both adapters. Without verified hook firing,
+   use the portable wrapper; for large objectives, pipe the complete text to its `-FromStdin`.
+   The 131,072-character limit rejects overflow rather than matching only a prefix.
+   The matcher's `-Brief` emits nothing on healthy `CLEAR` and compact mandatory gate information on
    a match. A `CLEAR` result is a prompt to reconsider objective wording, not a green light.
 2. **Tool-time.** A fragile domain's own scripts can print the relevant gate's compact trap banner
    at invocation via `bin/brain-recall.ps1 -GateId <id> -Header`, so the warning appears in output
