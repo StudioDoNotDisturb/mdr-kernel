@@ -35,6 +35,18 @@ fn git_ok(dir: &Path, args: &[&str]) -> Result<bool, String> {
         .map_err(|e| format!("required utility 'git' is unavailable ({e})"))
 }
 
+/// The lock check or heartbeat, in process: the same code `bin/state-lock.ps1` hands off to.
+fn lock_port(root: &Path, argv: &[&str]) -> Result<crate::state_lock::Report, String> {
+    let mut all: Vec<String> = argv.iter().map(|a| a.to_string()).collect();
+    all.extend(["-Root".to_string(), root.to_string_lossy().into_owned()]);
+    let args = crate::args::Args::parse(
+        &all,
+        &crate::state_lock::VALUES,
+        &crate::state_lock::SWITCHES,
+    )?;
+    crate::state_lock::run(root, &args)
+}
+
 fn staged_fingerprint(root: &Path) -> Result<String, String> {
     let mut files = Vec::new();
     for entry in names(root, &["ls-files", "-s", "-z", "--", "native"])? {
@@ -56,12 +68,12 @@ fn staged_fingerprint(root: &Path) -> Result<String, String> {
 }
 
 /// A binary built from other sources than the staged ones must not guard this commit.
-fn fresh(root: &Path) -> Result<(), String> {
+pub fn fresh(root: &Path) -> Result<(), String> {
     if staged_fingerprint(root)? == env!("MDR_SOURCE_FINGERPRINT") {
         return Ok(());
     }
     Err(format!(
-        "bin/mdr-kernel was built from different native/ sources than the staged ones.\n  Rebuild and reinstall it: {REBUILD}\n  (or run this commit with MDR_ENGINE=legacy to use the shell gates)"
+        "bin/mdr-kernel was built from different native/ sources than the staged ones.\n  Rebuild and reinstall it: {REBUILD}\n  (or set MDR_ENGINE=legacy to use the shell and PowerShell gates)"
     ))
 }
 
@@ -338,7 +350,9 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
                 "  Use the token printed by bin/state-lock.ps1 -Acquire, or wait for the holder to release the lock.".into(),
             ]));
         }
-        if !pwsh_to_stderr(root, "state-lock.ps1", &["-CheckOwner", "-Model", &model])? {
+        let owner = lock_port(root, &["-CheckOwner", "-Model", &model])?;
+        eprint!("{}", owner.out);
+        if owner.code != 0 {
             eprintln!("X mdr-kernel pre-commit: STATE.lock ownership is unproven; carry your own acquire token.");
             return Ok(1);
         }
@@ -380,7 +394,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
     }
     // 6) commit-driven heartbeat for the verified holder; never blocks
     if lock.exists && !model.is_empty() && lock.holder == model && token_ok {
-        let _ = pwsh(root, "state-lock.ps1", &["-Heartbeat"]);
+        let _ = lock_port(root, &["-Heartbeat"]);
     }
     Ok(0)
 }

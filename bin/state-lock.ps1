@@ -51,6 +51,16 @@ param(
 )
 
 $root  = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same lock logic when bin/mdr-kernel is installed (README); it refuses
+# when built from other native/ sources than the staged ones. MDR_ENGINE=legacy keeps this script.
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key)"; "$($p.Value)" }
+  })
+  & $engine state-lock @forward
+  exit $LASTEXITCODE
+}
 # STATE.lock must be ONE shared file across the canonical clone and all its linked worktrees, or
 # each working tree gets its own lock and the single-writer invariant breaks. Anchor it to
 # dirname(--git-common-dir) = the canonical repo top, which every worktree resolves to identically.
