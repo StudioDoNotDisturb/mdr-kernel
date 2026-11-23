@@ -274,9 +274,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
         ],
     )?;
     if changed.iter().any(|f| DOORS.contains(&f.as_str()))
-        && !pwsh(root, "sync-doors.ps1", &["-Check", "-Staged"])?
-            .status
-            .success()
+        && crate::doors::sync(root, true, true).code != 0
     {
         return Ok(block(&[
             "X mdr-kernel pre-commit: the STAGED contract/door set is internally drifted.".into(),

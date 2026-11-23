@@ -17,7 +17,16 @@ param([switch]$Check, [switch]$Staged)
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-if ($Staged -and -not $Check) { Write-Error '-Staged validates the commit snapshot and requires -Check'; exit 2 }
+# The native engine runs this same sync when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key)"; "$($p.Value)" }
+  })
+  & $engine sync-doors @forward
+  exit $LASTEXITCODE
+}
+if ($Staged -and -not $Check) { [Console]::Error.WriteLine('-Staged validates the commit snapshot and requires -Check'); exit 2 }
 # show-prefix keeps :<path> index lookups correct when this kernel lives in a subdirectory of a
 # larger repository (e.g. the template's own development tree).
 $indexPrefix = ''
@@ -94,7 +103,7 @@ AI Execution Prompts: protocol/CONTRACT.md
 
 $contractPath = Join-Path $root 'protocol/CONTRACT.md'
 $contract = Read-Source 'protocol/CONTRACT.md'
-if ($null -eq $contract) { Write-Error "CONTRACT not found: $contractPath"; exit 2 }
+if ($null -eq $contract) { [Console]::Error.WriteLine("CONTRACT not found: $contractPath"); exit 2 }
 
 # Block name -> (regex, target files relative to root, shell title if the file must be created)
 $blocks = @(
@@ -108,7 +117,7 @@ $changed = New-Object System.Collections.Generic.List[string]
 foreach ($b in $blocks) {
   $rx = "(?s)<!-- BEGIN $($b.Name).*?<!-- END $($b.Name) -->"
   $cm = [regex]::Match($contract, $rx)
-  if (-not $cm.Success) { Write-Error "No $($b.Name) markers in protocol/CONTRACT.md"; exit 2 }
+  if (-not $cm.Success) { [Console]::Error.WriteLine("No $($b.Name) markers in protocol/CONTRACT.md"); exit 2 }
   $canonical = $cm.Value
   foreach ($t in $b.Targets) {
     $p = Join-Path $root $t
@@ -123,7 +132,7 @@ foreach ($b in $blocks) {
       else { Write-Lf $p (New-DoorShell $b.Title $canonical $t); $changed.Add("$t (recreated)") }
       continue
     }
-    if ($tm.Value -ne $canonical) {
+    if ($tm.Value -cne $canonical) {  # case-sensitive: a case-only contract edit is drift
       if ($Check) { $drift.Add($t) }
       else { Write-Lf $p ($txt.Remove($tm.Index, $tm.Length).Insert($tm.Index, $canonical)); $changed.Add($t) }
     }

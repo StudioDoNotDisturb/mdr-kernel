@@ -1,6 +1,6 @@
 //! The public doctor. A port of `bin/brain-doctor.ps1`: advisory warnings for drift and
 //! non-compliance only for real hazards (a committed secret, broken startup wiring, a private
-//! memory that lost its origin, a failed authority or recall check). The door check, recall schema,
+//! memory that lost its origin, a failed authority or recall check). The recall schema,
 //! decision authority, hook-recall probe and node-map parity still run their PowerShell scripts
 //! until their own checkpoints.
 //!
@@ -391,7 +391,8 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
     // 5) Doors in sync with the contract (advisory; pre-commit still blocks a drifted door).
     if !o.hard_only {
         if exists("bin/sync-doors.ps1") {
-            let (code, lines) = pwsh_all(root, "sync-doors.ps1", &["-Check"], None);
+            let doors = crate::doors::sync(root, true, false);
+            let (code, lines) = (doors.code, read_lines((doors.out + &doors.err).as_bytes()));
             if code == 0 {
                 r.ok("front doors in sync with protocol/CONTRACT.md");
             } else {
