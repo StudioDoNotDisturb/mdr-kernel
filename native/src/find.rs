@@ -125,6 +125,35 @@ fn line_of(text: &str, offset: usize) -> i64 {
     text[..offset].matches('\n').count() as i64 + 1
 }
 
+fn without_footer(text: &str) -> &str {
+    let mut fence = None;
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end();
+        let content = trimmed.trim_start_matches(' ');
+        if trimmed.len() - content.len() <= 3 {
+            if let Some((marker, width)) = fence {
+                let run = content.bytes().take_while(|&b| b == marker).count();
+                if run >= width && content[run..].trim().is_empty() {
+                    fence = None;
+                }
+            } else if let Some(marker @ (b'`' | b'~')) = content.bytes().next() {
+                let run = content.bytes().take_while(|&b| b == marker).count();
+                if run >= 3 && (marker == b'~' || !content[run..].contains('`')) {
+                    fence = Some((marker, run));
+                }
+            } else if trimmed == "## SYSTEM NODE LINKS" {
+                let next = text[offset + line.len()..].trim_start();
+                if next.starts_with("Directory Path:") {
+                    return &text[..offset];
+                }
+            }
+        }
+        offset += line.len();
+    }
+    text
+}
+
 type Record = (String, i64, String, String, String);
 
 fn records(path: &Path, root: &Path) -> Result<Vec<Record>, String> {
@@ -143,17 +172,7 @@ fn records(path: &Path, root: &Path) -> Result<Vec<Record>, String> {
     let decoded = std::str::from_utf8(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes))
         .map_err(|_| format!("{relative}: not valid UTF-8"))?;
     let normalized = decoded.replace("\r\n", "\n").replace('\r', "\n");
-    // Only the text above the node-links footer is evidence.
-    let mut cut = normalized.len();
-    let mut offset = 0;
-    for line in normalized.split_inclusive('\n') {
-        if line.trim_end() == "## SYSTEM NODE LINKS" {
-            cut = offset;
-            break;
-        }
-        offset += line.len();
-    }
-    let text = &normalized[..cut];
+    let text = without_footer(&normalized);
     let mut out = Vec::new();
     if LOGS.contains(&name.as_str()) {
         let heading = HEADING.get_or_init(|| Regex::new(r"(?m)^## (D\d+)\b[^\n]*").unwrap());
@@ -265,7 +284,7 @@ fn search(
         .iter()
         .map(|f| format!("{}|{}|{}", f.path.to_string_lossy(), f.size, f.modified))
         .collect();
-    let signature = hash(&format!("mdr-find-v1\n{}", listing.join("\n")));
+    let signature = hash(&format!("mdr-find-v2\n{}", listing.join("\n")));
     let cache = match cache {
         Some(path) => absolute(path),
         None => default_cache(&root)?,
@@ -324,7 +343,7 @@ fn search(
         .cloned()
         .collect::<Vec<_>>()
         .join(" OR ");
-    let mut coverage: HashMap<i64, f64> = HashMap::new();
+    let mut coverage: HashMap<i64, usize> = HashMap::new();
     for word in &quoted {
         let mut statement = db
             .prepare("SELECT rowid FROM docs WHERE docs MATCH ?")
@@ -332,12 +351,12 @@ fn search(
         let ids = statement
             .query_map(params![word], |r| r.get::<_, i64>(0))
             .map_err(sql)?;
-        for id in ids.flatten() {
-            *coverage.entry(id).or_insert(0.0) += 1.0;
+        for id in ids {
+            *coverage.entry(id.map_err(sql)?).or_default() += 1;
         }
     }
     let mut statement = db
-        .prepare("SELECT rowid, path, line, id, snippet(docs,4,'','', ' ... ',42), bm25(docs,0,0,0,5,1) FROM docs WHERE docs MATCH ? ORDER BY bm25(docs,0,0,0,5,1) LIMIT 300")
+        .prepare("SELECT rowid, path, line, id, snippet(docs,4,'','', ' ... ',42), bm25(docs,0,0,0,5,1) FROM docs WHERE docs MATCH ?")
         .map_err(sql)?;
     let mut rows: Vec<(i64, String, i64, String, String, f64)> = statement
         .query_map(params![expression], |r| {
@@ -357,18 +376,18 @@ fn search(
     let exact = query.trim().to_uppercase();
     let key = |row: &(i64, String, i64, String, String, f64)| {
         let is_exact = row.3 == exact;
-        let share = coverage.get(&row.0).copied().unwrap_or(0.0) / words.len() as f64;
         (
             !is_exact,
             if is_exact { row.2 } else { 0 },
-            row.5 * share * share,
+            std::cmp::Reverse(coverage.get(&row.0).copied().unwrap_or_default()),
         )
     };
     rows.sort_by(|a, b| {
         let (ka, kb) = (key(a), key(b));
         ka.0.cmp(&kb.0)
             .then(ka.1.cmp(&kb.1))
-            .then(ka.2.total_cmp(&kb.2))
+            .then(ka.2.cmp(&kb.2))
+            .then(a.5.total_cmp(&b.5))
             .then(a.1.cmp(&b.1))
             .then(a.2.cmp(&b.2))
     });
@@ -388,9 +407,11 @@ fn search(
                 excerpt: snippet.chars().take(320).collect(),
                 kind,
             });
+            if unique.len() == limit {
+                break;
+            }
         }
     }
-    unique.truncate(limit);
     Ok(unique)
 }
 
@@ -415,11 +436,16 @@ pub fn render(rows: &[Row]) -> Vec<String> {
         "BRAIN_FIND: lexical matches. Check STATE and the source rules before acting.".to_string(),
     ];
     for row in rows {
+        let id = if row.id.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", row.id)
+        };
         lines.push(format!(
-            "{}:{} {} [{}] {}",
+            "{}:{}{} [{}] {}",
             row.path,
             row.line,
-            row.id,
+            id,
             row.kind,
             row.excerpt.split_whitespace().collect::<Vec<_>>().join(" ")
         ));
@@ -531,7 +557,7 @@ mod tests {
         std::fs::write(root.join("README.md"), "hiddenquartz").unwrap();
         std::fs::write(
             root.join("handoffs/review.md"),
-            "visiblequartz\n\n## SYSTEM NODE LINKS\n\nhiddenquartz",
+            "visiblequartz\n\n## SYSTEM NODE LINKS\n\nDirectory Path: hiddenquartz",
         )
         .unwrap();
         #[cfg(unix)]

@@ -1,6 +1,4 @@
-//! Argument parsing that accepts both PowerShell-style (`-GateId X`, `-Brief`, `-NoSemantic:$false`)
-//! and GNU-style (`--gate-id X`) names, so the legacy `bin/*.ps1` entry points can forward their
-//! arguments unchanged while every caller is moved over.
+//! Options and memory-root discovery for the history search CLI.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

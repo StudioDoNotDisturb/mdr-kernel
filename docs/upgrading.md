@@ -1,6 +1,6 @@
 Title: Upgrade the kernel while preserving your memory
 Type: Operator Guide / Upgrade
-Context: Exact, rehearsed commands for moving an existing private 0.1 memory to 0.2 without merging histories or touching your STATE, decisions, handoffs, gates or remote.
+Context: Use when upgrading a private 0.1.0 or 0.2.0 memory while preserving its history, settings, and private remote.
 
 # Upgrade an existing memory
 
@@ -9,17 +9,18 @@ An upgrade copies the release's tools into your memory and merges the few files 
 in one reviewed commit. It is not another first-time setup, not a history merge, and never a
 replacement of STATE, decisions, handoffs, references, local gates or your remote.
 
-## Try native history search from a 0.2 memory
+## Choose an upgrade
 
-Build the candidate source in its own checkout, outside your private memory:
+- From `0.1.0`, apply `0.2.0` first, including the decision-authority migration in U4 and U8.
+- From `0.2.0`, apply `2.0.0-rc.1` once its prerelease is available. Keep your existing decision
+  authority, ratifications, and recall gates. Review the BRAIN-CONTRACT v2 changes with your
+  local rules and regenerate the doors and maps. The upgrade includes compact startup output
+  and deterministic map generation.
 
-```powershell
-cargo build --release --locked --manifest-path native/Cargo.toml
-```
-
-Run the resulting `native/target/release/mdr-kernel` executable (with `.exe` on Windows).
-Pass `find --root <private-memory-path> --query <search-terms>`. This adds search without
-changing your existing memory or session tools. The procedure below covers the 0.1 to 0.2 upgrade.
+Rust is optional. To try search independently, build in a release checkout using
+`cargo build --release --locked --manifest-path native/Cargo.toml`. Use the resulting
+`native/target/release/mdr-kernel` binary (`.exe` on Windows) with
+`find --root <private-memory-path> --query <search-terms>`.
 
 ## Hearing about a release is separate from applying it
 
@@ -46,14 +47,15 @@ changing your existing memory or session tools. The procedure below covers the 0
 |---|---|---|
 | `0.1.0` | `8397591e8cd42ec25a09a311df160b74c0af2afb` | none (first export) |
 | `0.2.0` | `82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3` | `v0.2.0` |
+| `2.0.0-rc.1` | Verify the commit ID against the published prerelease | `v2.0.0-rc.1` |
 
 ## What the upgrade changes and what it keeps
 
 **Distribution-owned (taken from the release):** every path the release changed between your
-version and the new one. In 0.2 that is `bin/`, `.githooks/`, `tests/`, `docs/`, `.github/`,
+version and the new one. Distribution paths include `native/` in 2.0 and `bin/`, `.githooks/`, `tests/`, `docs/`, `.github/`,
 `_templates/`, the shipped `specs/` and `reference/` notes, `skills/mdr-kernel/`, `README.md`,
 `CHANGELOG.md`, `VERSION` and the other top-level release files. A file you never edited is
-replaced by the release copy; a file you edited gets a three-way merge instead (step U5).
+replaced by the release copy; a file you edited gets a three-way merge instead (step U6).
 
 **Merged by hand:** `protocol/CONTRACT.md` and `protocol/coordination-files.txt` when you edited
 them, and any other distribution file you adapted. Your lines stay; the release's lines arrive.
@@ -66,8 +68,8 @@ release's own doors are phase-zero doors for fresh adopters; do not copy them ov
 **Adopter-owned (never touched):** `STATE.md`, `DECISIONS.md`, `handoffs/`, your `reference/`
 notes and `reference/INDEX.md`, `inbox/`, `protocol/recall-gates.json`, host settings such as
 `.claude/` and `.codex/`, local Git configuration (`core.hooksPath`, `brain.mode`,
-`brain.approvedRemote`), and your private remote with its approval pin. The release does not
-change these paths, so the procedure below cannot overwrite them.
+`brain.approvedRemote`), and your private remote with its approval pin. The copy step stops if a release attempts to change a protected path. The existing decision-authority
+boundary and ratification ledger are protected as well.
 
 ## The procedure
 
@@ -83,16 +85,22 @@ the same block. Allow about 30 minutes; the suites and the final commit take mos
 Close every other session first (their normal close releases `STATE.lock`). Then:
 
 ```powershell
-# [U1] identity, clean 0.1 checkpoint, rollback point
+# [U1] identity, clean checkpoint, rollback point
 $model = '<your model id>'
 $env:BRAIN_MODEL = $model
 function Must([string]$What) { if ($LASTEXITCODE -ne 0) { throw "STOP at '$What' (exit $LASTEXITCODE)" } }
 if (git status --porcelain) { throw 'STOP: commit or close current work first; the tree must be clean' }
 if (Test-Path -LiteralPath STATE.lock) { throw 'STOP: STATE.lock is held; let its session close, or recover it by your current rules' }
 $installed = (Get-Content -Raw VERSION).Trim()
-if ($installed -ne '0.1.0') { throw "STOP: this walkthrough upgrades 0.1.0; VERSION says $installed" }
+$target = switch ($installed) {
+  '0.1.0' { '0.2.0' }
+  '0.2.0' { '2.0.0-rc.1' }
+  default { throw "STOP: no upgrade in this guide for VERSION $installed" }
+}
+$fromRef = "refs/mdr/v$installed"
+$toRef = "refs/mdr/v$target"
 git diff --quiet HEAD -- DECISIONS.md; Must 'DECISIONS.md must be committed unchanged'
-git branch mdr-before-0.2.0; Must 'rollback branch'
+git branch "mdr-before-$target"; Must 'rollback branch'
 ```
 
 ### U2 - Fetch the release read-only
@@ -103,12 +111,17 @@ never pushes.
 ```powershell
 # [U2] fetch the tagged release and name the installed version
 $mdr = 'https://github.com/StudioDoNotDisturb/mdr-kernel.git'
-git fetch --no-tags $mdr refs/tags/v0.2.0:refs/mdr/v0.2.0; Must 'fetch v0.2.0'
-if ((git rev-parse 'refs/mdr/v0.2.0^{commit}') -ne '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3') { throw 'STOP: v0.2.0 does not resolve to the published commit' }
-git update-ref refs/mdr/v0.1.0 8397591e8cd42ec25a09a311df160b74c0af2afb; Must 'name 0.1.0'
-$shared = @(git rev-list HEAD) -contains '8397591e8cd42ec25a09a311df160b74c0af2afb'
+$baseCommit = if ($installed -eq '0.1.0') { '8397591e8cd42ec25a09a311df160b74c0af2afb' } else { '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3' }
+$expected = if ($target -eq '0.2.0') { '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3' } else {
+  Read-Host 'Enter the full commit ID from the published v2.0.0-rc.1 prerelease'
+}
+if ($expected -notmatch '^[a-fA-F0-9]{40}$') { throw 'STOP: a full published commit ID is required' }
+git fetch --no-tags $mdr "refs/tags/v${target}:${toRef}"; Must "fetch v$target"
+if ((git rev-parse "${toRef}^{commit}") -ne $expected) { throw 'STOP: release tag does not match its published commit' }
+git update-ref $fromRef $baseCommit; Must "name $installed"
+$shared = @(git rev-list HEAD) -contains $baseCommit
 "Shape: $(if ($shared) { 'B - retained history' } else { 'A - template copy, no shared history' })"
-git diff --stat refs/mdr/v0.1.0 HEAD -- bin .githooks tests docs protocol/CONTRACT.md protocol/coordination-files.txt
+git diff --stat $fromRef HEAD -- bin .githooks tests docs protocol/CONTRACT.md protocol/coordination-files.txt
 ```
 
 The last command lists the release files you customized. An empty list means you never edited
@@ -117,9 +130,9 @@ them.
 ### U3 - Unpack both releases for comparison
 
 ```powershell
-# [U3] read-only copies of 0.1.0 and 0.2.0 in a temporary folder
+# [U3] read-only copies of the installed and target releases
 $work = Join-Path ([IO.Path]::GetTempPath()) ('mdr-upgrade-' + [guid]::NewGuid().ToString('N'))
-foreach ($v in 'v0.1.0', 'v0.2.0') {
+foreach ($v in "v$installed", "v$target") {
   New-Item -ItemType Directory -Path (Join-Path $work $v) | Out-Null
   git archive --format=tar -o (Join-Path $work "$v.tar") "refs/mdr/$v"; Must "archive $v"
   tar -xf (Join-Path $work "$v.tar") -C (Join-Path $work $v); Must "unpack $v"
@@ -128,6 +141,8 @@ $work
 ```
 
 ### U4 - Check the decision log before any new hook arrives
+
+If you have 0.2.0, skip U4 and U4b. U8 checks the existing authority boundary.
 
 0.2's pre-commit validates `DECISIONS.md` on every commit. Run its checker from the unpacked
 copy first, while your 0.1 hooks are still in charge:
@@ -169,24 +184,40 @@ Remove-Item Env:\BRAIN_LOCK_TOKEN
 This commit is the "unchanged old decision log" checkpoint: from here on the log is only
 appended to. If U4 passed, your existing commit already is that checkpoint.
 
-### U5 - Bring the release files, hooks and helpers together
+### U5 - Acquire your lock before editing release files
+
+Run this with the installed tool and keep the token in this shell through U11.
+
+```powershell
+$acq = pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model $model -Objective "upgrade mdr-kernel $installed to $target"
+Must 'acquire lock'
+$env:BRAIN_LOCK_TOKEN = ([regex]::Match(($acq -join "`n"), '(?m)^session token: ([a-f0-9]+)')).Groups[1].Value
+if (-not $env:BRAIN_LOCK_TOKEN) { throw 'STOP: acquire did not return a session token' }
+```
+
+### U6 - Bring the release files, hooks and helpers together
 
 New hooks are active as soon as they are on disk, and the 0.2 pre-commit refuses when any helper
 it calls is missing. This block therefore brings every changed release file in one step.
 
 ```powershell
-# [U5] take unedited release files, three-way merge edited ones
-if ($preflight -ne 0) { throw 'STOP: U4 must report DECISION_HISTORY_STATUS=OK first' }
-$regenerated = 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md'
-$changed = @(git diff --name-only refs/mdr/v0.1.0 refs/mdr/v0.2.0 | Where-Object { $_ -notin $regenerated -and $_ -notlike 'maps/*' })
+# [U6] take unedited release files, three-way merge edited ones
+if ($installed -eq '0.1.0' -and $preflight -ne 0) { throw 'STOP: U4 must report DECISION_HISTORY_STATUS=OK first' }
+$regenerated = 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'protocol/advisory.md', 'protocol/rulings.json'
+$releasePaths = @(git diff --name-only $fromRef $toRef); Must 'list release paths'
+$protected = '^(STATE[.]md$|DECISIONS[.]md$|[.]brain-root$|handoffs/|inbox/|[.]claude/|[.]codex/|reference/INDEX[.]md$|protocol/(recall-gates[.]json|decision-authority[.]json|decision-ratifications[.]jsonl)$)'
+if ($releasePaths -match $protected) { throw 'STOP: release changes protected memory paths' }
+$deleted = @(git diff --name-only --diff-filter=D $fromRef $toRef); Must 'check release deletions'
+if ($deleted.Count) { throw 'STOP: review release deletions before proceeding' }
+$changed = @($releasePaths | Where-Object { $_ -notin $regenerated -and $_ -notlike 'maps/*' })
 $empty = Join-Path $work 'empty'; New-Item -ItemType File -Path $empty -Force | Out-Null
 $merged = @(); $conflicts = @()
 foreach ($p in $changed) {
   $mine = git rev-parse -q --verify "HEAD:$p" 2>$null
-  $base = git rev-parse -q --verify "refs/mdr/v0.1.0:$p" 2>$null
-  if ($mine -eq $base) { git checkout refs/mdr/v0.2.0 -- $p; Must "take $p"; continue }
-  $baseFile = if ($base) { Join-Path $work "v0.1.0/$p" } else { $empty }
-  git merge-file --diff3 -L yours -L v0.1.0 -L v0.2.0 $p $baseFile (Join-Path $work "v0.2.0/$p")
+  $base = git rev-parse -q --verify "${fromRef}:$p" 2>$null
+  if ($mine -eq $base) { git checkout $toRef -- $p; Must "take $p"; continue }
+  $baseFile = if ($base) { Join-Path $work "v$installed/$p" } else { $empty }
+  git merge-file --diff3 -L yours -L "v$installed" -L "v$target" $p $baseFile (Join-Path $work "v$target/$p")
   if ($LASTEXITCODE -lt 0 -or $LASTEXITCODE -gt 127) { throw "STOP: merge-file failed on $p" }
   $merged += $p; if ($LASTEXITCODE -gt 0) { $conflicts += $p }
 }
@@ -194,44 +225,39 @@ foreach ($p in $changed) {
 "Conflicts to resolve by hand: $(if ($conflicts) { $conflicts -join ', ' } else { 'none' })"
 ```
 
-`git diff --name-only --diff-filter=D refs/mdr/v0.1.0 refs/mdr/v0.2.0` lists files a release
-deleted; 0.2 deletes none.
+Both upgrades in this guide preserve installed paths. The copy step refuses release deletions.
 
-### U6 - Resolve and review your merges
+### U7 - Resolve and review your merges
 
 Open every file named under "Conflicts". Each conflict shows your text after `<<<<<<< yours`,
-the 0.1 original after `||||||| v0.1.0`, and the release after `=======`. Keep the release text,
+your installed release after `||||||| v…`, and the release after `=======`. Keep the release text,
 re-add your own lines, and delete the three markers. Then confirm and review:
 
 ```powershell
-# [U6] no markers remain; each merged file differs from the release only by your adaptations
-if ($merged -and (Select-String -Path $merged -Pattern '^(<<<<<<< yours|\|\|\|\|\|\|\| v0\.1\.0|>>>>>>> v0\.2\.0)')) { throw 'STOP: conflict markers remain' }
-foreach ($p in $merged) { git diff --no-index -- (Join-Path $work "v0.2.0/$p") $p }
+# [U7] no markers remain; each merged file differs from the release only by your adaptations
+if ($merged -and (Select-String -Path $merged -Pattern '^(<<<<<<< yours|\|\|\|\|\|\|\| v|>>>>>>> v)')) { throw 'STOP: conflict markers remain' }
+foreach ($p in $merged) { git diff --no-index -- (Join-Path $work "v$target/$p") $p }
 ```
 
-In `protocol/coordination-files.txt` keep the paths you added and the eleven new 0.2 lines. In
-`protocol/CONTRACT.md` keep your own rules inside the contract blocks; the doors are built from
-them in U9.
+In `protocol/coordination-files.txt` keep the paths you added and the release entries. In
+`protocol/CONTRACT.md` keep your local rules in the contract block. Review BRAIN-CONTRACT v2
+when moving to the RC. U9 builds the doors from the merged contract.
 
-### U7 - Take the lock with the 0.2 tool
+### U8 - Verify the lock and preserve decision authority
 
 ```powershell
-# [U7] acquire STATE.lock and keep its token in this window
-$acq = pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model $model -Objective 'upgrade mdr-kernel 0.1.0 to 0.2.0'
-$acq; Must 'acquire lock'
-$env:BRAIN_LOCK_TOKEN = ([regex]::Match(($acq -join "`n"), '(?m)^session token: ([a-f0-9]+)')).Groups[1].Value
+# [U8] initialize only a 0.1 memory without an existing boundary
 pwsh -NoProfile -File bin/state-lock.ps1 -CheckOwner -Model $model; Must 'prove lock ownership'
-```
-
-### U8 - Migrate decision authority explicitly
-
-```powershell
-# [U8] boundary above your newest legacy entry; nothing is ratified
-pwsh -NoProfile -File bin/initialize-decision-authority.ps1 -PreserveLegacy; Must 'initialize authority'
+$authority = 'protocol/decision-authority.json'
+if ($installed -eq '0.1.0' -and -not (Test-Path -LiteralPath $authority)) {
+  pwsh -NoProfile -File bin/initialize-decision-authority.ps1 -PreserveLegacy; Must 'initialize authority'
+} elseif (-not (Test-Path -LiteralPath $authority)) {
+  throw 'STOP: the existing authority boundary is missing'
+}
 pwsh -NoProfile -File bin/build-rulings.ps1 -Check; Must 'rulings current'
 ```
 
-Expect `AUTHORITY_INITIALIZED from=D<newest+1> legacy=unclassified`. Old entries stay exactly as
+On first migration from 0.1, expect `AUTHORITY_INITIALIZED from=D<newest+1> legacy=unclassified`. Old entries stay exactly as
 written and are not rulings unless they already carried an operator quotation (U4). To adopt an
 old idea as a rule, ask the operator to rule on it in a new entry. A memory that never recorded
 a decision gets `from=D1`.
@@ -255,17 +281,20 @@ foreach ($suite in 'remote-privacy-unit', 'skill-structure', 'envelope-check', '
 }
 $pristine = Join-Path $work 'release-checkout'
 git init -q -b unborn $pristine; Must 'pristine repository'
-git -C $pristine fetch -q $PWD refs/mdr/v0.2.0; Must 'pristine fetch'
+git -C $pristine fetch -q $PWD $toRef; Must 'pristine fetch'
 git -C $pristine switch -q -c main FETCH_HEAD; Must 'pristine main'
 foreach ($suite in 'private-onboarding', 'node-map-retrieval', 'session-safety') {
   pwsh -NoProfile -File (Join-Path $pristine "tests/$suite.ps1"); Must "release tests/$suite"
 }
 $env:BRAIN_LOCK_TOKEN = $keepToken; $env:BRAIN_MODEL = $model
+if ($target -eq '2.0.0-rc.1' -and (Get-Command cargo -ErrorAction SilentlyContinue)) {
+  cargo test --locked --manifest-path native/Cargo.toml; Must 'native history tests'
+}
 git add -- $changed CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md maps protocol/decision-authority.json protocol/rulings.json; Must 'stage'
 $left = @(git status --porcelain | Where-Object { $_ -notmatch '^[AMD] ' })
 if ($left) { $left; throw 'STOP: unstaged or untracked paths remain; review them before committing' }
 git diff --cached --stat
-git commit -m 'Upgrade mdr-kernel 0.1.0 to 0.2.0'; Must 'upgrade commit'
+git commit -m "Upgrade mdr-kernel $installed to $target"; Must 'upgrade commit'
 pwsh -NoProfile -File bin/brain-doctor.ps1; Must 'doctor'
 ```
 
@@ -298,8 +327,7 @@ Remove-Item -LiteralPath $upgradeWorkPath -Recurse -Force
 pwsh -NoProfile -File bin/start-session.ps1 -Model $model; Must 'start-session'
 ```
 
-The last command must end with `STARTUP_STATUS=READY`. Keep `refs/mdr/v0.2.0`: it is the base
-for the next upgrade. `git config --local --unset brain.model` removes the 0.1 identity setting
+The last command must end with `STARTUP_STATUS=READY`. Keep the fetched release ref as the base for the next upgrade. `git config --local --unset brain.model` removes the 0.1 identity setting
 that 0.2 no longer reads; doctor warns about it otherwise.
 
 ## Expected refusals and what they mean
@@ -307,14 +335,14 @@ that 0.2 no longer reads; doctor warns about it otherwise.
 | Message contains | Cause | Fix |
 |---|---|---|
 | `set BRAIN_MODEL or include an explicit Brain-Model trailer` | A commit identified only by `git config brain.model` | Set `$env:BRAIN_MODEL` in the committing window (U1). |
-| `LOCK_OWNER=UNPROVEN` or `BRAIN_LOCK_TOKEN does not match` | A lock taken by another session, or a token that is not yours | Use the token from your own `-Acquire` (U7). Never copy one from the lock file. |
-| `required gate 'bin/...' is missing` | Hooks arrived without their helpers | Finish U5; it brings both together. |
+| `LOCK_OWNER=UNPROVEN` or `BRAIN_LOCK_TOKEN does not match` | A lock taken by another session, or a token that is not yours | Use the token from your own `-Acquire` (U5). Never copy one from the lock file. |
+| `required gate 'bin/...' is missing` | Hooks arrived without their helpers | Finish U6; it brings both together. |
 | `staged decision history/authority is invalid` | New hooks with an unmigrated decision log | Complete U8 before committing. |
 | `Commit existing history unchanged before migration` | `DECISIONS.md` edited after its last commit | Commit or restore it (U4, U4b) first. |
 | `Existing history is structurally invalid; migration refused` | A log U4 would have failed, for example free-form 0.1 headings | Go back to U4b. |
 | `Authority boundary already exists; it is immutable` | U8 already ran | Keep the committed boundary; never edit or delete it. |
 | `staged paths outside this close set` | `close-session.ps1` saw staged paths that belong to other work | Commit your own work separately, or name it with `-Also`. |
-| `refusing to merge unrelated histories` | A merge of the release into a template copy | Do not merge; use U5. |
+| `refusing to merge unrelated histories` | A merge of the release into a template copy | Do not merge; use U6. |
 
 ## Rollback
 
@@ -323,8 +351,11 @@ would be lost. Keep the authority boundary; it is durable history.
 
 ```powershell
 # [R1] revert the upgrade, keep later memory and the authority boundary
-$upgrade = git log -1 --format=%H --grep '^Upgrade mdr-kernel 0.1.0 to 0.2.0$'
+$upgrade = git log -1 --format=%H --grep '^Upgrade mdr-kernel [0-9].* to [0-9].*$'
 if (-not $upgrade) { throw 'STOP: no upgrade commit found' }
+$acq = pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model $model -Objective 'roll back the mdr-kernel upgrade'
+Must 'acquire lock'
+$env:BRAIN_LOCK_TOKEN = ([regex]::Match(($acq -join "`n"), '(?m)^session token: ([a-f0-9]+)')).Groups[1].Value
 git revert --no-commit $upgrade
 $keep = @('protocol/decision-authority.json', 'protocol/rulings.json', 'protocol/decision-ratifications.jsonl') |
   Where-Object { git cat-file -e "HEAD:$_" 2>$null; $LASTEXITCODE -eq 0 }
@@ -334,18 +365,13 @@ pwsh -NoProfile -File bin/update-node-map.ps1; Must 'node map'
 git add -- CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md maps; Must 'stage regenerated files'
 $open = @(git diff --name-only --diff-filter=U)
 if ($open) { $open; throw 'STOP: resolve these by hand (keep your later memory), then git add them' }
-$acq = pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model $model -Objective 'roll back mdr-kernel 0.2.0'
-$acq; Must 'acquire lock'
-$env:BRAIN_LOCK_TOKEN = ([regex]::Match(($acq -join "`n"), '(?m)^session token: ([a-f0-9]+)')).Groups[1].Value
-git commit -m "Revert mdr-kernel 0.2.0 upgrade ($upgrade)"; Must 'revert commit'
+git commit -m "Revert mdr-kernel upgrade ($upgrade)"; Must 'revert commit'
 pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model $model; Must 'release lock'
 ```
 
-The revert restores the 0.1 tools, contract and doors; STATE, handoffs and decisions written
-after the upgrade stay. The boundary, compiled rulings and any ratification records stay too;
-0.1 ignores them, and a later upgrade reuses the boundary instead of drawing a new one (skip U8's
-initializer then and run `bin/build-rulings.ps1`). Decisions added under 0.2 keep their
-`**Authority:**` lines.
+The revert restores the previous tools, contract, and doors. STATE, handoffs, decisions, the
+authority boundary, compiled rulings, and ratification records remain. A later upgrade reuses the
+existing boundary.
 
 ## Upgrade notes: 0.1 to 0.2
 

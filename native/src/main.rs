@@ -8,11 +8,18 @@ fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     match argv.split_first() {
         None => println!("{USAGE}"),
-        Some((cmd, [])) if cmd == "--help" || cmd == "help" => println!("{USAGE}"),
+        Some((cmd, [])) if matches!(cmd.as_str(), "--help" | "-h" | "help") => println!("{USAGE}"),
         Some((cmd, [])) if cmd == "--version" => {
             println!("mdr-kernel {}", env!("CARGO_PKG_VERSION"))
         }
-        Some((cmd, [flag])) if cmd == "find" && flag == "--help" => println!("{USAGE}"),
+        Some((cmd, args))
+            if cmd == "find"
+                && args
+                    .iter()
+                    .any(|arg| matches!(arg.as_str(), "--help" | "-h")) =>
+        {
+            println!("{USAGE}")
+        }
         Some((cmd, args)) if cmd == "find" => std::process::exit(find::cli(args)),
         Some((cmd, _)) => {
             eprintln!("Unknown command: {cmd}\n{USAGE}");

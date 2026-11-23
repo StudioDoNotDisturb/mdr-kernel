@@ -331,18 +331,14 @@ should trust:
 
 ## [ VERSION ] Release and Upgrade Policy
 
-The current version is in [`VERSION`](VERSION) (semantic versioning: `0.x` means the pattern can
-still change shape between releases; `1.0.0` is the first release considered stable). Each release
-is a tagged commit on this repository's `main`.
+The current version is in [`VERSION`](VERSION). Releases use semantic versioning. A version
+with an `-rc` suffix is a prerelease for testing. Interfaces and upgrade details may change
+before the final release. Stable releases are tagged on `main`.
 
-Your private memory is a **snapshot, not a subscription** — see "Setup does not auto-upgrade" in
-Known Limits above. There is no update command and no compatibility promise across versions yet
-(pre-`1.0.0`). "Use this template" gives your repository a fresh history that shares no commits
-with this one, so do not merge this repository into it. To apply a release, follow
-[`docs/upgrading.md`](docs/upgrading.md): it fetches the tag read-only, copies the release's
-files, three-way merges the ones you adapted (such as `protocol/CONTRACT.md`), and leaves your
-STATE, decisions, handoffs, gates and remote untouched. Watch > Custom > Releases tells you when
-one is published.
+Your private memory is a snapshot. To apply a release, follow [`docs/upgrading.md`](docs/upgrading.md).
+The guide fetches the release read-only, copies distribution changes, and merges your edits to
+files such as `protocol/CONTRACT.md`. It preserves your STATE, decisions, handoffs, gates, and
+remote. GitHub's **Watch > Custom > Releases** sends release notifications.
 
 ## What This Is Not
 

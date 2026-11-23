@@ -1,5 +1,5 @@
 {
-  "generatedUtc": "2026-11-23T05:03:37.0641730Z",
+  "generatedUtc": "2026-11-23T14:28:13.0106344Z",
   "roots": [
     {
       "name": "mdr-kernel",
@@ -505,7 +505,7 @@
       "relPath": "docs/upgrading.md",
       "title": "Upgrade the kernel while preserving your memory",
       "type": "Operator Guide / Upgrade",
-      "context": "Exact, rehearsed commands for moving an existing private 0.1 memory to 0.2 without merging histories or touching your STATE, decisions, handoffs, gates or remote.",
+      "context": "Use when upgrading a private 0.1.0 or 0.2.0 memory while preserving its history, settings, and private remote.",
       "envelopeTop": "strict",
       "nodeBlock": "strict",
       "links": {

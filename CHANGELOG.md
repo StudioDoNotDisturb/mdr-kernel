@@ -23,15 +23,20 @@ Context: Describes portable changes in the distribution without treating a sourc
 - `bin/update-node-map.ps1` now really sorts the file list (the sort keys did not read the
   dictionary records) and no longer stores file modification times, so regenerating the map
   without a Markdown change leaves `maps/` unchanged.
+- The upgrade guide covers 0.2.0 to 2.0.0-rc.1, including review of the contract merge, regeneration
+  of the doors and maps, and preservation of existing decision authority and private memory.
+- `tests/decision-authority.ps1` clears an inherited session identity and lock token before it
+  runs, so it passes inside a memory where a session holds the lock.
+- `bin/start-session.ps1` closing lines now name `reference/INDEX.md` for the reading slice and the
+  recall hook or `bin/prepare-work.ps1` for recall, matching the 0.2 contract.
+
+## Post-0.2.0 documentation
+
 - `docs/upgrading.md` is now an exact, rehearsed 0.1-to-0.2 walkthrough for template copies and
   retained-history clones: read-only release fetch, path-by-path copy with three-way merges of
   your edits, decision-log preflight before the new hooks arrive, explicit authority migration,
   expected refusals and rollback by revert. The README no longer suggests merging the public
   repository as a second remote.
-- `tests/decision-authority.ps1` clears an inherited session identity and lock token before it
-  runs, so it passes inside a memory where a session holds the lock.
-- `bin/start-session.ps1` closing lines now name `reference/INDEX.md` for the reading slice and the
-  recall hook or `bin/prepare-work.ps1` for recall, matching the 0.2 contract.
 
 ## 0.2.0
 
