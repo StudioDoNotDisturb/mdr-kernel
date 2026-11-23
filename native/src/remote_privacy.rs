@@ -526,10 +526,8 @@ mod tests {
                 "github:owner/repo"
             );
         }
-        assert_eq!(
-            status("https://user:token@github.com/owner/repo.git", &private),
-            "UNSAFE_URL"
-        ); // secret-audit:allow synthetic test URL
+        let embedded = "https://user:token@github.com/owner/repo.git"; // secret-audit:allow synthetic test URL
+        assert_eq!(status(embedded, &private), "UNSAFE_URL");
         assert_eq!(
             status(
                 "https://github.com/StudioDoNotDisturb/mdr-kernel.git",
