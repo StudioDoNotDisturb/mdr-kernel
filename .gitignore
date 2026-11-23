@@ -11,6 +11,9 @@ STATE.lock
 .secrets/
 *.secret
 
+# Native build output
+/native/target/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

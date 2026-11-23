@@ -37,6 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Test native history search
+        run: cargo test --locked --manifest-path native/Cargo.toml
+
       - name: PowerShell is preinstalled (pwsh)
         run: pwsh --version
 
@@ -68,3 +71,13 @@ jobs:
 
       - name: Run canonical start — must reach READY on a cold clone
         run: pwsh -NoProfile -File bin/start-session.ps1 -Model "ci-doctor"
+
+      - name: Search a handoff from the new private memory
+        shell: pwsh
+        run: |
+          Set-Content -LiteralPath handoffs/ci-search.md -Value "fixture quartz"
+          $hits = cargo run --locked --manifest-path native/Cargo.toml -- find --query "quartz" --json
+          if ($LASTEXITCODE -ne 0) { throw "history search failed" }
+          if (($hits | ConvertFrom-Json)[0].path -ne "handoffs/ci-search.md") {
+            throw "expected handoff was missing from history search"
+          }

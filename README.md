@@ -38,8 +38,9 @@ For the full philosophical mapping, see [FLOOR-GUIDE.md](FLOOR-GUIDE.md).
 ```
 mdr-kernel/
 |- README.md                  public orientation
-|- CHANGELOG.md               what changed per version (0.2.0 is prepared, not a release receipt)
+|- CHANGELOG.md               changes by version
 |- VERSION                    distribution source version
+|- native/                    Rust command for local history search
 |- protocol/CONTRACT.md       the model-facing contract, generated into front doors
 |- protocol/RUNBOOK.md        human startup and closeout workflow
 |- protocol/coordination-files.txt  the files that need STATE.lock (pre-commit enforces it)
@@ -109,22 +110,23 @@ logged; none is skippable.
 Deliberately boring infrastructure: the point is not to make agents *sound* coordinated, but to
 make uncoordinated work difficult to commit.
 
-## Changes in 0.2.0
+## Find a past decision or handoff
 
-Version 0.2.0 is prepared and tested in this source tree; the version number is not a release
-receipt. A release is a commit the maintainer publishes on this repository's `main`. Compared with
-0.1.x: every commit needs an explicit identity (`BRAIN_MODEL` or a `Brain-Model:` trailer), and
-every lock mutation also needs the session's own lock token; closeout commits
-only its own close set and refuses unrelated staged work; prompt recall validates its input,
-bounds its output and reports failures visibly; decisions keep proposals separate from quoted
-operator rulings, with staged history checks and human, hash-bound ratification; pre-commit runs
-the affected regression suites against the staged scripts. These are cooperative checks on a
-shared account, not a security sandbox. The July 0.1.x privacy and onboarding repairs are part of
-the earlier baseline, not new in 0.2.0.
+After setting up your private memory, run from its root:
 
-Existing 0.1 memories meet several deliberate refusals after upgrading; read the upgrade notes
-in [the upgrade guide](docs/upgrading.md) first. See also [CHANGELOG.md](CHANGELOG.md),
-[decision authority](docs/decision-authority.md), and [recall hooks](docs/recall-hooks.md).
+```powershell
+cargo run --locked --manifest-path native/Cargo.toml -- find --query "D7" --limit 3
+```
+
+The command returns file and line references from `STATE.md`, decision logs, and handoffs.
+Use `--json` for structured output. The search is optional. It requires Rust and a C compiler
+for bundled SQLite. Setup and the session lifecycle use Git and PowerShell 7.
+
+The index contains excerpts from your memory. It stays in your user cache outside the repository.
+Keep that cache private. Source files stay in your private memory checkout.
+
+For version changes and instructions for existing memories, see [CHANGELOG.md](CHANGELOG.md)
+and the [upgrade guide](docs/upgrading.md).
 
 ## [ PRIVACY ] Start With Your Own Private Repository
 

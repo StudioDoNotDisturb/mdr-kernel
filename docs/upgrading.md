@@ -9,6 +9,18 @@ An upgrade copies the release's tools into your memory and merges the few files 
 in one reviewed commit. It is not another first-time setup, not a history merge, and never a
 replacement of STATE, decisions, handoffs, references, local gates or your remote.
 
+## Try native history search from a 0.2 memory
+
+Build the candidate source in its own checkout, outside your private memory:
+
+```powershell
+cargo build --release --locked --manifest-path native/Cargo.toml
+```
+
+Run the resulting `native/target/release/mdr-kernel` executable (with `.exe` on Windows).
+Pass `find --root <private-memory-path> --query <search-terms>`. This adds search without
+changing your existing memory or session tools. The procedure below covers the 0.1 to 0.2 upgrade.
+
 ## Hearing about a release is separate from applying it
 
 - **Notification.** Each release is a tagged commit with a GitHub Release. On the public

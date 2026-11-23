@@ -59,7 +59,7 @@ work.
 |---|---|---|
 | **Full participant** (any CLI coding agent: Claude Code, Codex, Gemini CLI, ...) | Read/write the repo, run scripts, commit/push | `bin/start-session.ps1` (below) |
 | **Read-only local model** | Read allow-listed files, produce inbox-ready notes; never writes | Point it at `STATE.md`; it returns notes you fold in |
-| **Advisory chat** (a web/app assistant, no repo access) | Reason and plan only; you paste `STATE.md` to ground it | Paste `protocol/advisory.md` as its custom instruction, then paste STATE |
+| **Advisory chat** (a web/app assistant, no repo access) | Reason and plan only; you paste `STATE.md` to ground it | Paste the relevant excerpt from STATE and name the question for review |
 
 ## Full-participant kickoff
 
@@ -80,7 +80,8 @@ model then reports Right now, blockers, and the top next action and waits unless
 assigned work.
 
 For assigned work, the model uses `STATE.md` plus `reference/INDEX.md` to pick the smallest
-relevant reading slice. The generated node map checks links. If it is missing or stale,
+relevant reading slice. When you need a prior decision or handoff, use the local history search
+described in the README. The generated node map checks links. If it is missing or stale,
 regenerate it under your coordination lock:
 
 ```powershell

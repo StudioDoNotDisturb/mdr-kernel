@@ -1,0 +1,573 @@
+//! Bounded local history search over handoffs, STATE and the archived decision logs.
+//! A rebuildable SQLite FTS5 cache for lexical matches.
+//! The cache rebuilds itself when any source file is added, edited, renamed or removed, and a
+//! failed rebuild leaves the previous complete index in place.
+
+use crate::args::{absolute, Args};
+use regex::Regex;
+use rusqlite::{params, Connection};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+const STOP: &str = "a an the is are was were be been being do does did has have had how what why where when which who may must should can could would we i you it its this that these those of for to in on at by with and or as from any many much same never only asked call made";
+const LOGS: [&str; 2] = ["DECISIONS.md", "DECISIONS-ARCHIVE.md"];
+const QUERY_LIMIT: usize = 4096;
+
+fn hash(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
+
+fn ordinary(meta: &std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // Reject reparse points, including directory junctions.
+        if meta.file_attributes() & 0x400 != 0 {
+            return false;
+        }
+    }
+    !meta.file_type().is_symlink()
+}
+
+struct Source {
+    path: PathBuf,
+    size: u64,
+    modified: u128,
+}
+
+pub struct Row {
+    pub path: String,
+    pub line: i64,
+    pub id: String,
+    pub excerpt: String,
+    pub kind: &'static str,
+}
+
+fn stat(path: &Path) -> Option<Source> {
+    let meta = std::fs::symlink_metadata(path)
+        .ok()
+        .filter(|m| ordinary(m) && m.is_file())?;
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    Some(Source {
+        path: path.to_path_buf(),
+        size: meta.len(),
+        modified,
+    })
+}
+
+fn collect(folder: &Path, files: &mut Vec<Source>) {
+    if !std::fs::symlink_metadata(folder).is_ok_and(|m| ordinary(&m) && m.is_dir()) {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        let name = entry.file_name().to_string_lossy().to_string();
+        if kind.is_dir() {
+            collect(&entry.path(), files);
+        } else if kind.is_file() && name.ends_with(".md") && !name.starts_with("INDEX") {
+            files.extend(stat(&entry.path()));
+        }
+    }
+}
+
+fn sources(root: &Path) -> Vec<Source> {
+    let mut files = Vec::new();
+    collect(&root.join("handoffs"), &mut files);
+    for name in ["STATE.md", "DECISIONS.md", "DECISIONS-ARCHIVE.md"] {
+        files.extend(stat(&root.join(name)));
+    }
+    files.sort_by_key(|f| f.path.to_string_lossy().to_lowercase());
+    files
+}
+
+/// Paragraphs: runs of text separated by a blank (whitespace-only) line. Returns (byte offset, text).
+fn paragraphs(text: &str) -> Vec<(usize, &str)> {
+    let mut found = Vec::new();
+    let mut at = 0;
+    while let Some(skip) = text[at..].find(|c: char| !c.is_whitespace()) {
+        let start = at + skip;
+        let mut end = text.len();
+        let mut search = start;
+        while let Some(offset) = text[search..].find('\n') {
+            let newline = search + offset;
+            let run_end = text[newline..]
+                .find(|c: char| !c.is_whitespace())
+                .map_or(text.len(), |o| newline + o);
+            if text[newline + 1..run_end].contains('\n') {
+                end = newline;
+                break;
+            }
+            search = run_end.max(newline + 1);
+        }
+        found.push((start, &text[start..end]));
+        if end == text.len() {
+            break;
+        }
+        at = end;
+    }
+    found
+}
+
+fn line_of(text: &str, offset: usize) -> i64 {
+    text[..offset].matches('\n').count() as i64 + 1
+}
+
+type Record = (String, i64, String, String, String);
+
+fn records(path: &Path, root: &Path) -> Result<Vec<Record>, String> {
+    static HEADING: OnceLock<Regex> = OnceLock::new();
+    static TITLE: OnceLock<Regex> = OnceLock::new();
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .replace('\\', "/");
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let bytes = std::fs::read(path).map_err(|e| format!("{relative}: {e}"))?;
+    let decoded = std::str::from_utf8(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes))
+        .map_err(|_| format!("{relative}: not valid UTF-8"))?;
+    let normalized = decoded.replace("\r\n", "\n").replace('\r', "\n");
+    // Only the text above the node-links footer is evidence.
+    let mut cut = normalized.len();
+    let mut offset = 0;
+    for line in normalized.split_inclusive('\n') {
+        if line.trim_end() == "## SYSTEM NODE LINKS" {
+            cut = offset;
+            break;
+        }
+        offset += line.len();
+    }
+    let text = &normalized[..cut];
+    let mut out = Vec::new();
+    if LOGS.contains(&name.as_str()) {
+        let heading = HEADING.get_or_init(|| Regex::new(r"(?m)^## (D\d+)\b[^\n]*").unwrap());
+        let found: Vec<regex::Captures> = heading.captures_iter(text).collect();
+        for (i, m) in found.iter().enumerate() {
+            let whole = m.get(0).unwrap();
+            let end = found
+                .get(i + 1)
+                .map_or(text.len(), |n| n.get(0).unwrap().start());
+            let section = &text[whole.start()..end];
+            let first_line = line_of(text, whole.start());
+            for (at, part) in paragraphs(section) {
+                out.push((
+                    relative.clone(),
+                    first_line + line_of(section, at) - 1,
+                    m[1].to_string(),
+                    whole.as_str().to_string(),
+                    part.to_string(),
+                ));
+            }
+        }
+    } else {
+        let title = TITLE
+            .get_or_init(|| Regex::new(r"(?m)^Title: (.*)").unwrap())
+            .captures(text)
+            .map(|c| c[1].to_string())
+            .unwrap_or_default();
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        for (at, part) in paragraphs(text) {
+            out.push((
+                relative.clone(),
+                line_of(text, at),
+                String::new(),
+                format!("{stem} {title}"),
+                part.to_string(),
+            ));
+        }
+    }
+    Ok(out)
+}
+
+fn query_words(query: &str) -> Vec<String> {
+    static WORD: OnceLock<Regex> = OnceLock::new();
+    let stop: Vec<&str> = STOP.split(' ').collect();
+    let mut words: Vec<String> = Vec::new();
+    for m in WORD
+        .get_or_init(|| Regex::new(r"\w+").unwrap())
+        .find_iter(&query.to_lowercase())
+    {
+        let w = m.as_str();
+        if w.chars().count() > 1 && !stop.contains(&w) && !words.iter().any(|x| x == w) {
+            words.push(w.to_string());
+        }
+    }
+    words
+}
+
+fn default_cache(root: &Path) -> Result<PathBuf, String> {
+    let base = if cfg!(windows) {
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    } else {
+        std::env::var_os("XDG_CACHE_HOME")
+            .map(PathBuf::from)
+            .filter(|p| p.is_absolute())
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))
+    };
+    let base = base
+        .filter(|p| p.is_absolute())
+        .ok_or("Cannot locate a local user cache directory.")?;
+    let dir = base.join("mdr-kernel").join("history");
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&dir).map_err(|e| e.to_string())?;
+    let meta = std::fs::symlink_metadata(&dir).map_err(|e| e.to_string())?;
+    if !ordinary(&meta) || !meta.is_dir() {
+        return Err("History cache must be an ordinary directory.".into());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o077 != 0 {
+            return Err("History cache directory must be private (mode 0700).".into());
+        }
+    }
+    Ok(dir.join(format!("{}.sqlite3", &hash(&root.to_string_lossy())[..32])))
+}
+
+fn search(
+    query: &str,
+    limit: usize,
+    root: &Path,
+    cache: Option<&Path>,
+) -> Result<Vec<Row>, String> {
+    let root = absolute(root);
+    let words = query_words(query);
+    if words.is_empty() {
+        return Ok(Vec::new());
+    }
+    let files = sources(&root);
+    let listing: Vec<String> = files
+        .iter()
+        .map(|f| format!("{}|{}|{}", f.path.to_string_lossy(), f.size, f.modified))
+        .collect();
+    let signature = hash(&format!("mdr-find-v1\n{}", listing.join("\n")));
+    let cache = match cache {
+        Some(path) => absolute(path),
+        None => default_cache(&root)?,
+    };
+    if let Ok(meta) = std::fs::symlink_metadata(&cache) {
+        if !ordinary(&meta) || !meta.is_file() {
+            return Err("Cache must be an ordinary file.".into());
+        }
+    }
+    if let Some(parent) = cache.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let sql = |e: rusqlite::Error| e.to_string();
+    let mut db = Connection::open(&cache).map_err(sql)?;
+    db.busy_timeout(std::time::Duration::from_secs(20))
+        .map_err(sql)?;
+    db.execute_batch(
+        "CREATE TABLE IF NOT EXISTS meta (signature TEXT);
+         CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(path UNINDEXED, line UNINDEXED, id UNINDEXED, title, body, tokenize='porter unicode61');",
+    )
+    .map_err(sql)?;
+    let current: Option<String> = db
+        .query_row("SELECT signature FROM meta", [], |r| r.get(0))
+        .ok();
+    if current.as_deref() != Some(signature.as_str()) {
+        // Read everything first, then swap in one transaction: a failure keeps the previous index.
+        let mut all = Vec::new();
+        for file in &files {
+            all.extend(records(&file.path, &root)?);
+        }
+        let tx = db.transaction().map_err(sql)?;
+        tx.execute("DELETE FROM docs", []).map_err(sql)?;
+        {
+            let mut insert = tx
+                .prepare("INSERT INTO docs VALUES (?, ?, ?, ?, ?)")
+                .map_err(sql)?;
+            for (path, line, id, title, body) in &all {
+                insert
+                    .execute(params![path, line, id, title, body])
+                    .map_err(sql)?;
+            }
+        }
+        tx.execute("DELETE FROM meta", []).map_err(sql)?;
+        tx.execute("INSERT INTO meta VALUES (?)", params![signature])
+            .map_err(sql)?;
+        tx.commit().map_err(sql)?;
+    }
+    let quoted: Vec<String> = words.iter().map(|w| format!("\"{w}\"")).collect();
+    let phrases: Vec<String> = words
+        .windows(2)
+        .map(|p| format!("\"{} {}\"", p[0], p[1]))
+        .collect();
+    let expression = quoted
+        .iter()
+        .chain(phrases.iter())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let mut coverage: HashMap<i64, f64> = HashMap::new();
+    for word in &quoted {
+        let mut statement = db
+            .prepare("SELECT rowid FROM docs WHERE docs MATCH ?")
+            .map_err(sql)?;
+        let ids = statement
+            .query_map(params![word], |r| r.get::<_, i64>(0))
+            .map_err(sql)?;
+        for id in ids.flatten() {
+            *coverage.entry(id).or_insert(0.0) += 1.0;
+        }
+    }
+    let mut statement = db
+        .prepare("SELECT rowid, path, line, id, snippet(docs,4,'','', ' ... ',42), bm25(docs,0,0,0,5,1) FROM docs WHERE docs MATCH ? ORDER BY bm25(docs,0,0,0,5,1) LIMIT 300")
+        .map_err(sql)?;
+    let mut rows: Vec<(i64, String, i64, String, String, f64)> = statement
+        .query_map(params![expression], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+            ))
+        })
+        .map_err(sql)?
+        .collect::<Result<_, _>>()
+        .map_err(sql)?;
+    // A bare decision id lists that ruling first, from its heading.
+    let exact = query.trim().to_uppercase();
+    let key = |row: &(i64, String, i64, String, String, f64)| {
+        let is_exact = row.3 == exact;
+        let share = coverage.get(&row.0).copied().unwrap_or(0.0) / words.len() as f64;
+        (
+            !is_exact,
+            if is_exact { row.2 } else { 0 },
+            row.5 * share * share,
+        )
+    };
+    rows.sort_by(|a, b| {
+        let (ka, kb) = (key(a), key(b));
+        ka.0.cmp(&kb.0)
+            .then(ka.1.cmp(&kb.1))
+            .then(ka.2.total_cmp(&kb.2))
+            .then(a.1.cmp(&b.1))
+            .then(a.2.cmp(&b.2))
+    });
+    let mut seen = std::collections::HashSet::new();
+    let mut unique = Vec::new();
+    for (_, path, line, id, snippet, _) in rows {
+        if seen.insert((path.clone(), id.clone())) {
+            let kind = if id.is_empty() {
+                "dated context"
+            } else {
+                "decision evidence"
+            };
+            unique.push(Row {
+                path,
+                line,
+                id,
+                excerpt: snippet.chars().take(320).collect(),
+                kind,
+            });
+        }
+    }
+    unique.truncate(limit);
+    Ok(unique)
+}
+
+fn ascii_json(value: &Value) -> String {
+    let mut out = String::new();
+    for c in value.to_string().chars() {
+        if c.is_ascii() {
+            out.push(c);
+        } else {
+            let mut units = [0u16; 2];
+            for unit in c.encode_utf16(&mut units) {
+                out.push_str(&format!("\\u{unit:04x}"));
+            }
+        }
+    }
+    out
+}
+
+/// Render evidence pointers for a terminal.
+pub fn render(rows: &[Row]) -> Vec<String> {
+    let mut lines = vec![
+        "BRAIN_FIND: lexical matches. Check STATE and the source rules before acting.".to_string(),
+    ];
+    for row in rows {
+        lines.push(format!(
+            "{}:{} {} [{}] {}",
+            row.path,
+            row.line,
+            row.id,
+            row.kind,
+            row.excerpt.split_whitespace().collect::<Vec<_>>().join(" ")
+        ));
+    }
+    if rows.is_empty() {
+        lines.push("No lexical matches. Try a distinctive project name or ruling id.".into());
+    }
+    lines
+}
+
+/// `mdr-kernel find --query <text> [--limit 1..10] [--json]`
+pub fn cli(argv: &[String]) -> i32 {
+    let run = || -> Result<String, String> {
+        let args = Args::parse(argv, &["query", "limit", "root"], &["json"])?;
+        let query = args
+            .value("query")
+            .ok_or("the following arguments are required: --query")?
+            .to_string();
+        if query.chars().count() > QUERY_LIMIT {
+            return Err("query exceeds 4096 characters".into());
+        }
+        let limit = match args.value("limit").map(str::parse::<usize>) {
+            None => 10,
+            Some(Ok(n)) if (1..=10).contains(&n) => n,
+            _ => return Err("--limit must be 1 to 10".into()),
+        };
+        let root = args.root()?;
+        let rows = search(&query, limit, &root, None)?;
+        if args.switch("json") {
+            let list: Vec<Value> = rows.iter().map(|r| json!({"path": r.path, "line": r.line, "id": r.id, "excerpt": r.excerpt, "kind": r.kind})).collect();
+            return Ok(ascii_json(&Value::Array(list)));
+        }
+        Ok(render(&rows).join("\n"))
+    };
+    match run() {
+        Ok(text) => {
+            use std::io::Write;
+            let _ = std::io::stdout().write_all(format!("{text}\n").as_bytes());
+            0
+        }
+        Err(message) => {
+            eprintln!("mdr-kernel find: error: {message}");
+            2
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "mdr-find-test-{name}-{}-{nanos}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(dir.join("handoffs/archive")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn paragraphs_split_on_blank_lines_only() {
+        let text = "one\ntwo\n\n  \nthree\n";
+        let found: Vec<&str> = paragraphs(text).into_iter().map(|(_, p)| p).collect();
+        assert_eq!(found, vec!["one\ntwo", "three\n"]);
+        assert_eq!(line_of(text, paragraphs(text)[1].0), 5);
+    }
+
+    #[test]
+    fn cache_lifecycle_and_query_boundaries() {
+        let root = fixture("lifecycle");
+        std::fs::write(root.join("STATE.md"), "Live state").unwrap();
+        std::fs::write(root.join("DECISIONS.md"), "## D2 - newer\n\nAn inline `## SYSTEM NODE LINKS` mention.\n\n## D1 - older\n\nquartz collision evidence\n").unwrap();
+        let cache = root.join("cache.sqlite3");
+        let find = |q: &str| search(q, 3, &root, Some(&cache));
+        assert_eq!(find("quartz").unwrap()[0].id, "D1");
+        assert!(find("\" OR * : ()").unwrap().is_empty());
+        assert!(find("the and of").unwrap().is_empty());
+        assert!(find("unfindablexyzzy").unwrap().is_empty());
+        let note = root.join("handoffs/archive/cold.md");
+        std::fs::write(&note, "Title: archive\n\nzircon needle\n").unwrap();
+        assert!(find("zircon").unwrap()[0].path.ends_with("cold.md"));
+        // Edits, renames and removals must invalidate without an explicit rebuild.
+        std::fs::write(&note, "Title: archive\n\ntopaz replacement\n").unwrap();
+        assert!(find("zircon").unwrap().is_empty());
+        assert_eq!(find("topaz").unwrap()[0].line, 3);
+        let renamed = note.with_file_name("renamed.md");
+        std::fs::rename(&note, &renamed).unwrap();
+        assert!(find("topaz").unwrap()[0].path.ends_with("renamed.md"));
+        std::fs::remove_file(&renamed).unwrap();
+        assert!(find("topaz").unwrap().is_empty());
+        // A failed rebuild must leave the previous index readable and retryable.
+        let broken = root.join("handoffs/broken.md");
+        std::fs::write(&broken, [0xFFu8]).unwrap();
+        assert!(find("quartz").is_err());
+        std::fs::remove_file(&broken).unwrap();
+        assert_eq!(find("quartz").unwrap()[0].id, "D1");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn indexes_only_the_selected_memory_sources() {
+        let root = fixture("scope");
+        std::fs::write(root.join("handoffs/INDEX.md"), "hiddenquartz").unwrap();
+        std::fs::write(root.join("README.md"), "hiddenquartz").unwrap();
+        std::fs::write(
+            root.join("handoffs/review.md"),
+            "visiblequartz\n\n## SYSTEM NODE LINKS\n\nhiddenquartz",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink(root.join("README.md"), root.join("handoffs/external.md")).unwrap();
+            symlink(root.parent().unwrap(), root.join("handoffs/external")).unwrap();
+        }
+        let cache = root.join("cache.sqlite3");
+        assert!(search("hiddenquartz", 3, &root, Some(&cache))
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            search("visiblequartz", 3, &root, Some(&cache)).unwrap()[0].path,
+            "handoffs/review.md"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn exact_decision_id_ranks_its_ruling_first() {
+        let root = fixture("exact");
+        std::fs::write(
+            root.join("DECISIONS.md"),
+            "## D7 - the ruling\n\nWhat was decided.\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("handoffs/cites.md"),
+            "Title: D7 D7\n\nD7 D7 D7 cited again: D7.\n",
+        )
+        .unwrap();
+        assert_eq!(
+            search("D7", 3, &root, Some(&root.join("cache.sqlite3"))).unwrap()[0].id,
+            "D7"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

@@ -4,7 +4,12 @@ Context: Describes portable changes in the distribution without treating a sourc
 
 # Changes
 
-## Unreleased on main (after 0.2.0)
+## 2.0.0-rc.1
+
+- Added `mdr-kernel find` for local history search. It indexes STATE, decision logs, and handoffs
+  in a per-memory SQLite cache and returns file and line references for matching passages.
+- The native search builds from source. Private setup, recall, locking, and close still use the
+  existing PowerShell entry points.
 
 - The generated contract block is cut from 10.3 KB to about 3.3 KB, so a set-up door costs about
   2k fewer tokens per session. It keeps startup, STATE wins, the never-rules (secrets, operator
