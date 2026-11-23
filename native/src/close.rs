@@ -136,10 +136,13 @@ fn in_close_set(path: &str, coord: &[String], handoff: &[String], also: &[String
     {
         return true;
     }
-    also.iter().any(|a| {
-        let a = a.replace('\\', "/").trim_end_matches('/').to_lowercase();
-        n == a || n.starts_with(&format!("{a}/"))
-    })
+    also.iter().any(|a| also_match(&n, a))
+}
+
+/// One `-Also` spec: the path itself or anything under it (`n` is already normalized).
+fn also_match(n: &str, spec: &str) -> bool {
+    let a = spec.replace('\\', "/").trim_end_matches('/').to_lowercase();
+    n == a || n.starts_with(&format!("{a}/"))
 }
 
 /// `-Also a,b` arrives from `pwsh -File` as one string, so split on commas and drop quotes.
@@ -165,7 +168,7 @@ fn parse_status(raw: &str) -> Vec<String> {
         if record.len() < 4 {
             continue;
         }
-        if matches!(&record[..1], "R" | "C") {
+        if record[..2].contains(['R', 'C']) {
             records.next();
         }
         paths.push(record[3..].to_string());
@@ -190,8 +193,11 @@ fn staged(root: &Path) -> Vec<String> {
 /// A typo'd `-Also` silently stages nothing, so name every spec that matches no pending change.
 fn warn_unmatched(also: &[String], pending: &[String]) {
     for a in also {
-        let spec = std::slice::from_ref(a);
-        if !pending.iter().any(|p| in_close_set(p, &[], &[], spec)) {
+        // Only the spec itself counts: a pending node map must not make a typo look matched.
+        if !pending
+            .iter()
+            .any(|p| also_match(&p.replace('\\', "/").to_lowercase(), a))
+        {
             warn(&format!("-Also '{a}' matched no pending change - check the path (already committed, or a typo?)"));
         }
     }
@@ -989,6 +995,7 @@ mod tests {
         ] {
             assert!(in_close_set(p, &coord, &handoff, &also), "{p}");
         }
+        assert!(!also_match("maps/node-map.json", "ghost-note.md"));
         for p in ["notes-a.md.bak", "directory/x", "inbox/note.md"] {
             assert!(!in_close_set(p, &coord, &handoff, &also), "{p}");
         }
