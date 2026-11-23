@@ -71,6 +71,17 @@ fn help_arguments_and_memory_root_errors() {
         assert!(stdout(fixture.run(&fixture.0, args)).starts_with("Usage:"));
     }
     refuses(fixture.run(&fixture.0, &["find"]), "required: --query");
+    // A value option never swallows the next option, and "-h" as a value is searched, not help.
+    for option in ["--query", "--root", "--limit"] {
+        refuses(
+            fixture.run(&fixture.0, &["find", option, "--json"]),
+            &format!("Missing value for {option} (next is the option --json"),
+        );
+    }
+    refuses(
+        fixture.run(&fixture.0, &["find", "--query", "-h"]),
+        "Cannot locate a configured memory",
+    );
     for limit in ["0", "11", "large"] {
         refuses(
             fixture.run(&fixture.0, &["find", "--query=quartz", "--limit", limit]),
@@ -151,6 +162,31 @@ fn exact_id_and_full_coverage_survive_more_than_300_competitors() {
     assert_eq!(id[0]["id"], "D900");
     let coverage: serde_json::Value = serde_json::from_str(&ranked("quartz copper")).unwrap();
     assert_eq!(coverage[0]["path"], "handoffs/full.md");
+}
+
+#[test]
+fn bad_encoding_warns_and_corrupt_cache_rebuilds() {
+    let fixture = Fixture::new();
+    let root = fixture.memory("memory");
+    fs::write(root.join("handoffs/good.md"), "beryl note\n").unwrap();
+    fs::write(root.join("handoffs/legacy.md"), b"beryl caf\xE9\n").unwrap();
+    let output = fixture.run(&root, &["find", "--query", "beryl", "--json"]);
+    let warning = String::from_utf8_lossy(&output.stderr).to_string();
+    let hits: serde_json::Value = serde_json::from_str(&stdout(output)).unwrap();
+    assert_eq!(hits[0]["path"], "handoffs/good.md");
+    assert!(
+        warning.contains("warning: skipped handoffs/legacy.md: not valid UTF-8"),
+        "{warning}"
+    );
+    let cache = fs::read_dir(fixture.cache())
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    fs::write(&cache, "not a database").unwrap();
+    let result = stdout(fixture.run(&root, &["find", "--query", "beryl"]));
+    assert!(result.contains("handoffs/good.md:1"), "{result}");
 }
 
 #[cfg(unix)]

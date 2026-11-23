@@ -156,21 +156,21 @@ fn without_footer(text: &str) -> &str {
 
 type Record = (String, i64, String, String, String);
 
-fn records(path: &Path, root: &Path) -> Result<Vec<Record>, String> {
+/// `None` when the file is not UTF-8: it is skipped and reported instead of failing the search.
+fn records(path: &Path, relative: &str) -> Result<Option<Vec<Record>>, String> {
     static HEADING: OnceLock<Regex> = OnceLock::new();
     static TITLE: OnceLock<Regex> = OnceLock::new();
-    let relative = path
-        .strip_prefix(root)
-        .map_err(|e| e.to_string())?
-        .to_string_lossy()
-        .replace('\\', "/");
+    let relative = relative.to_string();
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     let bytes = std::fs::read(path).map_err(|e| format!("{relative}: {e}"))?;
-    let decoded = std::str::from_utf8(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes))
-        .map_err(|_| format!("{relative}: not valid UTF-8"))?;
+    let Ok(decoded) =
+        std::str::from_utf8(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes))
+    else {
+        return Ok(None);
+    };
     let normalized = decoded.replace("\r\n", "\n").replace('\r', "\n");
     let text = without_footer(&normalized);
     let mut out = Vec::new();
@@ -214,7 +214,7 @@ fn records(path: &Path, root: &Path) -> Result<Vec<Record>, String> {
             ));
         }
     }
-    Ok(out)
+    Ok(Some(out))
 }
 
 fn query_words(query: &str) -> Vec<String> {
@@ -268,23 +268,56 @@ fn default_cache(root: &Path) -> Result<PathBuf, String> {
     Ok(dir.join(format!("{}.sqlite3", &hash(&root.to_string_lossy())[..32])))
 }
 
-fn search(
-    query: &str,
-    limit: usize,
-    root: &Path,
-    cache: Option<&Path>,
-) -> Result<Vec<Row>, String> {
+pub struct Found {
+    pub rows: Vec<Row>,
+    /// Memory files left out of the index because they are not UTF-8.
+    pub skipped: Vec<String>,
+}
+
+enum Fail {
+    Cache(rusqlite::Error),
+    Other(String),
+}
+
+impl From<rusqlite::Error> for Fail {
+    fn from(e: rusqlite::Error) -> Self {
+        Fail::Cache(e)
+    }
+}
+
+impl From<String> for Fail {
+    fn from(e: String) -> Self {
+        Fail::Other(e)
+    }
+}
+
+fn damaged(e: &rusqlite::Error) -> bool {
+    use rusqlite::ErrorCode::{DatabaseCorrupt, NotADatabase};
+    matches!(e.sqlite_error_code(), Some(NotADatabase | DatabaseCorrupt))
+}
+
+/// The cache only holds derived excerpts, so a damaged one is removed and rebuilt from the sources.
+fn discard(cache: &Path) -> Result<(), String> {
+    for suffix in ["-journal", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", cache.display()));
+    }
+    std::fs::remove_file(cache).map_err(|e| {
+        format!(
+            "history cache {} is damaged and could not be removed ({e}); delete it to rebuild",
+            cache.display()
+        )
+    })
+}
+
+fn search(query: &str, limit: usize, root: &Path, cache: Option<&Path>) -> Result<Found, String> {
     let root = absolute(root);
     let words = query_words(query);
     if words.is_empty() {
-        return Ok(Vec::new());
+        return Ok(Found {
+            rows: Vec::new(),
+            skipped: Vec::new(),
+        });
     }
-    let files = sources(&root);
-    let listing: Vec<String> = files
-        .iter()
-        .map(|f| format!("{}|{}|{}", f.path.to_string_lossy(), f.size, f.modified))
-        .collect();
-    let signature = hash(&format!("mdr-find-v2\n{}", listing.join("\n")));
     let cache = match cache {
         Some(path) => absolute(path),
         None => default_cache(&root)?,
@@ -297,41 +330,82 @@ fn search(
     if let Some(parent) = cache.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let sql = |e: rusqlite::Error| e.to_string();
-    let mut db = Connection::open(&cache).map_err(sql)?;
-    db.busy_timeout(std::time::Duration::from_secs(20))
-        .map_err(sql)?;
+    let attempt = || lookup(query, &words, limit, &root, &cache);
+    let result = match attempt() {
+        Err(Fail::Cache(e)) if damaged(&e) => {
+            discard(&cache)?;
+            attempt()
+        }
+        other => other,
+    };
+    result.map_err(|fail| match fail {
+        Fail::Cache(e) => format!("history cache {}: {e}", cache.display()),
+        Fail::Other(message) => message,
+    })
+}
+
+fn lookup(
+    query: &str,
+    words: &[String],
+    limit: usize,
+    root: &Path,
+    cache: &Path,
+) -> Result<Found, Fail> {
+    let files = sources(root);
+    let listing: Vec<String> = files
+        .iter()
+        .map(|f| format!("{}|{}|{}", f.path.to_string_lossy(), f.size, f.modified))
+        .collect();
+    let signature = hash(&format!("mdr-find-v2\n{}", listing.join("\n")));
+    let mut db = Connection::open(cache)?;
+    db.busy_timeout(std::time::Duration::from_secs(20))?;
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS meta (signature TEXT);
+         CREATE TABLE IF NOT EXISTS skipped (path TEXT);
          CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(path UNINDEXED, line UNINDEXED, id UNINDEXED, title, body, tokenize='porter unicode61');",
-    )
-    .map_err(sql)?;
-    let current: Option<String> = db
-        .query_row("SELECT signature FROM meta", [], |r| r.get(0))
-        .ok();
+    )?;
+    let current: Option<String> = match db.query_row("SELECT signature FROM meta", [], |r| r.get(0))
+    {
+        Err(e) if damaged(&e) => return Err(e.into()),
+        other => other.ok(),
+    };
     if current.as_deref() != Some(signature.as_str()) {
         // Read everything first, then swap in one transaction: a failure keeps the previous index.
         let mut all = Vec::new();
+        let mut skipped = Vec::new();
         for file in &files {
-            all.extend(records(&file.path, &root)?);
-        }
-        let tx = db.transaction().map_err(sql)?;
-        tx.execute("DELETE FROM docs", []).map_err(sql)?;
-        {
-            let mut insert = tx
-                .prepare("INSERT INTO docs VALUES (?, ?, ?, ?, ?)")
-                .map_err(sql)?;
-            for (path, line, id, title, body) in &all {
-                insert
-                    .execute(params![path, line, id, title, body])
-                    .map_err(sql)?;
+            let relative = file
+                .path
+                .strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            match records(&file.path, &relative)? {
+                Some(found) => all.extend(found),
+                None => skipped.push(relative),
             }
         }
-        tx.execute("DELETE FROM meta", []).map_err(sql)?;
-        tx.execute("INSERT INTO meta VALUES (?)", params![signature])
-            .map_err(sql)?;
-        tx.commit().map_err(sql)?;
+        let tx = db.transaction()?;
+        tx.execute("DELETE FROM docs", [])?;
+        tx.execute("DELETE FROM skipped", [])?;
+        {
+            let mut insert = tx.prepare("INSERT INTO docs VALUES (?, ?, ?, ?, ?)")?;
+            for (path, line, id, title, body) in &all {
+                insert.execute(params![path, line, id, title, body])?;
+            }
+            let mut skip = tx.prepare("INSERT INTO skipped VALUES (?)")?;
+            for path in &skipped {
+                skip.execute(params![path])?;
+            }
+        }
+        tx.execute("DELETE FROM meta", [])?;
+        tx.execute("INSERT INTO meta VALUES (?)", params![signature])?;
+        tx.commit()?;
     }
+    let skipped = db
+        .prepare("SELECT path FROM skipped ORDER BY path")?
+        .query_map([], |r| r.get(0))?
+        .collect::<Result<Vec<String>, _>>()?;
     let quoted: Vec<String> = words.iter().map(|w| format!("\"{w}\"")).collect();
     let phrases: Vec<String> = words
         .windows(2)
@@ -345,19 +419,14 @@ fn search(
         .join(" OR ");
     let mut coverage: HashMap<i64, usize> = HashMap::new();
     for word in &quoted {
-        let mut statement = db
-            .prepare("SELECT rowid FROM docs WHERE docs MATCH ?")
-            .map_err(sql)?;
-        let ids = statement
-            .query_map(params![word], |r| r.get::<_, i64>(0))
-            .map_err(sql)?;
+        let mut statement = db.prepare("SELECT rowid FROM docs WHERE docs MATCH ?")?;
+        let ids = statement.query_map(params![word], |r| r.get::<_, i64>(0))?;
         for id in ids {
-            *coverage.entry(id.map_err(sql)?).or_default() += 1;
+            *coverage.entry(id?).or_default() += 1;
         }
     }
     let mut statement = db
-        .prepare("SELECT rowid, path, line, id, snippet(docs,4,'','', ' ... ',42), bm25(docs,0,0,0,5,1) FROM docs WHERE docs MATCH ?")
-        .map_err(sql)?;
+        .prepare("SELECT rowid, path, line, id, snippet(docs,4,'','', ' ... ',42), bm25(docs,0,0,0,5,1) FROM docs WHERE docs MATCH ?")?;
     let mut rows: Vec<(i64, String, i64, String, String, f64)> = statement
         .query_map(params![expression], |r| {
             Ok((
@@ -368,10 +437,8 @@ fn search(
                 r.get(4)?,
                 r.get(5)?,
             ))
-        })
-        .map_err(sql)?
-        .collect::<Result<_, _>>()
-        .map_err(sql)?;
+        })?
+        .collect::<Result<_, _>>()?;
     // A bare decision id lists that ruling first, from its heading.
     let exact = query.trim().to_uppercase();
     let key = |row: &(i64, String, i64, String, String, f64)| {
@@ -412,7 +479,10 @@ fn search(
             }
         }
     }
-    Ok(unique)
+    Ok(Found {
+        rows: unique,
+        skipped,
+    })
 }
 
 fn ascii_json(value: &Value) -> String {
@@ -459,7 +529,10 @@ pub fn render(rows: &[Row]) -> Vec<String> {
 /// `mdr-kernel find --query <text> [--limit 1..10] [--json]`
 pub fn cli(argv: &[String]) -> i32 {
     let run = || -> Result<String, String> {
-        let args = Args::parse(argv, &["query", "limit", "root"], &["json"])?;
+        let args = Args::parse(argv, &["query", "limit", "root"], &["json", "help", "h"])?;
+        if args.switch("help") || args.switch("h") {
+            return Ok(crate::USAGE.to_string());
+        }
         let query = args
             .value("query")
             .ok_or("the following arguments are required: --query")?
@@ -473,7 +546,10 @@ pub fn cli(argv: &[String]) -> i32 {
             _ => return Err("--limit must be 1 to 10".into()),
         };
         let root = args.root()?;
-        let rows = search(&query, limit, &root, None)?;
+        let Found { rows, skipped } = search(&query, limit, &root, None)?;
+        for path in skipped {
+            eprintln!("mdr-kernel find: warning: skipped {path}: not valid UTF-8; re-save it as UTF-8 to make it searchable");
+        }
         if args.switch("json") {
             let list: Vec<Value> = rows.iter().map(|r| json!({"path": r.path, "line": r.line, "id": r.id, "excerpt": r.excerpt, "kind": r.kind})).collect();
             return Ok(ascii_json(&Value::Array(list)));
@@ -524,7 +600,7 @@ mod tests {
         std::fs::write(root.join("STATE.md"), "Live state").unwrap();
         std::fs::write(root.join("DECISIONS.md"), "## D2 - newer\n\nAn inline `## SYSTEM NODE LINKS` mention.\n\n## D1 - older\n\nquartz collision evidence\n").unwrap();
         let cache = root.join("cache.sqlite3");
-        let find = |q: &str| search(q, 3, &root, Some(&cache));
+        let find = |q: &str| search(q, 3, &root, Some(&cache)).map(|f| f.rows);
         assert_eq!(find("quartz").unwrap()[0].id, "D1");
         assert!(find("\" OR * : ()").unwrap().is_empty());
         assert!(find("the and of").unwrap().is_empty());
@@ -541,12 +617,46 @@ mod tests {
         assert!(find("topaz").unwrap()[0].path.ends_with("renamed.md"));
         std::fs::remove_file(&renamed).unwrap();
         assert!(find("topaz").unwrap().is_empty());
-        // A failed rebuild must leave the previous index readable and retryable.
-        let broken = root.join("handoffs/broken.md");
-        std::fs::write(&broken, [0xFFu8]).unwrap();
-        assert!(find("quartz").is_err());
-        std::fs::remove_file(&broken).unwrap();
-        assert_eq!(find("quartz").unwrap()[0].id, "D1");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn non_utf8_handoffs_are_skipped_and_named() {
+        let root = fixture("encoding");
+        std::fs::write(root.join("handoffs/good.md"), "garnet evidence\n").unwrap();
+        // A cp1252 byte (0xE9) and a UTF-16LE BOM file: neither may disable search.
+        std::fs::write(root.join("handoffs/cp1252.md"), b"garnet caf\xE9\n").unwrap();
+        std::fs::write(root.join("handoffs/utf16.md"), b"\xFF\xFEg\0a\0r\0").unwrap();
+        let cache = root.join("cache.sqlite3");
+        for _ in 0..2 {
+            // The second run reads the warm cache and must still name the skipped files.
+            let found = search("garnet", 3, &root, Some(&cache)).unwrap();
+            assert_eq!(found.rows.len(), 1);
+            assert_eq!(found.rows[0].path, "handoffs/good.md");
+            assert_eq!(found.skipped, ["handoffs/cp1252.md", "handoffs/utf16.md"]);
+        }
+        std::fs::write(root.join("handoffs/cp1252.md"), "garnet fixed\n").unwrap();
+        let found = search("garnet", 3, &root, Some(&cache)).unwrap();
+        assert_eq!(found.rows.len(), 2);
+        assert_eq!(found.skipped, ["handoffs/utf16.md"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn corrupt_cache_rebuilds_itself() {
+        let root = fixture("corrupt");
+        std::fs::write(root.join("STATE.md"), "opal state\n").unwrap();
+        let cache = root.join("cache.sqlite3");
+        assert_eq!(
+            search("opal", 3, &root, Some(&cache)).unwrap().rows.len(),
+            1
+        );
+        // Garbage over a warm cache, and a bare header: both rebuild in the same call.
+        for junk in [vec![b'x'; 8192], b"SQLite format 3\0".to_vec()] {
+            std::fs::write(&cache, junk).unwrap();
+            let found = search("opal", 3, &root, Some(&cache)).unwrap();
+            assert_eq!(found.rows[0].path, "STATE.md");
+        }
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -569,9 +679,13 @@ mod tests {
         let cache = root.join("cache.sqlite3");
         assert!(search("hiddenquartz", 3, &root, Some(&cache))
             .unwrap()
+            .rows
             .is_empty());
         assert_eq!(
-            search("visiblequartz", 3, &root, Some(&cache)).unwrap()[0].path,
+            search("visiblequartz", 3, &root, Some(&cache))
+                .unwrap()
+                .rows[0]
+                .path,
             "handoffs/review.md"
         );
         let _ = std::fs::remove_dir_all(&root);
@@ -591,7 +705,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            search("D7", 3, &root, Some(&root.join("cache.sqlite3"))).unwrap()[0].id,
+            search("D7", 3, &root, Some(&root.join("cache.sqlite3")))
+                .unwrap()
+                .rows[0]
+                .id,
             "D7"
         );
         let _ = std::fs::remove_dir_all(&root);

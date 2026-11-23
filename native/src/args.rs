@@ -59,9 +59,14 @@ impl Args {
                     Some(v) => v.to_string(),
                     None => {
                         i += 1;
-                        argv.get(i)
-                            .cloned()
-                            .ok_or_else(|| format!("Missing value for {raw}"))?
+                        match argv.get(i) {
+                            Some(next) if next.starts_with("--") => {
+                                return Err(format!(
+                                    "Missing value for {raw} (next is the option {next}; write {raw}={next} to use it as the value)"
+                                ))
+                            }
+                            next => next.cloned().ok_or_else(|| format!("Missing value for {raw}"))?,
+                        }
                     }
                 };
                 values.insert(name, value);

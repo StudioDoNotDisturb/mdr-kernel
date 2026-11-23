@@ -16,7 +16,6 @@ name: doctor
 
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -36,6 +35,13 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # A PR checkout is a detached merge commit and a branch push is not main, but private
+      # setup requires main. Name the commit under test local main, as in an adopter's clone;
+      # setup-private keeps its main requirement unchanged.
+      - name: Put the commit under test on local main
+        shell: bash
+        run: git checkout -B main
 
       - name: Test native history search
         run: cargo test --locked --manifest-path native/Cargo.toml

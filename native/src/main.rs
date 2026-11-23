@@ -1,7 +1,7 @@
 mod args;
 mod find;
 
-const USAGE: &str =
+pub const USAGE: &str =
     "Usage: mdr-kernel find --query <text> [--root <memory>] [--limit 1..10] [--json]";
 
 fn main() {
@@ -11,14 +11,6 @@ fn main() {
         Some((cmd, [])) if matches!(cmd.as_str(), "--help" | "-h" | "help") => println!("{USAGE}"),
         Some((cmd, [])) if cmd == "--version" => {
             println!("mdr-kernel {}", env!("CARGO_PKG_VERSION"))
-        }
-        Some((cmd, args))
-            if cmd == "find"
-                && args
-                    .iter()
-                    .any(|arg| matches!(arg.as_str(), "--help" | "-h")) =>
-        {
-            println!("{USAGE}")
         }
         Some((cmd, args)) if cmd == "find" => std::process::exit(find::cli(args)),
         Some((cmd, _)) => {

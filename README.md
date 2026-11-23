@@ -122,8 +122,14 @@ The command returns file and line references from `STATE.md`, decision logs, and
 Use `--json` for structured output. The search is optional. It requires Rust and a C compiler
 for bundled SQLite. Setup and the session lifecycle use Git and PowerShell 7.
 
-The index contains excerpts from your memory. It stays in your user cache outside the repository.
-Keep that cache private. Source files stay in your private memory checkout.
+The index contains excerpts from your memory. It stays in your user cache outside the repository:
+`%LOCALAPPDATA%\mdr-kernel\history` on Windows and `~/.cache/mdr-kernel/history` on Linux
+(`$XDG_CACHE_HOME/mdr-kernel/history` when that is set). Keep that cache private. Source files
+stay in your private memory checkout.
+
+The cache rebuilds itself when a source changes or the cache file is damaged. To clear it, delete
+that folder; the next search rebuilds it. A handoff that is not UTF-8 is left out with a warning
+that names the file; re-save it as UTF-8 to make it searchable.
 
 For version changes and instructions for existing memories, see [CHANGELOG.md](CHANGELOG.md)
 and the [upgrade guide](docs/upgrading.md).
