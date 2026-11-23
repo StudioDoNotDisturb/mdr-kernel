@@ -4,6 +4,7 @@ mod envelope;
 mod find;
 mod fingerprint;
 mod git;
+mod health;
 mod hook;
 mod least_code;
 mod remote_privacy;
@@ -22,6 +23,8 @@ const COMMANDS: &str =
        mdr-kernel start-session [-Model <id>] [-FullDoctor] | session-stop
        mdr-kernel close-session [-Topic <slug>|-NoHandoff] [-Model <id>] [-Token <t>] [-Also a,b] [-OfflineCheckpoint] [-DryRun] ...
        mdr-kernel sync-private [-PreserveWorkingTree]
+       mdr-kernel state-budget [-Path <file>] [-MaxLines 90] [-MaxKB 10] [-Top 5] [-Detail]
+       mdr-kernel secret-audit [-CheckScannerCoverage]
        mdr-kernel install";
 
 fn main() {
@@ -48,6 +51,9 @@ fn main() {
         }
         Some((cmd, args)) if matches!(cmd.as_str(), "close-session" | "sync-private") => {
             close::cli(cmd, args)
+        }
+        Some((cmd, args)) if matches!(cmd.as_str(), "state-budget" | "secret-audit") => {
+            health::cli(cmd, args)
         }
         Some((cmd, _)) if matches!(cmd.as_str(), "hook" | "install") => hook::cli(&argv),
         Some((cmd, _)) => {

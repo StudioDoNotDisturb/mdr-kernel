@@ -17,6 +17,15 @@
 [CmdletBinding()]
 param([switch]$CheckScannerCoverage)
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same audit when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key)"; "$($p.Value)" }
+  })
+  & $engine secret-audit @forward
+  exit $LASTEXITCODE
+}
 Set-Location $root
 
 function Test-ScannerCoverage {
@@ -43,6 +52,23 @@ function Test-ScannerCoverage {
       RequiredPatterns = @(
         "(?m)^\s*'fast-scan set'\s*=\s*'.*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}",
         "(?m)^\s*'credential assignment'\s*=\s*'.*api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token"
+      )
+    },
+    # The native engine's scanners guard commits and audits once bin/mdr-kernel is installed.
+    [pscustomobject]@{
+      Name = 'native pre-commit staged scan'
+      Path = 'native/src/hook.rs'
+      RequiredPatterns = @(
+        'sk-\(proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}',
+        '\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)'
+      )
+    },
+    [pscustomobject]@{
+      Name = 'native secret-audit deep scan'
+      Path = 'native/src/health.rs'
+      RequiredPatterns = @(
+        '"fast-scan set",\s*r"[^"]*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}',
+        '"credential assignment",\s*r#?"[^\n]*\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)'
       )
     }
   )
@@ -79,7 +105,7 @@ if ($CheckScannerCoverage) {
 }
 
 # Files whose job is to describe secret shapes.
-$skip = @('.githooks/pre-commit', 'bin/brain-doctor.ps1', 'bin/secret-audit.ps1')
+$skip = @('.githooks/pre-commit', 'bin/brain-doctor.ps1', 'bin/secret-audit.ps1', 'native/src/health.rs')
 
 # Wider net than the fast scan (which covers Anthropic/OpenAI/GitHub/AWS/Google/Slack/PEM).
 $patterns = [ordered]@{

@@ -1,6 +1,6 @@
 //! Session close and private sync. Ports of `bin/close-session.ps1` (close set, handoff and INDEX
 //! checks, lock, commit, push, release) and `bin/sync-private.ps1` (live privacy check, fetch and
-//! rebase, push with one retry). The STATE budget, the doctor's hard gates and node-map generation
+//! rebase, push with one retry). The doctor's hard gates and node-map generation
 //! still run their PowerShell scripts until their own checkpoints.
 //!
 //!   mdr-kernel close-session [-Topic <slug> | -NoHandoff] [-Model <id>] [-Token <token>]
@@ -615,17 +615,9 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
     }
 
     // 3b) STATE budget, with the targeting breakdown when over.
-    let budget = pwsh_command(root, "state-budget.ps1", &[])
-        .stderr(Stdio::inherit())
-        .output();
-    let (budget_ok, budget) = match budget {
-        Ok(o) => (o.status.success(), lossy(o.stdout)),
-        Err(e) => (
-            false,
-            format!("required utility 'pwsh' is unavailable ({e})"),
-        ),
-    };
-    let mut budget_lines = budget.lines();
+    let budget = crate::health::state_budget(&root.join("STATE.md"), 90, 10, 5, false);
+    let budget_ok = budget.code == 0;
+    let mut budget_lines = budget.out.lines();
     let first = budget_lines.next().unwrap_or("");
     if budget_ok {
         ok(&format!("STATE budget: {first}"));
