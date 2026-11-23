@@ -25,6 +25,8 @@ param(
   [ValidatePattern('^\d{4}-\d{2}-\d{2}$')]
   [string]$SessionDate, # explicit handoff date when outside the accepted UTC-today/local-today/UTC±1 window
   [string[]]$Also = @(), # extra files/directories this session owns and wants in the close commit
+  [string]$LeastCode,  # Least-code trailer text, when the close adds a bin/ file or >60 code lines
+  [string]$LeastFile,  # Least-file trailer text, when the close adds files beyond one dated handoff and inbox/ notes
   [switch]$OfflineCheckpoint, # commit locally, mark pending sync, never push (private-remote mode only)
   [switch]$DryRun,     # run all checks, stage/commit/push nothing
   [switch]$NoHandoff   # explicit opt-out when this session wrote no new handoff
@@ -403,7 +405,8 @@ else { Ok 'inbox/ empty' }
       Write-Host '-- staging --'
       git status --short | Write-Host
       $subject = if ($Message) { $Message } elseif ($Topic) { "Session close: $Topic" } else { "Session close: $today" }
-      git commit -m "$subject`n`nBrain-Model: $model" | Out-Host
+      $trailers = @(if ($LeastCode) { "Least-code: $LeastCode" }; if ($LeastFile) { "Least-file: $LeastFile" }; "Brain-Model: $model")
+      git commit -m "$subject`n`n$($trailers -join "`n")" | Out-Host
       if ($LASTEXITCODE -ne 0) { Fail 'git commit failed (pre-commit gate?) — see output above'; exit 1 }
       $localCommitMade = $true
       Ok 'committed'

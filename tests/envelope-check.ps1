@@ -10,6 +10,14 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $checker = Join-Path $root 'bin/envelope-check.ps1'
 $failures = 0
+# MDR_TEST_ENGINE names a built binary: run every case through `mdr-kernel envelope` instead, so
+# the native port is held to the same fixtures as the PowerShell checker.
+$engine = $env:MDR_TEST_ENGINE
+function Invoke-Checker([string]$File, [switch]$Staged, [switch]$Count) {
+  $mode = if ($Staged) { 'staged' } elseif ($Count) { 'count' } else { 'check' }
+  if ($engine) { & $engine envelope $mode @(if ($File) { $File }) }
+  else { & pwsh -NoProfile -File $checker @(if ($Staged) { '-Staged' } elseif ($Count) { '-Count' } else { $File }) }
+}
 
 function Expect([string]$Name, [bool]$Condition, [string]$Detail = '') {
   if ($Condition) { Write-Host "[PASS] $Name" }
@@ -25,7 +33,7 @@ function Doc([string]$Title, [string]$Context) { "Title: $Title`nType: Test`nCon
 function Check([string]$Text) {
   $f = Join-Path $tmp 'case.md'
   [IO.File]::WriteAllText($f, $Text)
-  $null = & pwsh -NoProfile -File $checker $f
+  $null = Invoke-Checker $f
   $LASTEXITCODE
 }
 
@@ -52,16 +60,16 @@ try {
     git init -q
     [IO.File]::WriteAllText((Join-Path $repo 'ok.md'), (Doc 'Short' $good))
     git add ok.md
-    $null = & pwsh -NoProfile -File $checker -Staged
+    $null = Invoke-Checker -Staged
     Expect 'staged: compliant file passes' ($LASTEXITCODE -eq 0)
     [IO.File]::WriteAllText((Join-Path $repo 'bad.md'), (Doc ('z' * 150) 'Written today. Nothing here is doctrine.'))
     git add bad.md
-    $null = & pwsh -NoProfile -File $checker -Staged
+    $null = Invoke-Checker -Staged
     Expect 'staged: overlong header blocks the commit' ($LASTEXITCODE -eq 1)
-    $out = & pwsh -NoProfile -File $checker -Count
+    $out = Invoke-Checker -Count
     Expect 'count reports tracked files over the limits' ("$out" -match 'ENVELOPE_LENGTH over=1 tracked=2') "$out"
     [IO.File]::WriteAllText((Join-Path $repo 'bad.md'), (Doc 'Short' $good))
-    $null = & pwsh -NoProfile -File $checker -Staged
+    $null = Invoke-Checker -Staged
     Expect 'staged: an unstaged fix cannot mask the staged blob' ($LASTEXITCODE -eq 1)
   } finally { Pop-Location }
 } finally {

@@ -9,6 +9,13 @@ for tool in grep sed; do
 done
 msg_file="$1"
 [ -f "$msg_file" ] || exit 1
+# The native engine applies the same rules when installed in bin/ (MDR_ENGINE=legacy skips it).
+repo=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$repo" ] && [ "${MDR_ENGINE:-}" != legacy ]; then
+  for engine in "$repo/bin/mdr-kernel.exe" "$repo/bin/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" hook prepare-commit-msg "$msg_file"; fi
+  done
+fi
 model=$(printf '%s' "${BRAIN_MODEL:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
 count=$(grep -ci '^Brain-Model:' "$msg_file")
 if [ "$count" -gt 1 ]; then

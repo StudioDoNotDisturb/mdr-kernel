@@ -62,6 +62,21 @@ jobs:
           }
           if ($failed) { throw "failed suites: $($failed -join ', ')" }
 
+      # Parity: the hook suites again, with the hooks running the native engine instead of the
+      # shell gates. Same fixtures, same assertions, plus the engine-only trailer and staleness checks.
+      - name: Run the hook suites through the native engine
+        shell: pwsh
+        run: |
+          cargo build --locked --release --manifest-path native/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'native engine build failed' }
+          $env:MDR_TEST_ENGINE = (Resolve-Path "native/target/release/mdr-kernel$(if ($IsWindows) { '.exe' })").Path
+          $failed = @()
+          foreach ($suite in 'envelope-check','session-safety') {
+            pwsh -NoProfile -File "tests/$suite.ps1"
+            if ($LASTEXITCODE -ne 0) { $failed += "$suite (exit $LASTEXITCODE)" }
+          }
+          if ($failed) { throw "failed through the native engine: $($failed -join ', ')" }
+
       - name: Arm the git hooks
         shell: bash
         run: |

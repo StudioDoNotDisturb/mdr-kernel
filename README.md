@@ -131,6 +131,21 @@ The cache rebuilds itself when a source changes or the cache file is damaged. To
 that folder; the next search rebuilds it. A handoff that is not UTF-8 is left out with a warning
 that names the file; re-save it as UTF-8 to make it searchable.
 
+### Native commit guards (optional in this release)
+
+The same binary can run the git hooks. Install it into your memory's `bin/` folder:
+
+```powershell
+cargo run --locked --release --manifest-path native/Cargo.toml -- install
+```
+
+With `bin/mdr-kernel` installed, the hooks run the native engine. It applies the same pre-commit
+gates as the shell hooks, plus a `commit-msg` check for the `Least-code:` and `Least-file:`
+trailers that the contract asks for. Without the binary, the shell hooks run as before and the
+trailers are not checked. If you update the kernel's `native/` sources, the engine refuses to
+guard commits until you rebuild and reinstall it. To use the shell hooks for one commit, set
+`MDR_ENGINE=legacy`.
+
 For version changes and instructions for existing memories, see [CHANGELOG.md](CHANGELOG.md)
 and the [upgrade guide](docs/upgrading.md).
 

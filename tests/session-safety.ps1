@@ -31,6 +31,11 @@ try {
   # from both a clean export and the template directory without cloning the private source repo.
   Get-ChildItem -LiteralPath $root -Force | Where-Object { $_.Name -notin @('.git','.brain-root','STATE.lock') } |
     Copy-Item -Destination $clone -Recurse -Force
+  # MDR_TEST_ENGINE names a built binary: the hooks then run the native engine, and every
+  # assertion below must hold for it exactly as for the shell gates. Without it, test the shell.
+  $engine = $env:MDR_TEST_ENGINE
+  Remove-Item -Path (Join-Path $clone 'bin/mdr-kernel*') -Force -ErrorAction SilentlyContinue
+  if ($engine) { Copy-Item -LiteralPath $engine -Destination (Join-Path $clone "bin/mdr-kernel$(if ($IsWindows) { '.exe' })") }
   & git -C $clone init -q -b main
   & git -C $clone config user.name 'session safety test'
   & git -C $clone config user.email 'session-safety@example.invalid'
@@ -217,7 +222,7 @@ try {
   & git restore --staged --worktree -- STATE.md
   Write-Utf8 (Join-Path $clone 'ordinary.txt') 'Ordinary non-coordination work.'
   & git add -- ordinary.txt
-  $commit = @(& git commit -qm 'Ordinary commit without a lock' 2>&1)
+  $commit = @(& git commit -qm "Ordinary commit without a lock`n`nLeast-file: fixture file for the ordinary-commit test" 2>&1)
   Assert-True 'real ordinary commit needs no lock and gets one trailer' ($LASTEXITCODE -eq 0 -and @(& git log -1 --format=%B | Where-Object { $_ -ceq 'Brain-Model: test-model' }).Count -eq 1) ($commit | Out-String)
   Remove-Item Env:\BRAIN_MODEL
   & git rm -q -- ordinary.txt
@@ -225,6 +230,23 @@ try {
   Assert-True 'real commit with neither BRAIN_MODEL nor trailer is refused' ($LASTEXITCODE -ne 0 -and ($commit | Out-String) -match 'set BRAIN_MODEL or include') ($commit | Out-String)
   $commit = @(& git commit -qm "Remove ordinary fixture`n`nBrain-Model: test-model" 2>&1)
   Assert-True 'real commit with only an explicit message trailer is accepted' ($LASTEXITCODE -eq 0) ($commit | Out-String)
+  if ($engine) {
+    Write-Utf8 (Join-Path $clone 'untrailed.txt') 'A new file with no Least-file trailer.'
+    & git add -- untrailed.txt
+    $commit = @(& git commit -qm "Add a file without a trailer`n`nBrain-Model: test-model" 2>&1)
+    Assert-True 'engine: a new file without a Least-file trailer is refused' ($LASTEXITCODE -ne 0 -and ($commit | Out-String) -match 'Least-file:') ($commit | Out-String)
+    & git rm -q --cached -- untrailed.txt
+    Remove-Item -LiteralPath (Join-Path $clone 'untrailed.txt')
+    Add-Content -LiteralPath (Join-Path $clone 'native/src/main.rs') -Value '// drift'
+    & git add -- native/src/main.rs
+    $hook = @(& $shell '.githooks/pre-commit' 2>&1)
+    Assert-True 'engine: a binary built from other sources refuses to guard the commit' ($LASTEXITCODE -eq 1 -and ($hook | Out-String) -match 'different native/ sources') ($hook | Out-String)
+    $env:MDR_ENGINE = 'legacy'
+    $hook = @(& $shell '.githooks/pre-commit' 2>&1)
+    Assert-True 'engine: MDR_ENGINE=legacy runs the shell gates instead' ($LASTEXITCODE -eq 0) ($hook | Out-String)
+    Remove-Item Env:\MDR_ENGINE
+    & git restore --staged --worktree -- native/src/main.rs
+  }
   $fixtureHead = (& git rev-parse HEAD).Trim()
   Write-Utf8 (Join-Path $clone 'foreign.txt') 'Another session owns this change.'
   & git add -- foreign.txt
@@ -238,7 +260,7 @@ try {
   Write-Utf8 (Join-Path $clone 'inbox/foreign-note.md') 'Another session owns this inbox note.'
   Write-Utf8 (Join-Path $clone 'owned one.txt') 'First owned change.'
   Write-Utf8 (Join-Path $clone 'owned two.txt') 'Second owned change.'
-  $result = Run-Close @('-NoHandoff','-Model','test-model','-Also','"owned one.txt", "owned two.txt"')
+  $result = Run-Close @('-NoHandoff','-Model','test-model','-Also','"owned one.txt", "owned two.txt"','-LeastFile','owned fixture files for the Also test')
   $committed = @(& git show --pretty=format: --name-only HEAD)
   Assert-True 'quoted comma-separated Also paths both reach the checkpoint' ($result.Exit -eq 0 -and $committed -contains 'owned one.txt' -and $committed -contains 'owned two.txt') $result.Text
   Assert-True 'unowned inbox and unrelated work remain outside close' ($committed -notcontains 'inbox/foreign-note.md' -and $committed -notcontains 'foreign.txt' -and (Test-Path -LiteralPath (Join-Path $clone 'inbox/foreign-note.md')))

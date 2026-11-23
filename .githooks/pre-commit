@@ -30,6 +30,15 @@ for helper in bin/state-lock.ps1 bin/write-approval.ps1 bin/sync-doors.ps1 bin/e
   fi
 done
 
+# The native engine runs these same gates when it is installed in bin/ (see README). It refuses
+# when it was built from other native/ sources than the staged ones. MDR_ENGINE=legacy, or a
+# clone without the binary, runs the shell gates below.
+if [ "${MDR_ENGINE:-}" != legacy ]; then
+  for engine in "$repo/bin/mdr-kernel.exe" "$repo/bin/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" hook pre-commit; fi
+  done
+fi
+
 # --- 1) canonical-root WARNING -------------------------------------------------
 # A linked git worktree of the canonical repo is canonical for coordination purposes:
 # it shares the canonical .git, so its commits land in the same object store on the same branch.

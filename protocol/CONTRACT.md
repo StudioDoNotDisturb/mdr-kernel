@@ -46,7 +46,12 @@ you are not a full participant: read `STATE.md` and return an inbox-ready note.
 - **Walk the least-code ladder before writing any code.** Go in order and stop at the first rung
   that holds: is it needed at all? Is it already in the repo (grep)? Does the stdlib or the
   platform do it? Does an installed dependency? Is it one line? Only then write the minimum that
-  works. Never cut trust-boundary validation, data-loss handling, security or accessibility.
+  works. Never cut trust-boundary validation, data-loss handling, security or accessibility. A
+  commit that adds a new `bin/` file or over 60 code lines needs a `Least-code:` trailer.
+- **Walk the least-file ladder before creating any file or folder.** Does anyone need it after
+  this session? Can an existing file hold it? Is it bulk, generated or temporary (scratch, never
+  the repo)? Only then create one file; a new folder needs three files landing now. A commit
+  that adds files beyond one dated handoff and `inbox/` notes needs a `Least-file:` trailer.
 - Commit and push each unit of work as it lands.
 - Every tracked `.md` file starts with `Title:`, `Type:` and `Context:` lines and ends with a
   `SYSTEM NODE LINKS` block. Start new files from `_templates/markdown-file-template.md`.

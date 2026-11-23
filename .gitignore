@@ -13,6 +13,9 @@ STATE.lock
 
 # Native build output
 /native/target/
+/bin/mdr-kernel
+/bin/mdr-kernel.exe
+/bin/.mdr-kernel.installing
 
 # OS / editor cruft
 .DS_Store

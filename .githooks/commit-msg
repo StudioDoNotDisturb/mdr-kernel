@@ -1,0 +1,12 @@
+#!/bin/sh
+# Least-code and Least-file trailers (protocol/CONTRACT.md). A commit that adds a new bin/ file or
+# more than 60 code lines needs `Least-code: <text>`; one that adds files or folders (beyond one
+# dated handoff and inbox/ notes) needs `Least-file: <text>`. Only the native engine checks them:
+# without bin/mdr-kernel, or with MDR_ENGINE=legacy, this hook accepts the message.
+repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+if [ "${MDR_ENGINE:-}" != legacy ]; then
+  for engine in "$repo/bin/mdr-kernel.exe" "$repo/bin/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" hook commit-msg "$1"; fi
+  done
+fi
+exit 0

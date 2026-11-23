@@ -359,7 +359,7 @@ if ($CommitScaffold) {
       if (-not @(git diff --cached --name-only).Count) {
         Ok 'nothing to commit; scaffold already checkpointed (unrelated paths left untouched)'
       } else {
-        git commit -m 'Initialize mdr-kernel memory scaffold'
+        git commit -m "Initialize mdr-kernel memory scaffold`n`nLeast-file: the kernel requires these scaffold files to start a memory"
         if ($LASTEXITCODE -ne 0) { throw 'git commit failed for scaffold commit' }
         Ok 'committed scaffold checkpoint'
       }
