@@ -295,7 +295,7 @@ try {
   $env:BRAIN_MODEL = 'test-model'
   try {
     Expect-Exit 'close accepts multiple -Also paths in comma form' 0 {
-      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also 'notes-a.md,notes-b.md'
+      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -LeastFile 'fixture files for this close test' -Also 'notes-a.md,notes-b.md'
     }
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
@@ -312,7 +312,7 @@ try {
   $env:BRAIN_MODEL = 'test-model'
   try {
     Expect-Exit 'close accepts a pre-staged deletion named in -Also without splitting' 0 {
-      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also 'notes-b.md'
+      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -LeastFile 'fixture files for this close test' -Also 'notes-b.md'
     }
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
@@ -328,7 +328,7 @@ try {
   Set-Content -LiteralPath (Join-Path $clone 'notes-c.md') -Value 'battery also-c'
   $env:BRAIN_MODEL = 'test-model'
   try {
-    $ghostOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also 'notes-c.md,ghost-note.md' 2>&1)
+    $ghostOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -LeastFile 'fixture files for this close test' -Also 'notes-c.md,ghost-note.md' 2>&1)
     $ghostExit = $LASTEXITCODE
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
@@ -371,7 +371,7 @@ try {
     & pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -Approve -ProposalId $proposalId -Reason 'battery approve' | Out-Host
     Add-Content -LiteralPath (Join-Path $clone 'reference/INDEX.md') -Value '| battery-note.md | battery write-approval flow note |'
     Expect-Exit 'write-approval flow closes with file, INDEX row, and auto-ridden audit' 0 {
-      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also 'reference/battery-note.md'
+      & pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -LeastFile 'fixture files for this close test' -Also 'reference/battery-note.md'
     }
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
@@ -803,7 +803,7 @@ try {
   Set-Content -LiteralPath (Join-Path $clone 'cp2-newdir/deep-note.md') -Value 'cp2 deep also'
   $env:BRAIN_MODEL = 'test-model'
   try {
-    $deepOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also 'cp2-newdir/deep-note.md' 2>&1)
+    $deepOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -LeastFile 'fixture files for this close test' -Also 'cp2-newdir/deep-note.md' 2>&1)
     $deepExit = $LASTEXITCODE
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
