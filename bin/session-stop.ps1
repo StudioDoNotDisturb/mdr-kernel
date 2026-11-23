@@ -9,6 +9,9 @@
   required for CLI-only use; close-session works the same whether or not this nudge fires.
 #>
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine gives the same nudge when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') { & $engine session-stop -Root $root; exit $LASTEXITCODE }
 $msgs = @()
 
 $dirty = git -C $root status --porcelain 2>$null
