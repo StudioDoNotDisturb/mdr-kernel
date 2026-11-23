@@ -36,7 +36,11 @@ impl Default for Options {
 /// The tracked-file secret scan: the fast set plus generic credential assignments. PowerShell's
 /// `-match` ignores case, so the whole pattern does.
 const SECRETS: &str = r#"(?i)sk-ant-[A-Za-z0-9_-]{20,}|sk-(?:proj|svcacct)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[\w-]*(api[_-]?key|secret|passwd|password|access[_-]?token)\b\s*[:=]\s*["'][^"']{8,}["']"#;
-const SECRET_SKIP: [&str; 2] = [".githooks/pre-commit", "bin/brain-doctor.ps1"];
+const SECRET_SKIP: [&str; 3] = [
+    ".githooks/pre-commit",
+    "bin/brain-doctor.ps1",
+    "native/src/doctor.rs",
+];
 /// Files bootstrap scaffolds: absent on a pristine clone, so their absence points at bootstrap.
 const SCAFFOLDED: [&str; 14] = [
     ".brain-root",
@@ -912,6 +916,7 @@ pub fn cli(argv: &[String]) -> i32 {
             .value("Root")
             .map_or_else(|| top(&cwd), |r| Ok(PathBuf::from(r)))
             .map(|r| crate::args::absolute(&r))?;
+        crate::hook::fresh_in_repo(&root)?;
         let (code, out) = run(&root, &options);
         print!("{out}");
         Ok(code)

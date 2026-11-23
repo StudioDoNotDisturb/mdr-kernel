@@ -77,6 +77,15 @@ pub fn fresh(root: &Path) -> Result<(), String> {
     ))
 }
 
+/// `fresh` for report commands that may also run outside a work tree, where the script's own
+/// message (not a fingerprint error) is the right answer.
+pub fn fresh_in_repo(root: &Path) -> Result<(), String> {
+    if crate::git::text(root, &["rev-parse", "--is-inside-work-tree"]) == "true" {
+        return fresh(root);
+    }
+    Ok(())
+}
+
 fn block(lines: &[String]) -> i32 {
     eprintln!();
     for line in lines {

@@ -324,6 +324,7 @@ pub fn cli(command: &str, argv: &[String]) -> i32 {
         if command == "secret-audit" {
             let args = Args::parse(argv, &["Root"], &["CheckScannerCoverage"])?;
             let root = root_of(&args)?;
+            crate::hook::fresh_in_repo(&root)?;
             let (code, out) = if args.switch("CheckScannerCoverage") {
                 scanner_coverage(&root)
             } else {
@@ -337,6 +338,10 @@ pub fn cli(command: &str, argv: &[String]) -> i32 {
             &["Path", "MaxLines", "MaxKB", "Top", "Root"],
             &["Detail"],
         )?;
+        // A -Path outside any repository still gets its report; inside one, a stale binary refuses.
+        if let Ok(root) = root_of(&args) {
+            crate::hook::fresh_in_repo(&root)?;
+        }
         let path = match args.value("Path").filter(|p| !p.is_empty()) {
             Some(p) => PathBuf::from(p),
             None => root_of(&args)?.join("STATE.md"),

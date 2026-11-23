@@ -131,7 +131,9 @@ else {
 # removed. Neither one authorizes a push — sync-private re-verifies privacy live.
 $pendingSync = (git config --local --get brain.pendingSync 2>$null)
 $aheadCount = $null
-if (git show-ref --verify --quiet refs/remotes/origin/main) {
+# --quiet prints nothing, so test the exit code, not the (always empty) output.
+$null = git show-ref --verify --quiet refs/remotes/origin/main 2>$null
+if ($LASTEXITCODE -eq 0) {
   $aheadRaw = (& git rev-list --count origin/main..HEAD 2>$null | Out-String).Trim()
   if ($aheadRaw -match '^\d+$') { $aheadCount = [int]$aheadRaw }
 }
@@ -329,7 +331,7 @@ $patterns = @(
   'xox[baprs]-[A-Za-z0-9-]{10,}', '-----BEGIN [A-Z ]*PRIVATE KEY-----',
   '(?i)[\w-]*(api[_-]?key|secret|passwd|password|access[_-]?token)\b\s*[:=]\s*["''][^"'']{8,}["'']'
 ) -join '|'
-$skip = @('.githooks/pre-commit', 'bin/brain-doctor.ps1')
+$skip = @('.githooks/pre-commit', 'bin/brain-doctor.ps1', 'native/src/doctor.rs')
 $secretHits = @()
 foreach ($f in (git ls-files)) {
   if ($skip -contains $f) { continue }
@@ -410,7 +412,12 @@ if (Test-Path $lock) {
   if ($l) {
     $hb = if ($l.heartbeat_at) { $l.heartbeat_at } else { $l.acquired_at }
     $age = $null
-    try { $age = [math]::Round(([DateTimeOffset]::UtcNow - [DateTimeOffset]::Parse($hb)).TotalMinutes) } catch {}
+    # ConvertFrom-Json turns ISO strings into DateTime; a 'Z' value stringifies without its offset,
+    # so convert the DateTime itself instead of re-parsing its text as local time.
+    try {
+      $hbAt = if ($hb -is [datetime]) { [DateTimeOffset]$hb } else { [DateTimeOffset]::Parse($hb) }
+      $age = [math]::Round(([DateTimeOffset]::UtcNow - $hbAt).TotalMinutes)
+    } catch {}
     $objective = if ($l.objective) { $l.objective } else { 'MISSING' }
     $who = "$($l.model) on $($l.host) (objective: $objective)"
     if ($null -ne $age -and $age -gt 120) {

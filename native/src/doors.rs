@@ -203,6 +203,7 @@ pub fn cli(argv: &[String]) -> i32 {
             .value("Root")
             .map_or_else(|| top(&cwd), |r| Ok(PathBuf::from(r)))
             .map(|r| crate::args::absolute(&r))?;
+        crate::hook::fresh_in_repo(&root)?;
         let o = sync(&root, args.switch("Check"), args.switch("Staged"));
         print!("{}", o.out);
         eprint!("{}", o.err);
