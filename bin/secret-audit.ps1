@@ -70,6 +70,14 @@ function Test-ScannerCoverage {
         '"fast-scan set",\s*r"[^"]*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}',
         '"credential assignment",\s*r#?"[^\n]*\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)'
       )
+    },
+    [pscustomobject]@{
+      Name = 'native doctor tracked-file scan'
+      Path = 'native/src/doctor.rs'
+      RequiredPatterns = @(
+        'const SECRETS: &str = r#"[^\n]*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}',
+        'const SECRETS: &str = r#"[^\n]*\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)'
+      )
     }
   )
 

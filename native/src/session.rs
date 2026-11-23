@@ -1,12 +1,12 @@
 //! Session start and stop. Ports of `bin/start-session.ps1` (doctor, pull, STATE readback, one
-//! STARTUP_STATUS line) and `bin/session-stop.ps1` (a read-only Stop-hook nudge). Doctor still
-//! runs `bin/brain-doctor.ps1` until it is ported.
+//! STARTUP_STATUS line) and `bin/session-stop.ps1` (a read-only Stop-hook nudge). The doctor
+//! runs in process.
 //!
 //!   mdr-kernel start-session [-Model <id>] [-FullDoctor]
 //!   mdr-kernel session-stop
 
 use crate::args::Args;
-use crate::git::{common_top, git, lossy, pwsh, top};
+use crate::git::{common_top, git, lossy, top};
 use std::path::{Path, PathBuf};
 
 const RESPONSE: &str = "RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus reference/INDEX.md to pick the smallest relevant file set before reading broadly; the generated node map checks link health.";
@@ -71,13 +71,7 @@ pub fn start(root: &Path, model: Option<&str>, full_doctor: bool) -> i32 {
     }
 
     println!("\n== 1. brain-doctor ==");
-    let (doctor_exit, doctor) = match pwsh(root, "brain-doctor.ps1", &[]) {
-        Ok(o) => (
-            o.status.code().unwrap_or(1),
-            format!("{}{}", lossy(o.stdout), lossy(o.stderr)),
-        ),
-        Err(e) => (1, e),
-    };
+    let (doctor_exit, doctor) = crate::doctor::run(root, &crate::doctor::Options::default());
     // Compact by default: [ ok ] lines are counted, not printed; the lock line always prints.
     if full_doctor || std::env::var("BRAIN_STARTUP_FULL_DOCTOR").as_deref() == Ok("1") {
         doctor.lines().for_each(|l| println!("{l}"));

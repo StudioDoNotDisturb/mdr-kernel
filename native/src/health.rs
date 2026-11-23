@@ -137,7 +137,7 @@ pub fn state_budget(path: &Path, max_lines: i64, max_kb: i64, top: usize, detail
 // ---------- secret-audit ----------
 
 /// Scanners that must keep both modern key shapes and generic credential assignments.
-const COVERAGE: [(&str, &str, [&str; 2]); 5] = [
+const COVERAGE: [(&str, &str, [&str; 2]); 6] = [
     (
         "pre-commit fast staged scan",
         ".githooks/pre-commit",
@@ -176,6 +176,14 @@ const COVERAGE: [(&str, &str, [&str; 2]); 5] = [
         [
             r#""fast-scan set",\s*r"[^"]*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}"#,
             r#""credential assignment",\s*r#?"[^\n]*\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)"#,
+        ],
+    ),
+    (
+        "native doctor tracked-file scan",
+        "native/src/doctor.rs",
+        [
+            r#"const SECRETS: &str = r#"[^\n]*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}"#,
+            r#"const SECRETS: &str = r#"[^\n]*\(api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token\)"#,
         ],
     ),
 ];

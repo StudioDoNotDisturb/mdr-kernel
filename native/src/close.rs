@@ -1,7 +1,7 @@
 //! Session close and private sync. Ports of `bin/close-session.ps1` (close set, handoff and INDEX
 //! checks, lock, commit, push, release) and `bin/sync-private.ps1` (live privacy check, fetch and
-//! rebase, push with one retry). The doctor's hard gates and node-map generation
-//! still run their PowerShell scripts until their own checkpoints.
+//! rebase, push with one retry). Node-map generation still runs its PowerShell script
+//! until its own checkpoint.
 //!
 //!   mdr-kernel close-session [-Topic <slug> | -NoHandoff] [-Model <id>] [-Token <token>]
 //!       [-Message <subject>] [-SessionDate yyyy-MM-dd] [-Also a,b] [-LeastCode <why>]
@@ -9,7 +9,7 @@
 //!   mdr-kernel sync-private [-PreserveWorkingTree]
 
 use crate::args::Args;
-use crate::git::{common_top, git, lossy, names, pwsh_command, top};
+use crate::git::{common_top, git, lossy, names, pwsh_command, text as out, top};
 use crate::hook::lock_port;
 use crate::remote_privacy::{self, Live};
 use regex::Regex;
@@ -37,15 +37,6 @@ fn ok(m: &str) {
 
 fn warn(m: &str) {
     println!("[warn] {m}");
-}
-
-/// Trimmed stdout of a git query; empty when git fails.
-fn out(root: &Path, args: &[&str]) -> String {
-    git(root, args)
-        .map(lossy)
-        .unwrap_or_default()
-        .trim()
-        .to_string()
 }
 
 /// A git command whose output goes to the console, as `| Out-Host` does; returns its exit code.
@@ -635,11 +626,11 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
     }
 
     // 5) Doctor: only its hard failures block a close.
-    let doctor = pwsh_command(root, "brain-doctor.ps1", &["-HardOnly"])
-        .stdout(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success());
-    if doctor {
+    let hard = crate::doctor::Options {
+        hard_only: true,
+        ..Default::default()
+    };
+    if crate::doctor::run(root, &hard).0 == 0 {
         ok("brain-doctor: no hard failures");
     } else {
         c.fail("brain-doctor reports a hard failure — run it and fix before closing");

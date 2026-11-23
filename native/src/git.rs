@@ -25,6 +25,15 @@ pub fn git(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     Ok(out.stdout)
 }
 
+/// Trimmed stdout of a git query; empty when git fails.
+pub fn text(dir: &Path, args: &[&str]) -> String {
+    git(dir, args)
+        .map(lossy)
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
 /// NUL-separated path listing (`-z`), empty entries dropped.
 pub fn names(dir: &Path, args: &[&str]) -> Result<Vec<String>, String> {
     Ok(lossy(git(dir, args)?)

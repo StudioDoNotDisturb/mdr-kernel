@@ -184,6 +184,19 @@ fn read(path: &Path) -> Result<String, String> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Tracked Markdown whose envelope is over the limits, and how many files were checked.
+pub fn count(root: &Path) -> Result<(Vec<String>, usize), String> {
+    let tracked = names(root, &["ls-files", "-z", "*.md"])?;
+    let mut over = Vec::new();
+    for file in &tracked {
+        let full = root.join(file);
+        if full.is_file() && !problems(&read(&full)?).is_empty() {
+            over.push(file.clone());
+        }
+    }
+    Ok((over, tracked.len()))
+}
+
 pub fn cli(argv: &[String]) -> i32 {
     let cwd = std::env::current_dir().unwrap_or_default();
     let result = match argv.split_first() {
@@ -193,19 +206,8 @@ pub fn cli(argv: &[String]) -> i32 {
         }),
         Some((mode, rest)) if mode == "count" && rest.iter().all(|a| a == "--list") => top(&cwd)
             .and_then(|root| {
-                let tracked = names(&root, &["ls-files", "-z", "*.md"])?;
-                let mut over = Vec::new();
-                for file in &tracked {
-                    let full = root.join(file);
-                    if full.is_file() && !problems(&read(&full)?).is_empty() {
-                        over.push(file);
-                    }
-                }
-                println!(
-                    "ENVELOPE_LENGTH over={} tracked={}",
-                    over.len(),
-                    tracked.len()
-                );
+                let (over, tracked) = count(&root)?;
+                println!("ENVELOPE_LENGTH over={} tracked={tracked}", over.len());
                 if !rest.is_empty() {
                     over.iter().for_each(|f| println!("{f}"));
                 }

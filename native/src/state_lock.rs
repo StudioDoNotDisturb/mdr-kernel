@@ -73,7 +73,7 @@ fn iso(seconds: f64) -> String {
 }
 
 /// Epoch seconds for an ISO 8601 date-time. A string with no offset is read as UTC.
-fn parse_iso(text: &str) -> Option<f64> {
+pub(crate) fn parse_iso(text: &str) -> Option<f64> {
     static SHAPE: OnceLock<Regex> = OnceLock::new();
     let shape = SHAPE.get_or_init(|| {
         Regex::new(
