@@ -61,11 +61,15 @@ impl Args {
                         i += 1;
                         match argv.get(i) {
                             Some(next) if next.starts_with("--") => {
+                                // Only "--name" accepts "="; "-Name" (PowerShell style) takes ":".
+                                let join = if raw.starts_with("--") { '=' } else { ':' };
                                 return Err(format!(
-                                    "Missing value for {raw} (next is the option {next}; write {raw}={next} to use it as the value)"
-                                ))
+                                    "Missing value for {raw} (next is the option {next}; write {raw}{join}{next} to use it as the value)"
+                                ));
                             }
-                            next => next.cloned().ok_or_else(|| format!("Missing value for {raw}"))?,
+                            next => next
+                                .cloned()
+                                .ok_or_else(|| format!("Missing value for {raw}"))?,
                         }
                     }
                 };

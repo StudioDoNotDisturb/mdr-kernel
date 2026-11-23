@@ -291,15 +291,22 @@ impl From<String> for Fail {
     }
 }
 
+/// Corrupt, not a database, or a plain SQLITE_ERROR such as a foreign or outdated schema.
+/// Busy, locked and I/O errors are not damage and never discard the cache.
 fn damaged(e: &rusqlite::Error) -> bool {
-    use rusqlite::ErrorCode::{DatabaseCorrupt, NotADatabase};
-    matches!(e.sqlite_error_code(), Some(NotADatabase | DatabaseCorrupt))
+    use rusqlite::ErrorCode::{DatabaseCorrupt, NotADatabase, Unknown};
+    matches!(
+        e.sqlite_error_code(),
+        Some(NotADatabase | DatabaseCorrupt | Unknown)
+    )
 }
 
 /// The cache only holds derived excerpts, so a damaged one is removed and rebuilt from the sources.
 fn discard(cache: &Path) -> Result<(), String> {
     for suffix in ["-journal", "-wal", "-shm"] {
-        let _ = std::fs::remove_file(format!("{}{suffix}", cache.display()));
+        let mut sidecar = cache.as_os_str().to_os_string();
+        sidecar.push(suffix);
+        let _ = std::fs::remove_file(sidecar);
     }
     std::fs::remove_file(cache).map_err(|e| {
         format!(
@@ -657,6 +664,63 @@ mod tests {
             let found = search("opal", 3, &root, Some(&cache)).unwrap();
             assert_eq!(found.rows[0].path, "STATE.md");
         }
+        // A valid SQLite file with a foreign schema is rebuilt too.
+        std::fs::remove_file(&cache).unwrap();
+        Connection::open(&cache)
+            .unwrap()
+            .execute_batch("CREATE TABLE meta (wrong INT); CREATE TABLE docs (wrong INT);")
+            .unwrap();
+        let found = search("opal", 3, &root, Some(&cache)).unwrap();
+        assert_eq!(found.rows[0].path, "STATE.md");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn failed_rebuild_keeps_the_previous_index() {
+        let root = fixture("rollback");
+        std::fs::write(root.join("STATE.md"), "amber state\n").unwrap();
+        let cache = root.join("cache.sqlite3");
+        let find = |q: &str| search(q, 3, &root, Some(&cache)).map(|f| f.rows);
+        assert_eq!(find("amber").unwrap().len(), 1);
+        let blocked = root.join("handoffs/blocked.md");
+        std::fs::write(&blocked, "jade note\n").unwrap();
+        // Make the new source unreadable so the rebuild fails part way through reading.
+        #[cfg(windows)]
+        let lock = {
+            use std::os::windows::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(0)
+                .open(&blocked)
+                .unwrap()
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0)).unwrap();
+        }
+        // Root ignores file modes; there is then no failure to prove.
+        if std::fs::read(&blocked).is_err() {
+            let error = find("amber").err().expect("rebuild must fail");
+            assert!(error.contains("handoffs/blocked.md"), "{error}");
+            let kept: i64 = Connection::open(&cache)
+                .unwrap()
+                .query_row(
+                    "SELECT count(*) FROM docs WHERE docs MATCH 'amber'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(kept, 1, "the failed rebuild must not touch the old index");
+        }
+        #[cfg(windows)]
+        drop(lock);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        assert_eq!(find("jade").unwrap()[0].path, "handoffs/blocked.md");
         let _ = std::fs::remove_dir_all(&root);
     }
 

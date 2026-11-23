@@ -82,6 +82,15 @@ fn help_arguments_and_memory_root_errors() {
         fixture.run(&fixture.0, &["find", "--query", "-h"]),
         "Cannot locate a configured memory",
     );
+    // PowerShell-style names get the ":" form in the hint, and that form parses.
+    refuses(
+        fixture.run(&fixture.0, &["find", "-Query", "--json"]),
+        "write -Query:--json to use it",
+    );
+    refuses(
+        fixture.run(&fixture.0, &["find", "-Query:--json"]),
+        "Cannot locate a configured memory",
+    );
     for limit in ["0", "11", "large"] {
         refuses(
             fixture.run(&fixture.0, &["find", "--query=quartz", "--limit", limit]),
