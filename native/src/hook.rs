@@ -36,7 +36,7 @@ fn git_ok(dir: &Path, args: &[&str]) -> Result<bool, String> {
 }
 
 /// The lock check or heartbeat, in process: the same code `bin/state-lock.ps1` hands off to.
-fn lock_port(root: &Path, argv: &[&str]) -> Result<crate::state_lock::Report, String> {
+pub(crate) fn lock_port(root: &Path, argv: &[&str]) -> Result<crate::state_lock::Report, String> {
     let mut all: Vec<String> = argv.iter().map(|a| a.to_string()).collect();
     all.extend(["-Root".to_string(), root.to_string_lossy().into_owned()]);
     let args = crate::args::Args::parse(

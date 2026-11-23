@@ -1,4 +1,5 @@
 mod args;
+mod close;
 mod envelope;
 mod find;
 mod fingerprint;
@@ -19,6 +20,8 @@ const COMMANDS: &str =
        mdr-kernel state-lock [-Acquire|-Release|-Heartbeat|-CheckOwner] [-Model <id>] ...
        mdr-kernel remote-privacy [-RemoteUrl <url>] [-Approve] [-RequireApproved] [-ConfirmPrivateRemote] [-Quiet]
        mdr-kernel start-session [-Model <id>] [-FullDoctor] | session-stop
+       mdr-kernel close-session [-Topic <slug>|-NoHandoff] [-Model <id>] [-Token <t>] [-Also a,b] [-OfflineCheckpoint] [-DryRun] ...
+       mdr-kernel sync-private [-PreserveWorkingTree]
        mdr-kernel install";
 
 fn main() {
@@ -42,6 +45,9 @@ fn main() {
         Some((cmd, args)) if cmd == "remote-privacy" => remote_privacy::cli(args),
         Some((cmd, args)) if matches!(cmd.as_str(), "start-session" | "session-stop") => {
             session::cli(cmd, args)
+        }
+        Some((cmd, args)) if matches!(cmd.as_str(), "close-session" | "sync-private") => {
+            close::cli(cmd, args)
         }
         Some((cmd, _)) if matches!(cmd.as_str(), "hook" | "install") => hook::cli(&argv),
         Some((cmd, _)) => {

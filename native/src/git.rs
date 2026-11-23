@@ -52,7 +52,7 @@ pub fn common_top(dir: &Path) -> Option<PathBuf> {
     common.parent().map(Path::to_path_buf)
 }
 
-fn pwsh_command(root: &Path, script: &str, args: &[&str]) -> Command {
+pub fn pwsh_command(root: &Path, script: &str, args: &[&str]) -> Command {
     let mut command = Command::new("pwsh");
     command
         .current_dir(root)
