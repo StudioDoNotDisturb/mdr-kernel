@@ -71,7 +71,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'native engine build failed' }
           $env:MDR_TEST_ENGINE = (Resolve-Path "native/target/release/mdr-kernel$(if ($IsWindows) { '.exe' })").Path
           $failed = @()
-          foreach ($suite in 'envelope-check','session-safety') {
+          foreach ($suite in 'envelope-check','session-safety','private-onboarding') {
             pwsh -NoProfile -File "tests/$suite.ps1"
             if ($LASTEXITCODE -ne 0) { $failed += "$suite (exit $LASTEXITCODE)" }
           }

@@ -4,6 +4,11 @@ param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $failures = 0
+# MDR_TEST_ENGINE names a built binary: every working clone gets it in bin/, so setup, pushes and
+# privacy checks run through the native engine and must meet the same assertions.
+function Add-Engine([string]$Path) {
+  if ($env:MDR_TEST_ENGINE) { Copy-Item -LiteralPath $env:MDR_TEST_ENGINE -Destination (Join-Path $Path "bin/mdr-kernel$(if ($IsWindows) { '.exe' })") }
+}
 
 function Expect-Exit([string]$Name, [int]$Expected, [scriptblock]$Action) {
   $output = @(& $Action 2>&1)
@@ -40,6 +45,7 @@ try {
   & git clone -q --bare $root $bareB
   if ($LASTEXITCODE) { throw 'could not create private-b test remote' }
   & git clone -q $bareA $clone
+  Add-Engine $clone
   if ($LASTEXITCODE) { throw 'could not create test clone' }
   & git -C $clone config core.hooksPath .githooks
 
@@ -105,6 +111,7 @@ try {
   # Approval and hooks live in .git/config, so every clone must run setup once. Prove both a
   # second-machine-style clone and an idempotent rerun before continuing the close battery.
   & git clone -q $bareA $secondClone
+  Add-Engine $secondClone
   if ($LASTEXITCODE) { throw 'could not create second-clone test copy' }
   & git -C $secondClone config user.name 'second clone'; & git -C $secondClone config user.email 'second@example.invalid'
   $secondSetupOut = @(& pwsh -NoProfile -File (Join-Path $secondClone 'bin/setup-private.ps1') -Model 'test-model' -ConfirmPrivateRemote 2>&1)
@@ -225,6 +232,7 @@ try {
   # A concurrent, non-conflicting private checkpoint should trigger exactly one automatic rebase
   # and then land without expert intervention.
   & git clone -q $bareA $peer
+  Add-Engine $peer
   & git -C $peer config user.name 'peer'; & git -C $peer config user.email 'peer@example.invalid'
   New-Item -ItemType Directory -Path (Join-Path $peer 'reference') -Force | Out-Null
   Set-Content -LiteralPath (Join-Path $peer 'reference/peer-battery.md') -Value 'peer checkpoint'
@@ -487,6 +495,7 @@ try {
 
   # Local-only is a stable mode, not an offline-checkpoint error path.
   & git clone -q $bareA $localClone
+  Add-Engine $localClone
   & git -C $localClone config user.name 'local'; & git -C $localClone config user.email 'local@example.invalid'
   Expect-Exit 'local-only setup succeeds' 0 {
     & pwsh -NoProfile -File (Join-Path $localClone 'bin/setup-private.ps1') -Model 'test-model' -LocalOnly

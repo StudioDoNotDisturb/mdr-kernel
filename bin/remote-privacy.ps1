@@ -170,6 +170,15 @@ function Invoke-RemotePrivacy {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+  # Run as a command (not dot-sourced): the native engine answers when installed (README).
+  $engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+    $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+      if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key)"; "$($p.Value)" }
+    })
+    & $engine remote-privacy @forward
+    exit $LASTEXITCODE
+  }
   $result = Invoke-RemotePrivacy -RemoteUrl $RemoteUrl -Approve:$Approve -RequireApproved:$RequireApproved -ConfirmPrivateRemote:$ConfirmPrivateRemote
   if (-not $Quiet) {
     Write-Host "REMOTE_PRIVACY_STATUS=$($result.Status)"

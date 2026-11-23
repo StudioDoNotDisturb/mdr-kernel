@@ -502,7 +502,14 @@ pub fn cli(argv: &[String]) -> i32 {
                 fresh(&root)?;
                 commit_msg(&root, file)
             }
-            _ => Err("usage: mdr-kernel hook pre-commit | hook prepare-commit-msg <file> | hook commit-msg <file> | install".into()),
+            ["hook", "pre-push", _remote, url] => {
+                fresh(&root)?;
+                let live = crate::remote_privacy::Live;
+                let verdict = crate::remote_privacy::run(&root, Some(url), false, true, false, &live);
+                print!("{}", crate::remote_privacy::report(&verdict));
+                Ok(verdict.code)
+            }
+            _ => Err("usage: mdr-kernel hook pre-commit | hook prepare-commit-msg <file> | hook commit-msg <file> | hook pre-push <remote> <url> | install".into()),
         }
     };
     run().unwrap_or_else(|e| {
