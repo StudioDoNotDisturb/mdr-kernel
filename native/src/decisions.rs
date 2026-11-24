@@ -863,6 +863,28 @@ fn build(root: &Path, opts: &Build<'_>) -> Report {
     }
 }
 
+/// The pre-commit's two gates, judged on the index: decision history, then compiled rulings.
+pub fn history_from_index(root: &Path) -> Report {
+    check_history(
+        root,
+        &History {
+            from_index: true,
+            ..History::default()
+        },
+    )
+}
+
+pub fn rulings_check_from_index(root: &Path) -> Report {
+    build(
+        root,
+        &Build {
+            check: true,
+            from_index: true,
+            ..Build::default()
+        },
+    )
+}
+
 pub fn build_default(root: &Path, check: bool) -> Report {
     build(
         root,

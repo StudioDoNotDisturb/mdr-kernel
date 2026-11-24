@@ -88,6 +88,7 @@ try {
   Check ($one+$two) $false 'wrong order refused' 'not strictly descending: D1 precedes D2'
   Check ((Ruled 3)+$one+$two) $false 'order checked across 3 entries' 'D1 precedes D2'
   Check ($two.Replace(' - 2026-01-02 - ',' — 2026-01-02 — ')+$one) $true 'em dash heading passes'
+  Check ($two.Replace('"Keep every verified receipt intact."','“Keep every verified receipt intact.”')+$one) $true 'curly-quoted operator words pass'
   Check ($two.Replace('"Keep every verified receipt intact."','“🧾🧾🧾🧾🧾🧾”')+$one) $true 'curly-quoted operator words use UTF-16 length'
   Check ($one.Replace('**Authority:** proposed', '')) $false 'unclassified new entry refused' 'needs exactly one \*\*Authority:\*\* line.*found 0'
   Check ($one.Replace('**Authority:** proposed', "**Authority:** proposed`n`n**Authority:** operator-ruled")) $false 'duplicate Authority lines refused' 'needs exactly one \*\*Authority:\*\* line.*found 2'

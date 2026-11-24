@@ -368,11 +368,16 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
     if git_ok(root, &["cat-file", "-e", ":DECISIONS.md"])?
         || git_ok(root, &["cat-file", "-e", "HEAD:DECISIONS.md"])?
     {
-        if !pwsh_to_stderr(root, "check-decision-history.ps1", &["-FromIndex"])? {
+        // In process; both reports go to stderr, as the scripts' output did.
+        let passes = |report: crate::decisions::Report| {
+            eprint!("{}{}", report.out, report.err);
+            report.code == 0
+        };
+        if !passes(crate::decisions::history_from_index(root)) {
             eprintln!("X mdr-kernel pre-commit: staged decision history/authority is invalid.");
             return Ok(1);
         }
-        if !pwsh_to_stderr(root, "build-rulings.ps1", &["-Check", "-FromIndex"])? {
+        if !passes(crate::decisions::rulings_check_from_index(root)) {
             eprintln!(
                 "X mdr-kernel pre-commit: compile rulings and stage the output with its sources."
             );
