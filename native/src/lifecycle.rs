@@ -121,12 +121,30 @@ fn memory_root(args: &Args) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+#[cfg(windows)]
+fn windows_relative<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
+    // Git may expand a short Windows spelling of the repository directory.
+    // Resolve only that prefix, keeping the caller's exact relative document path.
+    let mut parts = path.components();
+    parts.nth(root.components().count().checked_sub(1)?)?;
+    let relative = parts.as_path();
+    let prefix = path.ancestors().nth(relative.components().count())?;
+    if prefix.components().any(|part| part == Component::ParentDir)
+        || !checked(prefix).ok()??.is_dir()
+    {
+        return None;
+    }
+    (fs::canonicalize(prefix).ok()? == fs::canonicalize(root).ok()?).then_some(relative)
+}
+
 fn relative(root: &Path, input: &str) -> Result<String, String> {
     let input = input.replace('\\', "/");
     let path = Path::new(&input);
     let rel = if path.is_absolute() {
-        path.strip_prefix(root)
-            .ok()
+        let relative = path.strip_prefix(root).ok();
+        #[cfg(windows)]
+        let relative = relative.or_else(|| windows_relative(root, path));
+        relative
             .and_then(Path::to_str)
             .map(|p| p.replace('\\', "/"))
             .ok_or("archive path must be inside the repository")?

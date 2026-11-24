@@ -582,7 +582,13 @@ fn lifecycle_lists_only_eligible_records_and_dispositions_and_moves_exact_paths(
             .unwrap()
             .starts_with("Title: [Archived] Example\n"));
     }
-    let named = format!("-Expired:{}", root.join("handoffs/old record.md").display());
+    let root_spelling = root.clone();
+    #[cfg(windows)]
+    let root_spelling = PathBuf::from(root_spelling.to_string_lossy().to_ascii_uppercase());
+    let named = format!(
+        "-Expired:{}",
+        root_spelling.join("handoffs/old record.md").display()
+    );
     assert_eq!(
         stdout(fixture.run(
             &root,
