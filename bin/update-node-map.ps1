@@ -184,15 +184,32 @@ function Get-RootFiles($RootRecord) {
   return $out
 }
 
+# git paths, unquoted and read as UTF-8. `& git` would decode git's UTF-8 with the console code
+# page and quote non-ASCII names, so such files read as untracked and their links as broken.
+function Get-GitPathLines([string]$RootPath, [string[]]$GitArgs) {
+  $start = [Diagnostics.ProcessStartInfo]::new('git')
+  foreach ($arg in (@('-C', $RootPath, '-c', 'core.quotepath=false') + $GitArgs)) { $start.ArgumentList.Add($arg) }
+  $start.UseShellExecute = $false
+  $start.RedirectStandardOutput = $true
+  $start.RedirectStandardError = $true
+  $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+  $process = [Diagnostics.Process]::Start($start)
+  $stderr = $process.StandardError.ReadToEndAsync()
+  $text = $process.StandardOutput.ReadToEnd()
+  $process.WaitForExit(); $null = $stderr.GetAwaiter().GetResult()
+  return ,@($text -split "`n" | ForEach-Object { $_.TrimEnd("`r") } | Where-Object { $_ })
+}
+
+# `return ,$set`: a returned HashSet must stay a set. Unrolled, an empty one became $null (a
+# null-method crash) and a single entry became a string whose .Contains is a substring test.
 function Get-GitTrackedSet([string]$RootPath) {
   $set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
   $inside = & git -C $RootPath rev-parse --is-inside-work-tree 2>$null
-  if ($LASTEXITCODE -ne 0 -or $inside -notmatch 'true') { return $set }
-  $tracked = & git -C $RootPath ls-files '*.md'
-  foreach ($entry in $tracked) {
+  if ($LASTEXITCODE -ne 0 -or $inside -notmatch 'true') { return ,$set }
+  foreach ($entry in (Get-GitPathLines $RootPath @('ls-files', '*.md'))) {
     if ($entry) { [void]$set.Add((Convert-ToForwardSlash $entry)) }
   }
-  return $set
+  return ,$set
 }
 
 function Test-TrackGit($RootRecord) {
@@ -455,7 +472,7 @@ function Build-RootIndex([string]$RootPath, $RootRecord) {
   $linkIndexExcludes = @($RootRecord.excludes | Where-Object { (Convert-ToForwardSlash $_) -ne 'maps/**' })
   $inside = & git -C $RootPath rev-parse --is-inside-work-tree 2>$null
   if ($LASTEXITCODE -eq 0 -and $inside -match 'true') {
-    $gitPaths = & git -C $RootPath ls-files --cached --others --exclude-standard 2>$null
+    $gitPaths = Get-GitPathLines $RootPath @('ls-files', '--cached', '--others', '--exclude-standard')
     foreach ($entry in $gitPaths) {
       if (-not $entry) { continue }
       $rel = Normalize-RelativePath $entry
@@ -819,7 +836,7 @@ function Get-NodeData {
     # ls-files (not check-ignore --stdin): PowerShell pipes CRLF into native stdin, which git
     # reads as part of the filename and then C-quotes the output — nothing matches.
     if ($trackedSet -and $rootFiles.Count) {
-      $ignoredOut = @(& git -C $rootPath -c core.quotepath=false ls-files --others --ignored --exclude-standard -- '*.md' 2>$null)
+      $ignoredOut = Get-GitPathLines $rootPath @('ls-files', '--others', '--ignored', '--exclude-standard', '--', '*.md')
       if ($ignoredOut.Count) {
         $ignoredSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
         foreach ($p in $ignoredOut) { if ($p) { [void]$ignoredSet.Add((Convert-ToForwardSlash $p)) } }
@@ -1095,7 +1112,7 @@ function Get-IssueKeys($Data) {
       }
     }
   }
-  return $keys
+  return ,$keys   # stays a set: no null-method crash for none, no substring match for one
 }
 
 if ($Repair) {
