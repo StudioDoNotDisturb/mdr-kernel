@@ -309,9 +309,11 @@ suites when `native/` and `.githooks/` are staged. Run the suite first to verify
 cargo test --locked --manifest-path native/Cargo.toml
 ```
 
-Stage all updated distribution files (`$changed` from Step 4, or any hand-merged files) and
-regenerated doors/maps (`git rm` already staged the retired scripts), review `git status` and
-`git diff --cached --stat`, and confirm `bin/mdr-kernel*` is ignored and unstaged. Because the
+Stage every updated distribution file from Step 4 (taken directly, merged cleanly, or resolved by
+hand) and the regenerated doors and maps (`git rm` already staged the retired scripts). Each block
+below stops if any tracked file is still unstaged, because a commit without a merged file would
+leave the upgrade half applied. Then review `git status` and `git diff --cached --stat`, and
+confirm `bin/mdr-kernel*` is ignored and unstaged. Because the
 upgrade adds `native/` code and new distribution files, `.githooks/commit-msg` requires **both**
 `Least-code:` and `Least-file:` trailers (in one contiguous trailer block at the end of the
 message, alongside `Brain-Model:` from `BRAIN_MODEL`):
@@ -320,6 +322,8 @@ Windows (PowerShell):
 
 ```powershell
 git add -- $changed CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps
+git diff --quiet
+if ($LASTEXITCODE -ne 0) { git diff --name-only; throw 'STOP: tracked files above are still unstaged' }
 git status
 git diff --cached --stat
 git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m "Least-code: apply upstream 2.0.0 native Rust engine and Git hooks.`nLeast-file: apply 2.0.0 release files and remove retired PowerShell scripts."
@@ -327,9 +331,13 @@ git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m "Least-code: apply upstream
 
 Linux (`bash`):
 
+Step 4's `$changed` list lives in PowerShell, so this block stages every tracked change instead.
+That is exact because Step 1 proved the tree was clean before the upgrade began:
+
 ```sh
-git add -- CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps
-# Also `git add -- <file>` for any files you resolved by hand in Step 4.
+git add -u -- . &&
+  git add -- CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps &&
+  { git diff --quiet || { git diff --name-only; echo 'STOP: tracked files above are still unstaged' >&2; false; }; }
 git status
 git diff --cached --stat
 git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m $'Least-code: apply upstream 2.0.0 native Rust engine and Git hooks.\nLeast-file: apply 2.0.0 release files and remove retired PowerShell scripts.'
