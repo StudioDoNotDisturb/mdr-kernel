@@ -96,8 +96,9 @@ and run `.\bin\mdr-kernel.exe doctor`, `.\bin\mdr-kernel.exe start-session -Mode
 `.\bin\mdr-kernel.exe close-session -NoHandoff -Model '<id>'`.
 
 - **What `close-session -NoHandoff` verifies:** lock acquisition and release, STATE budget checks,
-  hard doctor checks, and node-map verification on a clean tree (without needing a dummy handoff
-  or `handoffs/INDEX.md` row). When nothing is modified, it passes without creating a commit.
+  and hard doctor checks on a clean tree (without needing a dummy handoff or `handoffs/INDEX.md`
+  row). When nothing is modified, it skips node-map regeneration and passes without creating a
+  commit; standalone `./bin/mdr-kernel doctor` checks node-map parity.
 - **Exercising the commit hooks separately:** Step 7's upgrade commit in the throwaway clone
   exercises `.githooks/pre-commit`, `.githooks/prepare-commit-msg`, and `.githooks/commit-msg`.
   To also exercise a normal session commit through the hooks before deleting the throwaway clone,
@@ -346,13 +347,13 @@ unset BRAIN_LOCK_TOKEN
 
 Verify the upgraded memory:
 
-1. `./bin/mdr-kernel doctor` must report `doctor: ok.` and exit 0.
+1. `./bin/mdr-kernel doctor` must report `doctor: ok.` and exit 0 (including node-map parity).
 2. `./bin/mdr-kernel start-session -Model '<your-model-id>'` must end with `STARTUP_STATUS=READY`.
-3. `./bin/mdr-kernel close-session -NoHandoff -Model '<your-model-id>'` confirms clean-tree lock,
-   budget, doctor, and node-map close checks without creating a commit (a remote-free throwaway
-   clone cannot exercise `.githooks/pre-push`; `sync-private` above exercises it on a live
-   `private-remote` memory, and your first session close with a handoff exercises all hooks end to
-   end).
+3. `./bin/mdr-kernel close-session -NoHandoff -Model '<your-model-id>'` confirms clean-tree lock
+   acquisition/release, STATE budget, and hard doctor checks without regenerating maps or creating a
+   commit (a remote-free throwaway clone cannot exercise `.githooks/pre-push`; `sync-private` above
+   exercises it on a live `private-remote` memory, and your first session close with a handoff
+   exercises all hooks end to end).
 
 If your host config (`.claude/settings.json`, `.codex/hooks.json`, `.mcp.json`) still points at
 `pwsh -NoProfile -File bin/hook-recall.ps1`, update it to invoke `bin/mdr-kernel hook-recall`
