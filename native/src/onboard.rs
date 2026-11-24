@@ -1,13 +1,13 @@
 //! First run and repair. Ports of `bin/setup-private.ps1` (verify and pin the destination, then
 //! bootstrap and push the first checkpoint) and `bin/bootstrap-clone.ps1` (arm hooks, scaffold
 //! the grow-your-own files under STATE.lock, optionally commit them, run the doctor).
-//! Node-map generation still runs its PowerShell script.
+//! Rulings and the node map run in process.
 //!
 //!   mdr-kernel setup-private -Model <id> [-LocalOnly | -ConfirmPrivateRemote]
 //!   mdr-kernel bootstrap-clone -Model <id> [-CommitScaffold]
 
 use crate::args::Args;
-use crate::git::{lossy, names, pwsh_command, text, top};
+use crate::git::{lossy, names, text, top};
 use crate::hook::lock_port;
 use crate::remote_privacy::{self, Live};
 use regex::Regex;
@@ -195,23 +195,6 @@ fn git_status(root: &Path, args: &[&str]) -> i32 {
         .map_or(1, |s| s.code().unwrap_or(1))
 }
 
-/// A PowerShell child whose stdout is indented under the step (stderr passes through).
-fn pwsh_indented(root: &Path, script: &str) -> i32 {
-    match pwsh_command(root, script, &[])
-        .stderr(std::process::Stdio::inherit())
-        .output()
-    {
-        Ok(o) => {
-            indent(&lossy(o.stdout));
-            o.status.code().unwrap_or(1)
-        }
-        Err(e) => {
-            eprintln!("required utility 'pwsh' is unavailable ({e})");
-            1
-        }
-    }
-}
-
 fn new_if_missing(root: &Path, rel: &str, content: &str) -> Result<(), String> {
     let path = root.join(rel);
     if path.exists() {
@@ -234,7 +217,11 @@ fn node_map(root: &Path, required: bool) -> Result<(), String> {
         warn("bin/update-node-map.ps1 missing - node map not generated");
         return Ok(());
     }
-    match pwsh_indented(root, "update-node-map.ps1") {
+    // In process; its report is indented under the step, as the script's output was.
+    let mapped = crate::node_map::run(root, &crate::node_map::Opts::default());
+    indent(&mapped.out);
+    eprint!("{}", mapped.err);
+    match mapped.code {
         0 => ok("node map generated (maps/NODE-MAP.md + maps/node-map.json)"),
         code if required => {
             return Err(format!("node map generation failed with exit code {code}"))

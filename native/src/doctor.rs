@@ -609,7 +609,11 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
                     .iter()
                     .filter(|f| f["issues"].as_array().is_some_and(|i| !i.is_empty()))
                     .count();
-                let (code, _) = pwsh_all(root, "update-node-map.ps1", &["-Check"], None);
+                let check = crate::node_map::Opts {
+                    check: true,
+                    ..Default::default()
+                };
+                let code = crate::node_map::run(root, &check).code;
                 if code != 0 {
                     r.warn("node map differs from tracked Markdown or generated bridge output - run: pwsh -NoProfile -File bin/update-node-map.ps1");
                 } else {
