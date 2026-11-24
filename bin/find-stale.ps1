@@ -1,0 +1,17 @@
+#requires -Version 7.0
+[CmdletBinding()]
+param([ValidateSet('list')][string]$Action = 'list')
+$ErrorActionPreference = 'Stop'
+[void]$PSBoundParameters.Remove('Action')
+
+$root = Split-Path -Parent $PSScriptRoot
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine find-stale $Action.ToLowerInvariant() @forward
+  exit $LASTEXITCODE
+}
+[Console]::Error.WriteLine('Install the native mdr-kernel binary to run find-stale.')
+exit 2

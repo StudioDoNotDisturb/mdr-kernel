@@ -404,3 +404,457 @@ fn mcp_server_answers_over_stdio() {
     assert_eq!(by_id(11)["error"]["code"], -32601);
     assert_eq!(by_id(12)["result"]["protocolVersion"], "2025-06-18");
 }
+
+fn lifecycle_git(root: &Path, args: &[&str], old: bool) {
+    let mut command = Command::new("git");
+    command
+        .current_dir(root)
+        .args([
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "core.hooksPath=.git/no-hooks",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args);
+    for key in ["GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"] {
+        command.env_remove(key);
+        if old {
+            command.env(key, "2000-01-01T00:00:00Z");
+        }
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn live_archive(fixture: &Fixture, root: &Path, option: &str, file: &str) -> Output {
+    fixture.run(
+        root,
+        &[
+            "archive-adopted",
+            option,
+            file,
+            "-Model:lifecycle",
+            "-Token:fixture-token",
+        ],
+    )
+}
+
+fn lifecycle_lock(root: &Path) {
+    fs::write(
+        root.join("STATE.lock"),
+        r#"{"model":"lifecycle","token":"fixture-token"}"#,
+    )
+    .unwrap();
+}
+
+fn lifecycle_document(root: &Path, path: &str, state: &str) {
+    fs::write(
+        root.join(path),
+        format!(
+            "Title: [{state}] Example\nType: Note\nContext: Use when testing.\n\nPreserve me.\n"
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn lifecycle_lists_only_eligible_records_and_dispositions_and_moves_exact_paths() {
+    let fixture = Fixture::new();
+    let root = fixture.memory("lifecycle");
+    lifecycle_git(&root, &["init", "-q", "-b", "main"], false);
+    for (path, state) in [
+        ("handoffs/old record.md", "Record"),
+        ("handoffs/edited.md", "Record"),
+        ("handoffs/unindexed.md", "Record"),
+        ("cited record.md", "Record"),
+        ("draft.md", "Draft"),
+        ("open.md", "Open"),
+        ("pending.md", "Adopted?"),
+        ("ingested.md", "Ingested"),
+        ("superseded.md", "Superseded"),
+        ("rejected.md", "Rejected"),
+        ("living.md", "Living"),
+        ("already.md", "Archived"),
+    ] {
+        lifecycle_document(&root, path, state);
+    }
+    let handoff = "\u{feff}Title: [Record] Old record\r\nType: Handoff\r\nContext: Use when testing.\r\n\r\nBody \u{201c}preserved\u{201d}  \r\n";
+    fs::write(root.join("handoffs/old record.md"), handoff).unwrap();
+    let index = "| Date | File | What it covers | Status |\r\n|---|---|---|---|\r\n| Jan | [old record.md](old%20record.md) | Example | Done |\r\n| Jan | edited.md | Example | Done |\r\n";
+    fs::write(root.join("handoffs/INDEX.md"), index).unwrap();
+    fs::write(
+        root.join("STATE.md"),
+        "Title: [Open] State\n\nSee cited record.md.\n",
+    )
+    .unwrap();
+    lifecycle_git(&root, &["add", "."], true);
+    lifecycle_git(&root, &["commit", "-qm", "Old docs"], true);
+    lifecycle_document(&root, "fresh.md", "Record");
+    lifecycle_git(&root, &["add", "fresh.md"], false);
+    lifecycle_git(&root, &["commit", "-qm", "Fresh record"], false);
+    fs::write(
+        root.join("handoffs/edited.md"),
+        "Title: [Record] Edited since commit\n",
+    )
+    .unwrap();
+    assert_eq!(
+        stdout(fixture.run(&root, &["find-stale", "list"])),
+        "STALE_COUNT=5\nhandoffs/old record.md [Record]\nhandoffs/unindexed.md [Record]\ningested.md [Ingested]\nrejected.md [Rejected]\nsuperseded.md [Superseded]\n"
+    );
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", "ingested.md"),
+        "your own STATE.lock",
+    );
+    lifecycle_lock(&root);
+    refuses(
+        fixture.run(
+            &root,
+            &[
+                "archive-adopted",
+                "-Adopt:ingested.md",
+                "-Model:lifecycle",
+                "-Token:someone-else",
+            ],
+        ),
+        "LOCK_OWNER=UNPROVEN",
+    );
+    refuses(
+        fixture.run(
+            &root,
+            &[
+                "archive-adopted",
+                "-Adopt:ingested.md",
+                "-Model:other",
+                "-Token:fixture-token",
+            ],
+        ),
+        "LOCK_OWNER=UNPROVEN",
+    );
+
+    for (option, name, message) in [
+        ("-Adopt", "draft.md", "[Draft] is ineligible"),
+        ("-Adopt", "living.md", "[Living] is ineligible"),
+        ("-Adopt", "already.md", "[Archived] is ineligible"),
+        ("-Adopt", "fresh.md", "[Record] is ineligible"),
+        (
+            "-Expired",
+            "draft.md",
+            "unchanged [Record] older than 30 days",
+        ),
+        (
+            "-Expired",
+            "fresh.md",
+            "unchanged [Record] older than 30 days",
+        ),
+        (
+            "-Expired",
+            "handoffs/edited.md",
+            "unchanged [Record] older than 30 days",
+        ),
+        ("-Expired", "handoffs/unindexed.md", "missing INDEX row"),
+        (
+            "-Expired",
+            "cited record.md",
+            "still cited by main file STATE.md",
+        ),
+    ] {
+        refuses(live_archive(&fixture, &root, option, name), message);
+        assert!(root.join(name).is_file());
+    }
+    for name in [
+        "open.md",
+        "pending.md",
+        "ingested.md",
+        "superseded.md",
+        "rejected.md",
+    ] {
+        assert!(stdout(live_archive(&fixture, &root, "-Adopt", name)).contains("ARCHIVED="));
+        assert!(!root.join(name).exists());
+        assert!(fs::read_to_string(root.join("archive").join(name))
+            .unwrap()
+            .starts_with("Title: [Archived] Example\n"));
+    }
+    let named = format!("-Expired:{}", root.join("handoffs/old record.md").display());
+    assert_eq!(
+        stdout(fixture.run(
+            &root,
+            &[
+                "archive-adopted",
+                &named,
+                "-Model:lifecycle",
+                "-Token:fixture-token"
+            ]
+        )),
+        "ARCHIVED=handoffs/old record.md -> archive/handoffs/old record.md\n"
+    );
+    assert!(!root.join("handoffs/old record.md").exists());
+    assert_eq!(
+        fs::read(root.join("archive/handoffs/old record.md")).unwrap(),
+        handoff.replace("[Record]", "[Archived]").as_bytes()
+    );
+    assert_eq!(
+        fs::read(root.join("handoffs/INDEX.md")).unwrap(),
+        index
+            .replace(
+                "(old%20record.md) | Example | Done",
+                "(../archive/handoffs/old%20record.md) | Example | Archived"
+            )
+            .as_bytes()
+    );
+    assert_eq!(
+        stdout(fixture.run(&root, &["find-stale", "list"])),
+        "STALE_COUNT=1\nhandoffs/unindexed.md [Record]\n"
+    );
+}
+
+#[test]
+fn lifecycle_excludes_main_citations_and_checks_every_index_reference() {
+    let fixture = Fixture::new();
+    let root = fixture.memory("citations");
+    lifecycle_git(&root, &["init", "-q", "-b", "main"], false);
+    lifecycle_document(&root, "handoffs/target.md", "Superseded");
+    let index_path = root.join("handoffs/INDEX.md");
+    let index = "| Date | File | Status |\n|---|---|---|\n| Jan | target.md | Open |\n";
+    fs::write(&index_path, index).unwrap();
+    lifecycle_git(&root, &["add", "."], false);
+    lifecycle_git(&root, &["commit", "-qm", "Source docs"], false);
+    lifecycle_lock(&root);
+    let path = "handoffs/target.md";
+    for (file, body) in [
+        ("STATE.md", "Next: [revisit](handoffs/target.md#next)\n"),
+        (
+            "living.md",
+            "Title: [Living] Main\n\n[[handoffs/target|Current]]\n",
+        ),
+        ("protocol/links.json", "{\"entry\":\"handoffs/target.md\"}"),
+        ("README.md", "Read target.md for details.\n"),
+    ] {
+        fs::create_dir_all(root.join(file).parent().unwrap()).unwrap();
+        fs::write(root.join(file), body).unwrap();
+        assert_eq!(
+            stdout(fixture.run(&root, &["find-stale", "list"])),
+            "STALE_COUNT=1\nhandoffs/target.md [Superseded]\n"
+        );
+        refuses(
+            live_archive(&fixture, &root, "-Adopt", path),
+            &format!("still cited by main file {file}"),
+        );
+        assert!(root.join(path).is_file());
+        fs::remove_file(root.join(file)).unwrap();
+    }
+    fs::write(&index_path, format!("{index}\nSee target.md.\n")).unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", path),
+        "still cited by main file handoffs/INDEX.md",
+    );
+    fs::write(&index_path, index.replace("Open", "See target.md")).unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", path),
+        "another citation in its INDEX row",
+    );
+    fs::write(
+        &index_path,
+        format!("{index}| Jan | `target.md` | Completed |\n"),
+    )
+    .unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", path),
+        "multiple INDEX rows",
+    );
+    fs::write(&index_path, "| Date | File | Status |\n").unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", path),
+        "missing INDEX row",
+    );
+    fs::write(&index_path, index).unwrap();
+    fs::write(
+        root.join("history.md"),
+        "Title: [Record] Historical\n\nSee target.md.\n",
+    )
+    .unwrap();
+    stdout(live_archive(&fixture, &root, "-Adopt", path));
+    assert!(fs::read_to_string(index_path)
+        .unwrap()
+        .contains("| Jan | ../archive/handoffs/target.md | Archived |"));
+}
+
+#[test]
+fn lifecycle_refuses_unsafe_or_unreadable_paths_and_preserves_existing_targets() {
+    let fixture = Fixture::new();
+    let root = fixture.memory("refusals");
+    lifecycle_git(&root, &["init", "-q", "-b", "main"], false);
+    for name in ["one.md", "two.md", "one, two.md"] {
+        lifecycle_document(&root, name, "Rejected");
+    }
+    fs::write(root.join("no-title.md"), "# [Ingested] in Markdown body\n").unwrap();
+    fs::write(
+        root.join("ambiguous.md"),
+        "Title: [Open] One\nTitle: [Rejected] Two\n",
+    )
+    .unwrap();
+    fs::write(root.join("unreadable.md"), [0xff]).unwrap();
+    lifecycle_lock(&root);
+    refuses(fixture.run(&root, &["find-stale"]), "find-stale list");
+    refuses(
+        fixture.run(&root, &["archive-adopted"]),
+        "choose exactly one",
+    );
+    refuses(
+        fixture.run(
+            &root,
+            &["archive-adopted", "-Adopt:one.md", "-Expired:two.md"],
+        ),
+        "choose exactly one",
+    );
+    for (name, message) in [
+        ("../outside.md", "one exact file"),
+        ("handoffs/../one.md", "one exact file"),
+        ("*.md", "one exact file"),
+        ("one.md:stream", "one exact file"),
+        (".git/target.md", "one exact file"),
+        ("handoffs/INDEX.md", "outside archive/ and INDEX.md"),
+        ("archive/one.md", "outside archive/ and INDEX.md"),
+        ("missing.md", "not a readable regular file"),
+        ("no-title.md", "missing or ambiguous Title state"),
+        ("ambiguous.md", "missing or ambiguous Title state"),
+        ("unreadable.md", "unreadable.md"),
+    ] {
+        refuses(live_archive(&fixture, &root, "-Adopt", name), message);
+    }
+    let outside = fixture.0.join("outside.md");
+    lifecycle_document(&fixture.0, "outside.md", "Rejected");
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", outside.to_str().unwrap()),
+        "inside the repository",
+    );
+    assert!(outside.exists());
+    refuses(fixture.run(&root, &["find-stale", "list"]), "unreadable.md");
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", "one.md"),
+        "unreadable.md",
+    );
+    fs::remove_file(root.join("unreadable.md")).unwrap();
+    fs::create_dir(root.join("archive")).unwrap();
+    fs::write(root.join("archive/one.md"), "Existing archive contents\n").unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", "one.md"),
+        "already exists",
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("archive/one.md")).unwrap(),
+        "Existing archive contents\n"
+    );
+    assert!(root.join("one.md").exists());
+    stdout(live_archive(&fixture, &root, "-Adopt", "one, two.md"));
+    assert!(root.join("one.md").exists());
+    assert!(root.join("two.md").exists());
+    assert!(root.join("archive/one, two.md").exists());
+}
+
+#[cfg(any(unix, windows))]
+fn lifecycle_directory_link(link: &Path, destination: &Path) {
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(destination, link).unwrap();
+    #[cfg(windows)]
+    {
+        let output = Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(link)
+            .arg(destination)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn lifecycle_refuses_links_in_source_archive_and_root_paths() {
+    let fixture = Fixture::new();
+    let root = fixture.memory("links");
+    let outside = fixture.memory("outside");
+    lifecycle_git(&root, &["init", "-q", "-b", "main"], false);
+    lifecycle_document(&root, "source.md", "Rejected");
+    lifecycle_document(&outside, "target.md", "Rejected");
+    lifecycle_lock(&root);
+    lifecycle_directory_link(&root.join("linked"), &outside);
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", "linked/target.md"),
+        "link or junction",
+    );
+    let linked_root = fixture.0.join("linked-root");
+    lifecycle_directory_link(&linked_root, &root);
+    refuses(
+        fixture.run(
+            &root,
+            &["find-stale", "list", "-Root", linked_root.to_str().unwrap()],
+        ),
+        "link or junction",
+    );
+    lifecycle_directory_link(&root.join("archive"), &outside);
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", "source.md"),
+        "link or junction",
+    );
+    assert!(outside.join("target.md").exists());
+    assert!(!outside.join("source.md").exists());
+    assert!(root.join("source.md").exists());
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(outside.join("target.md"), root.join("direct.md")).unwrap();
+        refuses(
+            live_archive(&fixture, &root, "-Adopt", "direct.md"),
+            "link or junction",
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn lifecycle_serializes_operations_and_rolls_back_a_failed_index_replace() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let fixture = Fixture::new();
+    let root = fixture.memory("rollback");
+    lifecycle_git(&root, &["init", "-q", "-b", "main"], false);
+    lifecycle_lock(&root);
+    let source = "handoffs/target.md";
+    lifecycle_document(&root, source, "Rejected");
+    let original = fs::read(root.join(source)).unwrap();
+    let index_path = root.join("handoffs/INDEX.md");
+    let index = "| File | Status |\n|---|---|\n| target.md | Done |\n";
+    fs::write(&index_path, index).unwrap();
+
+    let guard = fs::File::create(root.join(".git/mdr-lifecycle.lock")).unwrap();
+    guard.lock().unwrap();
+    refuses(
+        live_archive(&fixture, &root, "-Adopt", source),
+        "could not acquire archive operation lock",
+    );
+    drop(guard);
+
+    // Allow the command to validate the index, then make replacement fail.
+    let index_handle = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(&index_path)
+        .unwrap();
+    refuses(live_archive(&fixture, &root, "-Adopt", source), "INDEX.md");
+    drop(index_handle);
+    assert_eq!(fs::read(root.join(source)).unwrap(), original);
+    assert_eq!(fs::read_to_string(index_path).unwrap(), index);
+    assert!(!root.join("archive").join(source).exists());
+    stdout(live_archive(&fixture, &root, "-Adopt", source));
+}

@@ -11,6 +11,7 @@ mod git;
 mod health;
 mod hook;
 mod least_code;
+mod lifecycle;
 mod mcp;
 mod node_map;
 mod onboard;
@@ -45,6 +46,8 @@ const COMMANDS: &str =
        mdr-kernel write-approval -Propose | -Approve | -List | -Show | -ValidateStagedApprovals ...
        mdr-kernel update-node-map [-Check] [-Path <file> [-Repair [-Apply]]]
        mdr-kernel mcp   (read-only MCP server on stdio: recall_gates, get_gate_traps, find_history)
+       mdr-kernel find-stale list
+       mdr-kernel archive-adopted (-Adopt <path> | -Expired <path>) [-Model <id>] [-Token <t>]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
 
@@ -93,6 +96,9 @@ fn main() {
             decisions::cli(cmd, args)
         }
         Some((cmd, args)) if cmd == "update-node-map" => node_map::cli(args),
+        Some((cmd, args)) if matches!(cmd.as_str(), "find-stale" | "archive-adopted") => {
+            lifecycle::cli(cmd, args)
+        }
         Some((cmd, args)) if cmd == "brain-recall" => recall::cli(args),
         Some((cmd, args)) if matches!(cmd.as_str(), "hook-recall" | "prepare-work") => {
             recall::adapter_cli(cmd, args)

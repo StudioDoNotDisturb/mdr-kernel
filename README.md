@@ -33,6 +33,8 @@ boring engineering.
 
 For the full philosophical mapping, see [FLOOR-GUIDE.md](FLOOR-GUIDE.md).
 
+See [Document lifecycle](docs/document-lifecycle.md) for finding stale records and archiving adopted documents.
+
 ## [ MANIFEST ] What You Get
 
 ```
