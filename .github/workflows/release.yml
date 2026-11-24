@@ -32,6 +32,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Isolate the checkout
+        shell: bash
+        run: |
+          git remote remove origin
+          git checkout -B main
+          test -z "$(git remote)"
+
       - name: Build release binary
         run: cargo build --locked --release --manifest-path native/Cargo.toml
 
