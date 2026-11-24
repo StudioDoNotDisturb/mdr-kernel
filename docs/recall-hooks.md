@@ -81,6 +81,39 @@ the installed host's loader and event behavior before relying on them. If it use
 payload shape, use explicit recall until that adapter has been implemented and tested; do not rename
 an event and assume its input and output protocols are identical.
 
+## Repeat suppression with the native engine
+
+With `bin/mdr-kernel` installed, the hook keeps a receipt for each session, so it does not
+send a session the same traps twice. This needs a host that puts `session_id` in its hook payload.
+A payload without one is never suppressed. Receipts change only what the hook sends:
+`bin/brain-recall.ps1` and `bin/prepare-work.ps1` always print their full output.
+
+The hook sends a trap again in three cases:
+
+- the gate or trap changes, including its recurrence count;
+- the payload carries a different `checkpoint`;
+- the host sends a `SessionStart` payload for that session.
+
+A host that runs `SessionStart` again after it compacts the context therefore gets every reminder
+back. To wire that, add the same command under `SessionStart`, next to `UserPromptSubmit`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "pwsh -NoProfile -File bin/hook-recall.ps1", "timeout": 20 } ] }
+    ]
+  }
+}
+```
+
+A `SessionStart` payload prints nothing. The receipts sit in the OS temp folder under
+`mdr-kernel-recall-delivery/`. Each file is named by a hash of the memory root and the session, and
+holds only trap fingerprints, never prompt text. If a receipt file can't be trusted (a link,
+oversized, unreadable), the hook sends the reminder again; it never hides one. To reset every
+session's receipts, delete that folder. Without the engine, the PowerShell adapter keeps no
+receipts and sends every matching trap each time.
+
 ## Verify behavior without claiming a live hook receipt
 
 After bootstrap has created `protocol/recall-gates.json`, run:

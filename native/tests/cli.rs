@@ -217,3 +217,86 @@ fn cache_requires_private_unix_permissions() {
         "must be private (mode 0700)",
     );
 }
+
+/// The prompt hook's receipts: one session is not re-sent what it was shown, every other case is.
+#[test]
+fn hook_receipts_suppress_repeats_and_rearm() {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let fixture = Fixture::new();
+    let root = fixture.memory("memory");
+    fs::create_dir_all(root.join("protocol")).unwrap();
+    let example =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../protocol/recall-gates.example.json");
+    let gates = root.join("protocol/recall-gates.json");
+    fs::copy(&example, &gates).unwrap();
+    let temp = fixture.0.join("temp");
+    fs::create_dir_all(&temp).unwrap();
+    let hook = |payload: &str| -> String {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_mdr-kernel"))
+            .args(["hook-recall", "-Root", &root.to_string_lossy()])
+            .env("TMP", &temp)
+            .env("TEMP", &temp)
+            .env("TMPDIR", &temp)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(payload.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(out.status.success());
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let ask = |session: &str, extra: &str| {
+        hook(&format!(
+            r#"{{"session_id":"{session}","prompt":"deploy again"{extra}}}"#
+        ))
+    };
+    assert!(
+        ask("one", "").contains("EXAMPLE-DOMAIN"),
+        "first prompt delivers"
+    );
+    assert_eq!(ask("one", ""), "", "same session, same traps: suppressed");
+    assert!(
+        ask("two", "").contains("EXAMPLE-DOMAIN"),
+        "another session gets its own"
+    );
+    assert_eq!(
+        hook(r#"{"session_id":"one","hook_event_name":"SessionStart","source":"compact"}"#),
+        "",
+        "SessionStart is silent"
+    );
+    assert!(
+        ask("one", "").contains("EXAMPLE-DOMAIN"),
+        "SessionStart re-arms"
+    );
+    assert!(
+        ask("one", r#","checkpoint":"c2""#).contains("EXAMPLE-DOMAIN"),
+        "a new checkpoint re-arms"
+    );
+    assert_eq!(ask("one", r#","checkpoint":"c2""#), "");
+    // A changed trap is a new fingerprint and is delivered again.
+    let text = fs::read_to_string(&gates).unwrap();
+    fs::write(
+        &gates,
+        text.replacen("\"times_recurred\": 0", "\"times_recurred\": 3", 1),
+    )
+    .unwrap();
+    assert!(ask("one", r#","checkpoint":"c2""#).contains("RECALL_STATUS=MATCHED"));
+    // No session id: nothing is ever suppressed.
+    let anonymous = r#"{"prompt":"deploy again"}"#;
+    assert!(hook(anonymous).contains("EXAMPLE-DOMAIN"));
+    assert!(hook(anonymous).contains("EXAMPLE-DOMAIN"));
+    // A corrupt receipt file repeats the reminder instead of hiding it.
+    for entry in fs::read_dir(temp.join("mdr-kernel-recall-delivery")).unwrap() {
+        fs::write(entry.unwrap().path(), "not json").unwrap();
+    }
+    assert!(ask("two", "").contains("EXAMPLE-DOMAIN"));
+}

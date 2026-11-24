@@ -354,6 +354,18 @@ struct Matched<'a> {
 }
 
 pub fn run(root: &Path, args: &Args, stdin: Option<String>) -> Outcome {
+    run_seen(root, args, stdin, &HashSet::new(), &mut Vec::new())
+}
+
+/// `run`, with the hook's delivery receipts: in `-Brief`, traps already in `seen` are not
+/// re-sent, and `delivered` receives the fingerprints this banner actually printed.
+fn run_seen(
+    root: &Path,
+    args: &Args,
+    stdin: Option<String>,
+    seen: &HashSet<String>,
+    delivered: &mut Vec<String>,
+) -> Outcome {
     let mut gate_path = root.join("protocol/recall-gates.json");
     if args.has("GatesPath") {
         let others = [
@@ -540,8 +552,11 @@ pub fn run(root: &Path, args: &Args, stdin: Option<String>) -> Outcome {
         return done(0, String::new());
     }
     if args.switch("Brief") {
-        return match brief(&matched) {
-            Ok(banner) => done(0, banner),
+        return match brief(&matched, seen) {
+            Ok((banner, sent)) => {
+                *delivered = sent;
+                done(0, banner)
+            }
             Err(()) => blocked(
                 "compact-budget-exceeded (use full recall; no matched gate was silently omitted)",
             ),
@@ -559,15 +574,27 @@ fn traps(gate: &Value) -> &[Value] {
 
 /// Healthy CLEAR prints nothing. Every matched gate and the full-read instruction come before
 /// optional detail, so a budget cut never erases a later gate or the recovery path.
-fn brief(matched: &[Matched]) -> Result<String, ()> {
+fn brief(matched: &[Matched], seen: &HashSet<String>) -> Result<(String, Vec<String>), ()> {
+    // Receipts suppress delivery only, after matching: a gate whose traps were all delivered to
+    // this session drops out; a gate with no traps cannot be receipted and always shows.
+    fn pending<'a>(m: &Matched<'a>, seen: &HashSet<String>) -> Vec<&'a Value> {
+        traps(m.gate)
+            .iter()
+            .filter(|t| !seen.contains(&delivery_key(m.gate, t)))
+            .collect()
+    }
+    let matched: Vec<&Matched> = matched
+        .iter()
+        .filter(|m| traps(m.gate).is_empty() || !pending(m, seen).is_empty())
+        .collect();
     if matched.is_empty() {
-        return Ok(String::new());
+        return Ok((String::new(), Vec::new()));
     }
     let mut lines = vec![format!(
         "RECALL_STATUS=MATCHED gates={} - read before acting",
         matched.len()
     )];
-    for m in matched {
+    for m in &matched {
         let mut line = format!(
             "- {} {}x ({} traps, {} reads)",
             text(&m.gate["id"]),
@@ -587,20 +614,133 @@ fn brief(matched: &[Matched]) -> Result<String, ()> {
     if units(&banner) > BRIEF_BUDGET {
         return Err(());
     }
-    for m in matched {
-        for trap in traps(m.gate) {
+    let mut sent = Vec::new();
+    for m in &matched {
+        for trap in pending(m, seen) {
             let detail = format!(
                 "  {}/{} {}x",
                 text(&m.gate["id"]),
                 text(&trap["id"]),
                 text(&trap["times_recurred"])
             );
+            // Only a trap whose line was printed counts as delivered.
             if units(&banner) + units(&detail) < BRIEF_BUDGET {
                 banner = banner + "\n" + &detail;
+                sent.push(delivery_key(m.gate, trap));
             }
         }
     }
-    Ok(banner + "\n")
+    Ok((banner + "\n", sent))
+}
+
+// ---------- receipts: one session is not re-sent the traps it was already shown ----------
+
+const RECEIPT_MAX_BYTES: u64 = 131_072;
+const RECEIPT_MAX_KEYS: usize = 1024;
+
+fn sha_hex(text: &str) -> String {
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// A changed gate (its rules, reads or recurrence counts) or trap is a new fingerprint.
+fn delivery_key(gate: &Value, trap: &Value) -> String {
+    sha_hex(&format!("mdr-kernel-recall-v1|{gate}|{trap}"))
+}
+
+fn session_of(payload: &Map<String, Value>) -> Option<String> {
+    match field(payload, "session_id") {
+        Some(Value::String(s)) if !s.trim().is_empty() => Some(s.clone()),
+        Some(Value::Number(n)) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+/// The per-session receipt file, under the OS temp folder, named by a hash of the memory root
+/// and the session: no prompt text or raw session id is written anywhere.
+fn receipt_path(root: &Path, session: &str) -> Option<PathBuf> {
+    let root = root.canonicalize().ok()?;
+    let key = sha_hex(&format!("{}|{session}", root.display()));
+    Some(
+        std::env::temp_dir()
+            .join("mdr-kernel-recall-delivery")
+            .join(format!("{key}.json")),
+    )
+}
+
+/// A link (or Windows junction) at the receipt folder or file could redirect a write.
+fn linked(path: &Path) -> bool {
+    [Some(path), path.parent()].into_iter().flatten().any(|p| {
+        std::fs::symlink_metadata(p).is_ok_and(|m| {
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                m.file_type().is_symlink() || m.file_attributes() & 0x400 != 0
+            }
+            #[cfg(not(windows))]
+            {
+                m.file_type().is_symlink()
+            }
+        })
+    })
+}
+
+/// What this session was already shown. Any doubt (a link, size, version, another checkpoint,
+/// a malformed key) yields an empty set: a reminder repeats, a new one never hides.
+fn load_receipts(path: &Path, checkpoint: Option<&str>) -> HashSet<String> {
+    let read = || -> Option<HashSet<String>> {
+        if linked(path) || std::fs::metadata(path).ok()?.len() > RECEIPT_MAX_BYTES {
+            return None;
+        }
+        let data: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+        if data["version"] != 1 || data["checkpoint"].as_str() != checkpoint {
+            return None;
+        }
+        let keys = data["seen"]
+            .as_array()
+            .filter(|k| k.len() <= RECEIPT_MAX_KEYS)?;
+        keys.iter()
+            .map(|k| {
+                k.as_str()
+                    .filter(|s| s.len() == 64 && s.bytes().all(|c| c.is_ascii_hexdigit()))
+                    .map(str::to_string)
+            })
+            .collect()
+    };
+    read().unwrap_or_default()
+}
+
+/// Best effort and atomic (write aside, then rename). A failed save only repeats a reminder.
+fn save_receipts(path: &Path, seen: &HashSet<String>, checkpoint: Option<&str>) {
+    let save = || -> Option<()> {
+        let dir = path.parent()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(dir)
+                .ok()?;
+        }
+        #[cfg(not(unix))]
+        std::fs::create_dir_all(dir).ok()?;
+        if linked(path) {
+            return None;
+        }
+        let mut keys: Vec<&String> = seen.iter().collect();
+        keys.sort();
+        keys.truncate(RECEIPT_MAX_KEYS);
+        let data = serde_json::json!({"version": 1, "seen": keys, "checkpoint": checkpoint});
+        let aside = path.with_extension(format!("{}.tmp", std::process::id()));
+        std::fs::write(&aside, data.to_string()).ok()?;
+        std::fs::rename(&aside, path)
+            .or_else(|_| std::fs::remove_file(&aside))
+            .ok()
+    };
+    let _ = save();
 }
 
 /// The tool-time banner a fragile script prints at the moment of action.
@@ -788,6 +928,19 @@ pub fn hook(root: &Path, raw: &str) -> String {
     let Some(object) = payload.as_object() else {
         return hook_degraded("payload-not-object");
     };
+    // SessionStart (a new session, a resume, or the restart after compaction) re-arms every
+    // reminder for that session, silently.
+    let receipts = session_of(object).and_then(|s| receipt_path(root, &s));
+    let checkpoint = field(object, "checkpoint").and_then(Value::as_str);
+    if field(object, "hook_event_name")
+        .and_then(Value::as_str)
+        .is_some_and(|e| e.eq_ignore_ascii_case("SessionStart"))
+    {
+        if let Some(path) = &receipts {
+            save_receipts(path, &HashSet::new(), None);
+        }
+        return String::new();
+    }
     let prompt = match field(object, "user_input") {
         None | Some(Value::Null) => field(object, "prompt"),
         Some(Value::String(s)) if s.trim().is_empty() => field(object, "prompt"),
@@ -806,7 +959,16 @@ pub fn hook(root: &Path, raw: &str) -> String {
         Ok(a) => a,
         Err(_) => return hook_degraded("adapter-error"),
     };
-    let outcome = run(root, &args, Some(prompt.to_string()));
+    let mut seen = receipts
+        .as_deref()
+        .map(|p| load_receipts(p, checkpoint))
+        .unwrap_or_default();
+    let mut delivered = Vec::new();
+    let outcome = run_seen(root, &args, Some(prompt.to_string()), &seen, &mut delivered);
+    if let (Some(path), false) = (&receipts, delivered.is_empty()) {
+        seen.extend(delivered);
+        save_receipts(path, &seen, checkpoint);
+    }
     if outcome.code != 0 || !outcome.err.trim().is_empty() {
         return hook_degraded("matcher-failed");
     }
