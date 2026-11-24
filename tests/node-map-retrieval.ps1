@@ -24,6 +24,9 @@ try {
   & git clone -q --no-hardlinks $root $clone
   if ($LASTEXITCODE) { throw 'could not create retrieval test clone' }
   & git -C $clone remote remove origin
+  # MDR_TEST_ENGINE names a built binary: the clone gets it in bin/, so setup, close, the doctor and
+  # the node map run the native engine, and every assertion must hold for it as for PowerShell.
+  if ($env:MDR_TEST_ENGINE) { Copy-Item -LiteralPath $env:MDR_TEST_ENGINE -Destination (Join-Path $clone "bin/mdr-kernel$(if ($IsWindows) { '.exe' })") }
   & git -C $clone config user.name 'node-map retrieval test'
   & git -C $clone config user.email 'node-map@example.invalid'
   & pwsh -NoProfile -File (Join-Path $clone 'bin/setup-private.ps1') -Model 'test-model' -LocalOnly | Out-Host
@@ -96,6 +99,9 @@ AI Execution Prompts: none
   Assert-True 'instructional node-field placeholders are explicitly waived' (
     $null -ne $markdownTemplate -and $markdownTemplate.issues.Count -eq 0 -and $markdownTemplate.waivedIssues.Count -eq 4
   )
+
+  $checkOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/update-node-map.ps1') -Check 2>&1) | Out-String
+  Assert-True 'generated maps pass -Check right after close' ($LASTEXITCODE -eq 0 -and $checkOut -match 'node-map check passed') $checkOut
 
   $sourcePath = Join-Path $clone $sourceRel
   $changed = (Get-Content -Raw -LiteralPath $sourcePath).Replace(

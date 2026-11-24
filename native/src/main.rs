@@ -11,6 +11,7 @@ mod git;
 mod health;
 mod hook;
 mod least_code;
+mod node_map;
 mod onboard;
 mod recall;
 mod remote_privacy;
@@ -40,6 +41,7 @@ const COMMANDS: &str =
        mdr-kernel add-decision -Title <one line> -Body <text> | -BodyPath <file> [-Path <log>] | initialize-decision-authority [-PreserveLegacy]
        mdr-kernel build-rulings [-Check] [-FromIndex] [-DecisionsPath <file>] [-RatificationsPath <file>] [-GatesPath <file>] [-OutPath <file>]
        mdr-kernel write-approval -Propose | -Approve | -List | -Show | -ValidateStagedApprovals ...
+       mdr-kernel update-node-map [-Check] [-Path <file> [-Repair [-Apply]]]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
 
@@ -85,6 +87,7 @@ fn main() {
         Some((cmd, args)) if matches!(cmd.as_str(), "check-decision-history" | "build-rulings") => {
             decisions::cli(cmd, args)
         }
+        Some((cmd, args)) if cmd == "update-node-map" => node_map::cli(args),
         Some((cmd, args)) if cmd == "brain-recall" => recall::cli(args),
         Some((cmd, args)) if matches!(cmd.as_str(), "hook-recall" | "prepare-work") => {
             recall::adapter_cli(cmd, args)

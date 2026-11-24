@@ -1,7 +1,6 @@
 //! Session close and private sync. Ports of `bin/close-session.ps1` (close set, handoff and INDEX
 //! checks, lock, commit, push, release) and `bin/sync-private.ps1` (live privacy check, fetch and
-//! rebase, push with one retry). Node-map generation still runs its PowerShell script
-//! until its own checkpoint.
+//! rebase, push with one retry). Node-map generation runs in process.
 //!
 //!   mdr-kernel close-session [-Topic <slug> | -NoHandoff] [-Model <id>] [-Token <token>]
 //!       [-Message <subject>] [-SessionDate yyyy-MM-dd] [-Also a,b] [-LeastCode <why>]
@@ -9,7 +8,7 @@
 //!   mdr-kernel sync-private [-PreserveWorkingTree]
 
 use crate::args::Args;
-use crate::git::{common_top, git, lossy, names, pwsh_command, text as out, top};
+use crate::git::{common_top, git, lossy, names, text as out, top};
 use crate::hook::lock_port;
 use crate::remote_privacy::{self, Live};
 use regex::Regex;
@@ -704,10 +703,9 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
             }
         }
         if root.join("bin/update-node-map.ps1").exists() {
-            let mapped = pwsh_command(root, "update-node-map.ps1", &[])
-                .status()
-                .is_ok_and(|s| s.success());
-            if !mapped {
+            let mapped = crate::node_map::run(root, &crate::node_map::Opts::default());
+            crate::node_map::print(&mapped);
+            if mapped.code != 0 {
                 c.fail("node-map regeneration failed after staging — see output above");
                 return 1;
             }
