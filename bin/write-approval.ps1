@@ -125,7 +125,9 @@ function Get-StagedContent([string]$RepoPath) {
 
 function Get-StagedAddedApprovalTargets() {
   $targets = [System.Collections.Generic.List[string]]::new()
-  foreach ($path in (& git -C $root diff --cached --name-only --diff-filter=A -- 'reference/*.md' 'skills/*/SKILL.md' 2>$null)) {
+  # --no-renames: a file moved into a gated path from anywhere else is a new gated file, not a
+  # rename that slips past the added-file filter.
+  foreach ($path in (& git -C $root diff --cached --name-only --no-renames --diff-filter=A -- 'reference/*.md' 'skills/*/SKILL.md' 2>$null)) {
     $repoPath = ($path -replace '\\', '/').Trim()
     if (-not $repoPath) { continue }
     if (Test-ApprovedTarget $repoPath) { $targets.Add($repoPath) }
@@ -196,6 +198,14 @@ function Test-ValidateStagedApprovals {
     }
     if (-not $auditHash -or $proposalHash -ne $auditHash) {
       $errors.Add("${targetPath}: audit content hash mismatch for $($entry.proposal_id)")
+    }
+    # The commit snapshots the INDEX, so the staged file itself must be the approved content.
+    # hash-object --path applies the same filters staging does (autocrlf, attributes), so line
+    # endings cannot cause a false refusal; any other byte difference is a swap after approval.
+    $stagedId = (& git -C $root rev-parse --verify --quiet ":$targetPath" 2>$null | Out-String).Trim()
+    $approvedId = (& git -C $root hash-object "--path=$targetPath" -- $contentPath 2>$null | Out-String).Trim()
+    if (-not $stagedId -or -not $approvedId -or $stagedId -ne $approvedId) {
+      $errors.Add("${targetPath}: staged content is not the approved proposal $($entry.proposal_id)")
     }
   }
 

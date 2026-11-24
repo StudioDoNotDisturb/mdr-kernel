@@ -164,6 +164,9 @@ pub fn validate_staged(root: &Path) -> Result<(), String> {
             "--cached",
             "--name-only",
             "-z",
+            // A file moved into a gated path is a new gated file, not a rename that slips
+            // past the added-file filter.
+            "--no-renames",
             "--diff-filter=A",
             "--",
             "reference/*.md",
@@ -235,6 +238,27 @@ pub fn validate_staged(root: &Path) -> Result<(), String> {
         }
         if audited.is_empty() || hash != audited {
             errors.push(format!("{target}: audit content hash mismatch for {id}"));
+        }
+        // The commit snapshots the index, so the staged file itself must be the approved
+        // content. hash-object --path applies the filters staging does (autocrlf, attributes):
+        // line endings cannot cause a false refusal, and any other difference is a swap.
+        let staged = crate::git::text(
+            root,
+            &["rev-parse", "--verify", "--quiet", &format!(":{target}")],
+        );
+        let approved = crate::git::text(
+            root,
+            &[
+                "hash-object",
+                &format!("--path={target}"),
+                "--",
+                &content.to_string_lossy(),
+            ],
+        );
+        if staged.is_empty() || approved.is_empty() || staged != approved {
+            errors.push(format!(
+                "{target}: staged content is not the approved proposal {id}"
+            ));
         }
     }
     if errors.is_empty() {

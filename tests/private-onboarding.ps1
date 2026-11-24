@@ -382,6 +382,44 @@ try {
   if ($remoteHasNote -and $remoteHasAudit) { Write-Host '[PASS] approved note and its audit entry both reached the private remote' }
   else { Write-Host '[FAIL] write-approval close left the note or audit behind'; $failures++ }
 
+  # The staged-approval gate judges what the commit snapshots: the staged file must be the
+  # approved content, and a move into a gated path is a new gated file, not a rename.
+  $env:BRAIN_MODEL = 'test-model'
+  try {
+    $validate = { $o = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -ValidateStagedApprovals 2>&1); [pscustomobject]@{ Exit = $LASTEXITCODE; Text = ($o | Out-String) } }
+    $swapDraft = Join-Path $sandbox 'swap-note-draft.md'
+    Set-Content -LiteralPath $swapDraft -Value 'Approved swap note body.'
+    $swapOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -Propose -Target 'reference/swap-note.md' -Source $swapDraft -Reason 'swap check' 2>&1)
+    $swapId = (($swapOut | Where-Object { $_ -like 'PROPOSAL_ID=*' } | Select-Object -First 1) -replace '^PROPOSAL_ID=', '')
+    & pwsh -NoProfile -File (Join-Path $clone 'bin/write-approval.ps1') -Approve -ProposalId $swapId -Reason 'swap approve' | Out-Null
+    $swapPath = Join-Path $clone 'reference/swap-note.md'
+    $approvedBytes = [IO.File]::ReadAllBytes($swapPath)
+    Set-Content -LiteralPath $swapPath -Value 'Different content staged after approval.'
+    & git -C $clone add -- reference/swap-note.md inbox/write-approval-audit.jsonl
+    $swapped = & $validate
+    [IO.File]::WriteAllBytes($swapPath, $approvedBytes)
+    & git -C $clone add -- reference/swap-note.md
+    $restored = & $validate
+    if ($swapped.Exit -eq 1 -and $swapped.Text -match 'staged content is not the approved proposal' -and $restored.Exit -eq 0) {
+      Write-Host '[PASS] approval gate refuses content swapped after approval and passes the approved bytes'
+    } else { "$($swapped.Text)$($restored.Text)" | Out-Host; Write-Host "[FAIL] approval gate missed a post-approval swap (swapped $($swapped.Exit), restored $($restored.Exit))"; $failures++ }
+    & git -C $clone reset -q -- reference/swap-note.md inbox/write-approval-audit.jsonl
+    & git -C $clone checkout -q -- inbox/write-approval-audit.jsonl
+    Remove-Item -LiteralPath $swapPath -Force
+
+    $movable = @(& git -C $clone ls-files -- 'docs/*.md' | Select-Object -First 1)[0]
+    & git -C $clone mv -- $movable reference/moved-note.md
+    $moved = & $validate
+    & git -C $clone mv -- reference/moved-note.md $movable
+    $clean = -not (& git -C $clone status --porcelain --untracked-files=no)
+    if ($moved.Exit -eq 1 -and $moved.Text -match 'reference/moved-note\.md' -and $clean) {
+      Write-Host '[PASS] approval gate treats a move into a gated path as a new gated file'
+    } else { $moved.Text | Out-Host; Write-Host "[FAIL] a move into reference/ bypassed approval (exit $($moved.Exit), clean $clean)"; $failures++ }
+  } finally {
+    if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
+    else { $env:BRAIN_MODEL = $oldModel }
+  }
+
   # The durable write-approval audit log is not a foldable inbox note: with only README + the
   # audit in inbox/, a close must not emit the unfolded-note warning (doctor and close agree).
   $env:BRAIN_MODEL = 'test-model'
