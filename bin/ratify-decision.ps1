@@ -45,6 +45,17 @@ if ($reasons.Count) {
   exit 3
 }
 
+# Only an interactive operator terminal reaches this point. The native engine then runs the
+# same ratification when bin/mdr-kernel is installed (README), and checks its terminal again.
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine ratify-decision @forward
+  exit $LASTEXITCODE
+}
+
 if ($Id -notmatch '^D?(\d+)$') { throw "Id must look like D123, not '$Id'." }
 $Id = "D$($Matches[1])"
 $hashOut = @(& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'check-decision-history.ps1') -HashOf $Id 2>&1)

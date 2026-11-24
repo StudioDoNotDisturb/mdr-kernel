@@ -40,6 +40,7 @@ const COMMANDS: &str =
        mdr-kernel check-decision-history [-Path <file>] [-FromIndex] [-BaselinePath <file>] [-AuthorityFrom <id>] [-RatificationsPath <file>] [-RatificationsBaselinePath <file>] [-HashOf <id>]
        mdr-kernel add-decision -Title <one line> -Body <text> | -BodyPath <file> [-Path <log>] | initialize-decision-authority [-PreserveLegacy]
        mdr-kernel build-rulings [-Check] [-FromIndex] [-DecisionsPath <file>] [-RatificationsPath <file>] [-GatesPath <file>] [-OutPath <file>]
+       mdr-kernel ratify-decision -Id <D#> [-Quote <words>]   (operator terminal only)
        mdr-kernel write-approval -Propose | -Approve | -List | -Show | -ValidateStagedApprovals ...
        mdr-kernel update-node-map [-Check] [-Path <file> [-Repair [-Apply]]]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
@@ -75,6 +76,7 @@ fn main() {
         }
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
         Some((cmd, args)) if cmd == "write-approval" => approval::cli(args),
+        Some((cmd, args)) if cmd == "ratify-decision" => decisions::ratify_cli(args),
         Some((cmd, args)) if cmd == "sync-doors" => doors::cli(args),
         Some((cmd, args))
             if matches!(

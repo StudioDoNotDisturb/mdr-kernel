@@ -1356,3 +1356,258 @@ pub fn write_cli(command: &str, argv: &[String]) -> i32 {
     })();
     result.unwrap_or_else(|e| thrown(&e))
 }
+
+// ---------- ratify-decision: an operator act, in the operator's own terminal ----------
+
+/// The entry's exact bytes as the checker hashes them: (heading, sha256), or the report.
+fn hashed_entry(root: &Path, id: &str) -> Result<(String, String), Report> {
+    let report = check_history(
+        root,
+        &History {
+            hash_of: Some(id),
+            ..History::default()
+        },
+    );
+    let field = |name: &str| {
+        report
+            .out
+            .lines()
+            .find_map(|l| l.strip_prefix(name).map(str::to_string))
+    };
+    match (field("ENTRY_HEADING="), field("ENTRY_SHA256=")) {
+        (Some(heading), Some(sha)) if report.code == 0 => Ok((heading, sha)),
+        _ => Err(report),
+    }
+}
+
+/// Everything after the terminal gate. `ask` stands in for the operator's keyboard, so the
+/// confirmation logic can be tested without driving any terminal.
+fn ratify_steps(
+    root: &Path,
+    id: &str,
+    quote: Option<&str>,
+    surface: &str,
+    model: &str,
+    token: &str,
+    ask: &mut dyn FnMut(&str) -> String,
+) -> Result<i32, String> {
+    let digits = regex(r"(?i)^D?(\d+)$")
+        .captures(id.trim())
+        .map(|c| c[1].to_string())
+        .ok_or_else(|| format!("Id must look like D123, not {id}."))?;
+    let id = format!("D{digits}");
+    let (heading, sha) = match hashed_entry(root, &id) {
+        Ok(found) => found,
+        Err(report) => {
+            report.emit();
+            return Err(format!("Could not hash {id}."));
+        }
+    };
+    let ledger = root.join(LEDGER);
+    if let Ok(existing) = fs::read_to_string(&ledger) {
+        for line in existing.lines().filter(|l| !l.trim().is_empty()) {
+            let Ok(record) = serde_json::from_str::<Value>(line) else {
+                continue;
+            };
+            if value(&record, "id").eq_ignore_ascii_case(&id)
+                && value(&record, "entry_sha256") == sha
+            {
+                println!(
+                    "RATIFICATION_STATUS=ALREADY id={id} ratified_at={}",
+                    value(&record, "ratified_at")
+                );
+                return Ok(0);
+            }
+        }
+    }
+    println!("\n  {heading}\n  SHA-256 {sha}\n");
+    let quote = match quote {
+        Some(q) => q.to_string(),
+        None => ask("Your own words for the record (optional; press Enter to skip)"),
+    };
+    let phrase = format!("RATIFY {id}");
+    if ask(&format!("Type '{phrase}' to ratify this exact entry")) != phrase {
+        println!(
+            "RATIFICATION_STATUS=CANCELLED (confirmation phrase did not match; nothing written)"
+        );
+        return Ok(1);
+    }
+    if !owner(root, model, token)? {
+        return Err(
+            "Own STATE.lock in your operator terminal before recording ratification.".into(),
+        );
+    }
+    if hashed_entry(root, &id).ok().map(|(_, now)| now).as_deref() != Some(sha.as_str()) {
+        return Err("Entry changed while you reviewed it; rerun and review the new bytes.".into());
+    }
+    let history = check_history(root, &History::default());
+    history.emit();
+    if history.code != 0 {
+        return Err("Decision history is invalid; no ratification written.".into());
+    }
+    let seconds = crate::state_lock::now_seconds() as i64;
+    let (y, m, d) = crate::state_lock::civil_from_days(seconds.div_euclid(86_400));
+    let s = seconds.rem_euclid(86_400);
+    let at = format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        s / 3600,
+        s % 3600 / 60,
+        s % 60
+    );
+    let record = json!({"id": id, "entry_sha256": sha, "ratified_at": at, "quote": quote, "surface": surface});
+    let current = fs::read_to_string(&ledger).unwrap_or_default();
+    let prefix = if !current.is_empty() && !current.ends_with('\n') {
+        "\n"
+    } else {
+        ""
+    };
+    use std::io::Write;
+    fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&ledger)
+        .and_then(|mut f| f.write_all(format!("{prefix}{record}\n").as_bytes()))
+        .map_err(|e| format!("{}: {e}", ledger.display()))?;
+    if check_history(root, &History::default()).code != 0 {
+        println!("WARNING: the decision checker now fails; run bin/check-decision-history.ps1 to see why.");
+    }
+    if build_default(root, false).code != 0 {
+        println!("WARNING: protocol/rulings.json was not rebuilt; the next session must run bin/build-rulings.ps1.");
+    }
+    println!("RATIFICATION_STATUS=RECORDED id={id} sha256={sha}");
+    println!("The next session commits protocol/decision-ratifications.jsonl at its close.");
+    Ok(0)
+}
+
+/// `mdr-kernel ratify-decision -Id <D#>`. Refuses unless standard input and output are a real
+/// terminal: ratification is the operator's act, never a model tool call's. The PowerShell
+/// wrapper refuses non-interactive and -NonInteractive callers before it hands off.
+pub fn ratify_cli(argv: &[String]) -> i32 {
+    use std::io::IsTerminal;
+    let mut reasons = Vec::new();
+    if !std::io::stdin().is_terminal() {
+        reasons.push("standard input is redirected");
+    }
+    if !std::io::stdout().is_terminal() {
+        reasons.push("standard output is redirected");
+    }
+    if !reasons.is_empty() {
+        println!("RATIFICATION_STATUS=REFUSED");
+        println!("REASON={}", reasons.join("; "));
+        println!(
+            "Ratification is an operator act. Run this command yourself in your own terminal."
+        );
+        return 3;
+    }
+    let result = (|| -> Result<i32, String> {
+        let args = Args::parse(
+            argv,
+            &["Id", "Quote", "Model", "Token", "Surface", "Root"],
+            &[],
+        )?;
+        let surface = args.value("Surface").unwrap_or("terminal");
+        const SURFACES: [&str; 6] = [
+            "terminal",
+            "chat",
+            "operator terminal",
+            "in person",
+            "email",
+            "phone",
+        ];
+        if !SURFACES.iter().any(|s| s.eq_ignore_ascii_case(surface)) {
+            return Err(format!("-Surface must be one of: {}", SURFACES.join(", ")));
+        }
+        let id = args.value("Id").ok_or("-Id is required.")?;
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let root = args
+            .value("Root")
+            .map_or_else(|| git::top(&cwd), |p| Ok(PathBuf::from(p)))
+            .map(|r| crate::args::absolute(&r))?;
+        crate::hook::fresh_in_repo(&root)?;
+        let env = |k: &str| std::env::var(k).unwrap_or_default();
+        let model = args
+            .value("Model")
+            .map_or_else(|| env("BRAIN_MODEL"), str::to_string);
+        let token = args
+            .value("Token")
+            .map_or_else(|| env("BRAIN_LOCK_TOKEN"), str::to_string);
+        let mut ask = |prompt: &str| -> String {
+            use std::io::Write;
+            print!("{prompt}: ");
+            let _ = std::io::stdout().flush();
+            let mut line = String::new();
+            let _ = std::io::stdin().read_line(&mut line);
+            line.trim_end_matches(['\r', '\n']).to_string()
+        };
+        ratify_steps(
+            &root,
+            id,
+            args.value("Quote"),
+            surface,
+            &model,
+            &token,
+            &mut ask,
+        )
+    })();
+    result.unwrap_or_else(|e| thrown(&e))
+}
+
+#[cfg(test)]
+mod ratify_tests {
+    use super::*;
+
+    fn fixture(tag: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("mdr-ratify-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("protocol")).unwrap();
+        fs::write(
+            root.join("DECISIONS.md"),
+            "# Decisions\n\n## D1 - 2026-11-23 - Keep receipts\n\n**Authority:** proposed\n\n**Decision:** Keep every verified receipt.\n",
+        )
+        .unwrap();
+        root
+    }
+
+    #[test]
+    fn a_wrong_phrase_writes_nothing() {
+        let root = fixture("cancel");
+        let mut answers = vec!["".to_string(), "ratify d1".to_string()].into_iter();
+        let code = ratify_steps(&root, "D1", None, "terminal", "m", "", &mut |_| {
+            answers.next().unwrap_or_default()
+        });
+        assert_eq!(code, Ok(1));
+        assert!(!root.join(LEDGER).exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_unknown_id_and_a_bad_id_refuse() {
+        let root = fixture("unknown");
+        let mut never = |_: &str| -> String { panic!("must not prompt") };
+        assert!(ratify_steps(&root, "D9", None, "terminal", "m", "", &mut never).is_err());
+        assert!(ratify_steps(&root, "x1", None, "terminal", "m", "", &mut never).is_err());
+        assert!(!root.join(LEDGER).exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_right_phrase_still_needs_the_lock() {
+        let root = fixture("lock");
+        let mut answers = vec!["RATIFY D1".to_string()].into_iter();
+        let result = ratify_steps(
+            &root,
+            "D1",
+            Some("my words"),
+            "terminal",
+            "m",
+            "",
+            &mut |_| answers.next().unwrap_or_default(),
+        );
+        assert!(
+            result.is_err(),
+            "no STATE.lock is held, so nothing may be recorded"
+        );
+        assert!(!root.join(LEDGER).exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+}
