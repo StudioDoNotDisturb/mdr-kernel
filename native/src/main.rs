@@ -36,6 +36,7 @@ const COMMANDS: &str =
        mdr-kernel hook-recall (UserPromptSubmit JSON on stdin) | prepare-work -Objective <text> | -FromStdin
        mdr-kernel sync-doors [-Check [-Staged]]
        mdr-kernel check-decision-history [-Path <file>] [-FromIndex] [-BaselinePath <file>] [-AuthorityFrom <id>] [-RatificationsPath <file>] [-RatificationsBaselinePath <file>] [-HashOf <id>]
+       mdr-kernel add-decision -Title <one line> -Body <text> | -BodyPath <file> [-Path <log>] | initialize-decision-authority [-PreserveLegacy]
        mdr-kernel build-rulings [-Check] [-FromIndex] [-DecisionsPath <file>] [-RatificationsPath <file>] [-GatesPath <file>] [-OutPath <file>]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
@@ -70,6 +71,14 @@ fn main() {
         }
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
         Some((cmd, args)) if cmd == "sync-doors" => doors::cli(args),
+        Some((cmd, args))
+            if matches!(
+                cmd.as_str(),
+                "add-decision" | "initialize-decision-authority"
+            ) =>
+        {
+            decisions::write_cli(cmd, args)
+        }
         Some((cmd, args)) if matches!(cmd.as_str(), "check-decision-history" | "build-rulings") => {
             decisions::cli(cmd, args)
         }

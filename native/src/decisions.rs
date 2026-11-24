@@ -1047,3 +1047,312 @@ pub fn cli(command: &str, argv: &[String]) -> i32 {
     report.emit();
     report.code
 }
+
+// ---------- writers: add-decision and initialize-decision-authority ----------
+
+/// The script's `throw`: the message on stderr, exit 1.
+fn thrown(message: &str) -> i32 {
+    eprintln!("{message}");
+    1
+}
+
+fn owner(root: &Path, model: &str, token: &str) -> Result<bool, String> {
+    let mut argv = vec!["-CheckOwner", "-Model", model];
+    if !token.is_empty() {
+        argv.extend(["-Token", token]);
+    }
+    let report = crate::hook::lock_port(root, &argv)?;
+    print!("{}", report.out);
+    Ok(report.code == 0)
+}
+
+fn verify(root: &Path, path: &str, authority_from: i32) -> bool {
+    let report = check_history(
+        root,
+        &History {
+            path: Some(path),
+            authority_from: Some(authority_from),
+            ..History::default()
+        },
+    );
+    report.emit();
+    report.code == 0
+}
+
+fn utc_today() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64);
+    let (y, m, d) = crate::state_lock::civil_from_days(seconds.div_euclid(86_400));
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// Prepend a newest-first entry, stamp supersession targets in the same write, verify the
+/// whole result, and roll back on failure. Keeps the file's BOM and line-ending style.
+fn add(root: &Path, args: &Args) -> Result<i32, String> {
+    let title = args.value("Title").unwrap_or("");
+    let body_path = args.value("BodyPath");
+    if args.value("Title").is_none() || (args.value("Body").is_some() == body_path.is_some()) {
+        return Err("Specify -Title and exactly one of -Body or -BodyPath.".into());
+    }
+    let canonical_log = root.join(LOG);
+    let target = match args.value("Path").filter(|p| !p.is_empty()) {
+        Some(p) => crate::args::absolute(Path::new(p)),
+        None => crate::args::absolute(&canonical_log),
+    };
+    let is_canonical = target
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&crate::args::absolute(&canonical_log).to_string_lossy());
+    if title.trim().is_empty() || title.contains(['\r', '\n']) {
+        return Ok(thrown("Title must be one non-empty line."));
+    }
+    let body = match body_path {
+        Some(p) => file_text(Path::new(p))
+            .ok_or_else(|| format!("Cannot find path {p} because it does not exist."))?,
+        None => args.value("Body").unwrap_or("").to_string(),
+    };
+    if body.trim().is_empty() {
+        return Ok(thrown("Decision body must not be empty."));
+    }
+    if !regex(r"(?im)^\*\*Decision(?: \([^\r\n]+\))?:\*\*").is_match(&body) {
+        return Ok(thrown(
+            "Decision body must contain a top-level **Decision:** marker.",
+        ));
+    }
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    if is_canonical {
+        let model = args
+            .value("Model")
+            .map_or_else(|| env("BRAIN_MODEL"), str::to_string);
+        if model.trim().is_empty() {
+            return Ok(thrown(
+                "BRAIN_MODEL or -Model is required for a canonical decision append.",
+            ));
+        }
+        let token = args
+            .value("LockToken")
+            .map_or_else(|| env("BRAIN_LOCK_TOKEN"), str::to_string);
+        if !owner(root, &model, &token)? {
+            return Ok(thrown(
+                "Your sealed STATE.lock is required before editing DECISIONS.md.",
+            ));
+        }
+    }
+    let authority_from: i32 = args.value("AuthorityFrom").map_or(Ok(1), |v| {
+        v.trim()
+            .parse()
+            .map_err(|_| format!("-AuthorityFrom needs a whole number, not {v}"))
+    })?;
+    let target_text = target.to_string_lossy().into_owned();
+    if !verify(root, &target_text, authority_from) {
+        return Ok(thrown(
+            "Existing decision history is invalid; append refused.",
+        ));
+    }
+    let original = fs::read(&target).map_err(|e| format!("{}: {e}", target.display()))?;
+    let bom = original.starts_with(b"\xEF\xBB\xBF");
+    let raw = String::from_utf8(original[if bom { 3 } else { 0 }..].to_vec())
+        .map_err(|_| "DECISIONS.md is not valid UTF-8.".to_string())?;
+    let first = regex(r"(?m)^## D(?<id>\d+)\b[^\r\n]*").captures(&raw);
+    let next = match &first {
+        Some(c) => c["id"].parse::<i64>().map_err(|e| e.to_string())? + 1,
+        None => 1,
+    };
+    let eol = if raw.contains("\r\n") { "\r\n" } else { "\n" };
+    let body = regex(r"\r\n|\r|\n")
+        .replace_all(&body, eol)
+        .trim_end_matches(['\r', '\n'])
+        .to_string();
+    let today = utc_today();
+    let entry = format!(
+        "## D{next} - {today} - {}{eol}{eol}{body}{eol}{eol}",
+        title.trim()
+    );
+    let mut updated = match &first {
+        Some(c) => {
+            let at = c.get(0).map_or(0, |m| m.start());
+            format!("{}{entry}{}", &raw[..at], &raw[at..])
+        }
+        None => {
+            const EMPTY: &str = "_No decisions yet._";
+            let Some(at) = raw.find(EMPTY) else {
+                return Ok(thrown("Empty log marker missing."));
+            };
+            format!(
+                "{}{}{}",
+                &raw[..at],
+                entry.trim_end(),
+                &raw[at + EMPTY.len()..]
+            )
+        }
+    };
+    // Stamp every target a supersession field names, directly under its heading line.
+    for (field, kind) in [
+        ("Supersedes", "superseded"),
+        ("Supersedes in part", "superseded in part"),
+        ("Retires", "retired"),
+    ] {
+        let line = regex(&format!(
+            r"(?m)^\*\*{}:\*\*[ \t]*(?<v>[^\r\n]*?)[ \t]*\r?$",
+            regex::escape(field)
+        ));
+        let Some(found) = line.captures(&body) else {
+            continue;
+        };
+        let ids: BTreeSet<i64> = regex(r"D(\d+)")
+            .captures_iter(&found["v"])
+            .filter_map(|c| c[1].parse().ok())
+            .collect();
+        for id in ids {
+            let heading = regex(&format!(r"(?m)^## D{id}\b[^\r\n]*\r?\n"));
+            let Some(h) = heading.find(&updated) else {
+                return Ok(thrown(&format!(
+                    "**{field}:** names D{id}, which does not exist."
+                )));
+            };
+            let at = h.end();
+            updated.insert_str(at, &format!("_Status: {kind} by D{next} ({today})_{eol}"));
+        }
+    }
+    let mut payload = if bom {
+        b"\xEF\xBB\xBF".to_vec()
+    } else {
+        Vec::new()
+    };
+    payload.extend_from_slice(updated.as_bytes());
+    let dir = target.parent().unwrap_or(root);
+    let aside = dir.join(format!(".DECISIONS.{}.tmp", std::process::id()));
+    fs::write(&aside, &payload).map_err(|e| format!("{}: {e}", aside.display()))?;
+    if let Err(e) = fs::rename(&aside, &target) {
+        let _ = fs::remove_file(&aside);
+        return Err(format!("{}: {e}", target.display()));
+    }
+    if !verify(root, &target_text, authority_from) {
+        let _ = fs::write(&target, &original);
+        return Ok(thrown("Appended decision failed verification (structure, authority or supersession); rolled back."));
+    }
+    println!(
+        "DECISION_APPEND_STATUS=OK id=D{next} path={}",
+        target.display()
+    );
+    // Keep protocol/rulings.json current for the canonical log; fixtures are left alone.
+    if is_canonical {
+        let rulings = build_default(root, false);
+        rulings.emit();
+        if rulings.code != 0 {
+            println!("WARNING: protocol/rulings.json was not rebuilt; run bin/build-rulings.ps1 before committing.");
+        }
+    }
+    Ok(0)
+}
+
+/// Write the immutable authority boundary. A fresh log starts at D1; an existing history needs
+/// -PreserveLegacy, must be committed unchanged, and is never ratified by this step.
+fn initialize(root: &Path, args: &Args) -> Result<i32, String> {
+    let target = root.join("protocol/decision-authority.json");
+    if target.exists() {
+        return Ok(thrown(
+            "Authority boundary already exists; it is immutable.",
+        ));
+    }
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    let model = args
+        .value("Model")
+        .map_or_else(|| env("BRAIN_MODEL"), str::to_string);
+    let token = args
+        .value("Token")
+        .map_or_else(|| env("BRAIN_LOCK_TOKEN"), str::to_string);
+    if !owner(root, &model, &token)? {
+        return Ok(thrown("Own STATE.lock before initializing authority."));
+    }
+    let log = root.join(LOG);
+    let Ok(bytes) = fs::read(&log) else {
+        return Ok(thrown("DECISIONS.md is missing; bootstrap first."));
+    };
+    let raw =
+        String::from_utf8_lossy(bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes)).into_owned();
+    let ids: Vec<i64> = regex(r"(?m)^## D(\d+)\b")
+        .captures_iter(&raw)
+        .filter_map(|c| c[1].parse().ok())
+        .collect();
+    let mut next = 1;
+    if let Some(max) = ids.iter().max() {
+        if !args.switch("PreserveLegacy") {
+            return Ok(thrown("Existing history: review it, then explicitly use -PreserveLegacy; no old entry is ratified."));
+        }
+        // Only committed, unchanged history may be preserved.
+        let quiet = |a: &[&str]| {
+            std::process::Command::new("git")
+                .current_dir(root)
+                .args(a)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success())
+        };
+        if !quiet(&["cat-file", "-e", "HEAD:DECISIONS.md"])
+            || !quiet(&["diff", "--quiet", "HEAD", "--", "DECISIONS.md"])
+        {
+            return Ok(thrown(
+                "Commit existing history unchanged before migration.",
+            ));
+        }
+        next = max + 1;
+    }
+    let from = i32::try_from(next).map_err(|_| "decision id out of range".to_string())?;
+    if !verify(root, &log.to_string_lossy(), from) {
+        return Ok(thrown(
+            "Existing history is structurally invalid; migration refused.",
+        ));
+    }
+    fs::write(
+        &target,
+        format!("{{\"schema_version\":1,\"authority_from\":{next}}}\n"),
+    )
+    .map_err(|e| format!("{}: {e}", target.display()))?;
+    let rulings = build_default(root, false);
+    rulings.emit();
+    if rulings.code != 0 {
+        return Ok(thrown(
+            "Boundary written but rulings failed; inspect before committing.",
+        ));
+    }
+    println!("AUTHORITY_INITIALIZED from=D{next} legacy=unclassified");
+    Ok(0)
+}
+
+/// `mdr-kernel add-decision` and `mdr-kernel initialize-decision-authority`.
+pub fn write_cli(command: &str, argv: &[String]) -> i32 {
+    let result = (|| -> Result<i32, String> {
+        let (values, switches): (&[&str], &[&str]) = if command == "add-decision" {
+            (
+                &[
+                    "Title",
+                    "Body",
+                    "BodyPath",
+                    "Path",
+                    "Model",
+                    "LockToken",
+                    "AuthorityFrom",
+                    "Root",
+                ],
+                &[],
+            )
+        } else {
+            (&["Model", "Token", "Root"], &["PreserveLegacy"])
+        };
+        let args = Args::parse(argv, values, switches)?;
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let root = args
+            .value("Root")
+            .map_or_else(|| git::top(&cwd), |p| Ok(PathBuf::from(p)))
+            .map(|r| crate::args::absolute(&r))?;
+        crate::hook::fresh_in_repo(&root)?;
+        if command == "add-decision" {
+            add(&root, &args)
+        } else {
+            initialize(&root, &args)
+        }
+    })();
+    result.unwrap_or_else(|e| thrown(&e))
+}

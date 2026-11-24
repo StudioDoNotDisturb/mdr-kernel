@@ -10,6 +10,15 @@
 param([switch]$PreserveLegacy, [string]$Model = $env:BRAIN_MODEL, [string]$Token = $env:BRAIN_LOCK_TOKEN)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same command when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine initialize-decision-authority @forward
+  exit $LASTEXITCODE
+}
 $target = Join-Path $root 'protocol/decision-authority.json'
 if (Test-Path -LiteralPath $target) { throw 'Authority boundary already exists; it is immutable.' }
 & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'state-lock.ps1') -CheckOwner -Model $Model -Token $Token
