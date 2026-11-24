@@ -51,7 +51,7 @@ pub(crate) fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 /// Seconds since the epoch, as f64, for `now`.
-fn now_seconds() -> f64 {
+pub(crate) fn now_seconds() -> f64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
@@ -59,7 +59,7 @@ fn now_seconds() -> f64 {
 }
 
 /// `2026-11-23T18:13:44.2801234+00:00`, the shape PowerShell writes with `ToString('o')`.
-fn iso(seconds: f64) -> String {
+pub(crate) fn iso(seconds: f64) -> String {
     let whole = seconds.floor() as i64;
     let ticks = ((seconds - whole as f64) * 1e7).floor() as i64;
     let (y, m, d) = civil_from_days(whole.div_euclid(86_400));

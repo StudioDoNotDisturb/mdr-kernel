@@ -34,6 +34,15 @@ $ErrorActionPreference = 'Stop'
 # use their local try/catch.
 trap { Write-Host "[FAIL] $($_.Exception.Message)"; exit 1 }
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same workflow when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine write-approval @forward
+  exit $LASTEXITCODE
+}
 $proposalRoot = Join-Path $root '.write-proposals'
 $auditPath = Join-Path $root 'inbox/write-approval-audit.jsonl'
 $workflow = 'write-approval-v1'

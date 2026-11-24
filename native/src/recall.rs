@@ -69,7 +69,7 @@ fn read_text(path: &Path) -> Option<String> {
 }
 
 /// The file `ConvertTo-Json` writes: serde's pretty form with the platform newline.
-fn to_json(value: &Value) -> String {
+pub(crate) fn to_json(value: &Value) -> String {
     let text = serde_json::to_string_pretty(value).unwrap_or_default();
     if cfg!(windows) {
         text.replace('\n', "\r\n")

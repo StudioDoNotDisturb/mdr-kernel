@@ -9,7 +9,7 @@
 //!   mdr-kernel install            copy this binary to <repo>/bin, where the hooks find it
 
 use crate::fingerprint::{compiler_input, digest};
-use crate::git::{common_top, git, lossy, names, pwsh, pwsh_to_stderr, top};
+use crate::git::{common_top, git, lossy, names, pwsh_to_stderr, top};
 use regex::Regex;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -291,9 +291,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
         ]));
     }
     // 4) write approval for new live reference/skill files
-    let approval = pwsh(root, "write-approval.ps1", &["-ValidateStagedApprovals"])?;
-    if !approval.status.success() {
-        let said = format!("{}{}", lossy(approval.stdout), lossy(approval.stderr));
+    if let Err(said) = crate::approval::validate_staged(root) {
         return Ok(block(&[
             format!("X mdr-kernel pre-commit: {}", said.trim_end()),
             "  Use: pwsh -NoProfile -File bin/write-approval.ps1 -Propose ... then -Approve ...".into(),

@@ -2,7 +2,7 @@
 //! checkpoints port.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Stdio};
 
 pub fn lossy(bytes: Vec<u8>) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
@@ -70,13 +70,6 @@ pub fn pwsh_command(root: &Path, script: &str, args: &[&str]) -> Command {
         .arg(root.join("bin").join(script))
         .args(args);
     command
-}
-
-/// A PowerShell gate whose output is captured.
-pub fn pwsh(root: &Path, script: &str, args: &[&str]) -> Result<Output, String> {
-    pwsh_command(root, script, args)
-        .output()
-        .map_err(|e| format!("required utility 'pwsh' is unavailable ({e})"))
 }
 
 /// A PowerShell gate whose stdout and stderr both go to this process's stderr, as `>&2` does.
