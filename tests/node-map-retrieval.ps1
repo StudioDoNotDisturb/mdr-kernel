@@ -70,7 +70,8 @@ AI Execution Prompts: none
   $oldModel = $env:BRAIN_MODEL
   $env:BRAIN_MODEL = 'test-model'
   try {
-    $closeOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also "$sourceRel,$targetRel" 2>&1)
+    # This close adds two files, so the native commit-msg gate needs a Least-file reason.
+    $closeOut = @(& pwsh -NoProfile -File (Join-Path $clone 'bin/close-session.ps1') -NoHandoff -Also "$sourceRel,$targetRel" -LeastFile 'fixture files for this node-map close test' 2>&1)
     $closeExit = $LASTEXITCODE
   } finally {
     if ($null -eq $oldModel) { Remove-Item Env:\BRAIN_MODEL -ErrorAction SilentlyContinue }
