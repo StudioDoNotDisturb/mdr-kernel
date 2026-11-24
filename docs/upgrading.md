@@ -11,24 +11,19 @@ replacement of STATE, decisions, handoffs, references, local gates or your remot
 
 ## Choose an upgrade
 
-- From `0.1.0`, apply `0.2.0` first, including the decision-authority migration in U4 and U8.
-- From `0.2.0`, apply `2.0.0-rc.1` once its prerelease is available. Keep your existing decision
-  authority, ratifications, and recall gates. Review the BRAIN-CONTRACT v2 changes with your
-  local rules and regenerate the doors and maps. The upgrade includes compact startup output
-  and deterministic map generation.
-
-Rust is optional. To try search independently, build in a release checkout using
-`cargo build --release --locked --manifest-path native/Cargo.toml`. Use the resulting
-`native/target/release/mdr-kernel` binary (`.exe` on Windows) with
-`find --root <private-memory-path> --query <search-terms>`.
+- From `0.1.0`, apply `0.2.0` first using [The 0.1.0 to 0.2.0 procedure](#the-procedure), including
+  the decision-authority migration in U4 and U8, then apply `2.0.0`.
+- From `0.2.0`, follow [Upgrading 0.2.0 to 2.0.0](#upgrading-020-to-200) below. Keep your existing
+  decision authority, ratifications, and recall gates. Review the `BRAIN-CONTRACT v2` changes with
+  your local rules, install `bin/mdr-kernel`, and regenerate the doors and maps.
 
 ## Hearing about a release is separate from applying it
 
 - **Notification.** Each release is a tagged commit with a GitHub Release. On the public
   repository choose **Watch > Custom > Releases** to be notified; a newsletter, if you read one,
   is only an announcement. Neither one changes your files.
-- **There is no updater.** No script fetches releases. Re-running `bin/setup-private.ps1` or
-  `bin/bootstrap-clone.ps1` does not upgrade: they only create files that are missing.
+- **There is no updater.** No script or subcommand fetches releases. Re-running `setup-private` or
+  `bootstrap-clone` does not upgrade: they only create files that are missing.
 - **Your private origin does not carry releases.** `git pull` from your private repository only
   synchronizes your own memory. The release must be fetched from the public repository, read-only,
   as shown below.
@@ -41,37 +36,284 @@ Rust is optional. To try search independently, build in a release checkout using
   fresh export: either would mix release history into your memory or overwrite it.
 - **(B) Retained-history clone - rare.** A private mirror that kept the public commits. It shares
   ancestry, but its doors, maps and decision log still diverge from the release, so it uses the
-  same path-by-path procedure. Step U2 prints which shape you have; nothing else differs.
+  same path-by-path procedure.
 
 | Your `VERSION` | Public commit | Tag |
 |---|---|---|
 | `0.1.0` | `8397591e8cd42ec25a09a311df160b74c0af2afb` | none (first export) |
 | `0.2.0` | `82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3` | `v0.2.0` |
-| `2.0.0-rc.1` | Verify the commit ID against the published prerelease | `v2.0.0-rc.1` |
+| `2.0.0` | Verify the commit ID against the published `v2.0.0` release | `v2.0.0` |
 
-## What the upgrade changes and what it keeps
+## Upgrading 0.2.0 to 2.0.0
 
-**Distribution-owned (taken from the release):** every path the release changed between your
-version and the new one. Distribution paths include `native/` in 2.0 and `bin/`, `.githooks/`, `tests/`, `docs/`, `.github/`,
-`_templates/`, the shipped `specs/` and `reference/` notes, `skills/mdr-kernel/`, `README.md`,
-`CHANGELOG.md`, `VERSION` and the other top-level release files. A file you never edited is
-replaced by the release copy; a file you edited gets a three-way merge instead (step U6).
+### What changes in 2.0.0
 
-**Merged by hand:** `protocol/CONTRACT.md` and `protocol/coordination-files.txt` when you edited
-them, and any other distribution file you adapted. Your lines stay; the release's lines arrive.
+- **One binary replaces the PowerShell scripts.** `bin/mdr-kernel` (`bin/mdr-kernel.exe` on
+  Windows) implements the entire kernel lifecycle (`setup-private`, `bootstrap-clone`,
+  `start-session`, `session-stop`, `close-session`, `sync-private`, `state-lock`, `remote-privacy`,
+  `doctor`, `state-budget`, `secret-audit`, `sync-doors`, `brain-recall`, `hook-recall`,
+  `prepare-work`, `add-decision`, `check-decision-history`, `build-rulings`, `ratify-decision`,
+  `initialize-decision-authority`, `write-approval`, `update-node-map`, `envelope`, `find`,
+  `find-stale`, `archive-adopted`, and `mcp`). PowerShell 7 is no longer required, and the retired
+  `bin/*.ps1` scripts, POSIX wrapper twins, and PowerShell test suites are removed.
+- **Git hooks call the binary.** `.githooks/pre-commit`, `.githooks/prepare-commit-msg`,
+  `.githooks/commit-msg`, and `.githooks/pre-push` invoke `bin/mdr-kernel` directly. `bin/mdr-kernel`
+  is gitignored and carries a build-time source fingerprint of `native/`; hooks refuse if the binary
+  does not match the staged `native/` sources.
+- **New 2.0 behavior in the contract and tools:** `protocol/CONTRACT.md` uses the compact
+  `BRAIN-CONTRACT v2` block and names `Least-code:` / `Least-file:` trailers (enforced by
+  `.githooks/commit-msg`); `hook-recall` stores per-session delivery receipts with `SessionStart`
+  compaction re-arming; `mdr-kernel mcp` serves read-only recall and search tools over stdio
+  without Node or Bun; `find-stale` and `archive-adopted` manage document retirement.
+- **Preserved untouched:** `STATE.md`, `DECISIONS.md`, `handoffs/`, `inbox/`, your `reference/`
+  notes and `reference/INDEX.md`, `protocol/recall-gates.json`,
+  `protocol/decision-authority.json`, `protocol/decision-ratifications.jsonl`, local git config
+  (`core.hooksPath`, `brain.mode`, `brain.approvedRemote`), and your private remote.
 
-**Regenerated, never copied:** the front doors `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and
-`protocol/advisory.md` (from your merged contract by `bin/sync-doors.ps1`), the `maps/` output
-(by `bin/update-node-map.ps1`), and `protocol/rulings.json` (by `bin/build-rulings.ps1`). The
-release's own doors are phase-zero doors for fresh adopters; do not copy them over yours.
+### Rehearse in a throwaway clone first
 
-**Adopter-owned (never touched):** `STATE.md`, `DECISIONS.md`, `handoffs/`, your `reference/`
-notes and `reference/INDEX.md`, `inbox/`, `protocol/recall-gates.json`, host settings such as
-`.claude/` and `.codex/`, local Git configuration (`core.hooksPath`, `brain.mode`,
-`brain.approvedRemote`), and your private remote with its approval pin. The copy step stops if a release attempts to change a protected path. The existing decision-authority
-boundary and ratification ledger are protected as well.
+Before modifying your live checkout, test the full upgrade and a session close in an isolated,
+remote-free copy:
 
-## The procedure
+```sh
+git clone . /tmp/mdr-upgrade-test
+cd /tmp/mdr-upgrade-test
+git remote remove origin
+# Run the upgrade steps below in /tmp/mdr-upgrade-test, then verify:
+./bin/mdr-kernel doctor
+./bin/mdr-kernel start-session -Model '<your-model-id>'
+./bin/mdr-kernel close-session -Topic upgrade-smoke -Model '<your-model-id>'
+```
+
+On Windows PowerShell, clone to `"$env:TEMP\mdr-upgrade-test"`, remove `origin`, run the upgrade,
+and verify `.\bin\mdr-kernel.exe doctor`, `.\bin\mdr-kernel.exe start-session -Model '<id>'`, and
+`.\bin\mdr-kernel.exe close-session -Topic upgrade-smoke -Model '<id>'`. Delete the throwaway
+clone when finished, then run the same upgrade in your live memory checkout.
+
+### Exact steps (0.2.0 to 2.0.0)
+
+Run every step from the root of your private memory in one shell session so `BRAIN_MODEL` and
+`BRAIN_LOCK_TOKEN` stay set across commands. Close every other active session first.
+
+#### 1. Seal identity, verify a clean tree, and create a rollback branch
+
+Linux (`bash`):
+
+```sh
+export BRAIN_MODEL='<your-model-id>'
+test -z "$(git status --porcelain)"
+test ! -e STATE.lock
+test "$(tr -d '\r\n' < VERSION)" = "0.2.0"
+git diff --quiet HEAD -- DECISIONS.md
+git branch mdr-before-2.0.0
+```
+
+Windows (PowerShell):
+
+```powershell
+$model = '<your-model-id>'
+$env:BRAIN_MODEL = $model
+if (git status --porcelain) { throw 'STOP: commit or close current work first; the tree must be clean' }
+if (Test-Path -LiteralPath STATE.lock) { throw 'STOP: STATE.lock is held' }
+if ((Get-Content -Raw VERSION).Trim() -ne '0.2.0') { throw 'STOP: expected VERSION 0.2.0' }
+git diff --quiet HEAD -- DECISIONS.md
+if ($LASTEXITCODE -ne 0) { throw 'STOP: DECISIONS.md must be committed unchanged' }
+git branch mdr-before-2.0.0
+```
+
+#### 2. Fetch `v2.0.0` read-only and pin `v0.2.0`
+
+```sh
+mdr='https://github.com/StudioDoNotDisturb/mdr-kernel.git'
+expected='<full-40-char-commit-id-from-v2.0.0-release>'
+git fetch --no-tags "$mdr" refs/tags/v2.0.0:refs/mdr/v2.0.0
+test "$(git rev-parse 'refs/mdr/v2.0.0^{commit}')" = "$expected"
+git update-ref refs/mdr/v0.2.0 82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3
+git diff --stat refs/mdr/v0.2.0 HEAD -- bin .githooks tests docs protocol/CONTRACT.md protocol/coordination-files.txt
+```
+
+#### 3. Acquire `STATE.lock` with the 0.2.0 script before changing files
+
+Capture the printed `session token:` value into `BRAIN_LOCK_TOKEN` (keep it in the same shell):
+
+Windows (PowerShell):
+
+```powershell
+$acq = pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model $model -Objective 'upgrade mdr-kernel 0.2.0 to 2.0.0'
+if ($LASTEXITCODE -ne 0) { throw 'STOP: acquire lock failed' }
+$env:BRAIN_LOCK_TOKEN = ([regex]::Match(($acq -join "`n"), '(?m)^session token: ([a-f0-9]+)')).Groups[1].Value
+if (-not $env:BRAIN_LOCK_TOKEN) { throw 'STOP: acquire did not return a session token' }
+```
+
+Linux (`bash`):
+
+```sh
+acq=$(pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model "$BRAIN_MODEL" -Objective 'upgrade mdr-kernel 0.2.0 to 2.0.0')
+printf '%s\n' "$acq"
+export BRAIN_LOCK_TOKEN=$(printf '%s\n' "$acq" | sed -n 's/^session token: \([a-f0-9]\+\)$/\1/p')
+test -n "$BRAIN_LOCK_TOKEN"
+```
+
+#### 4. Apply distribution changes, three-way merge edits, and remove retired scripts
+
+Review the diff between `refs/mdr/v0.2.0` and `refs/mdr/v2.0.0` first: confirm no protected
+memory path (`STATE.md`, `DECISIONS.md`, `.brain-root`, `handoffs/`, `inbox/`, `.claude/`,
+`.codex/`, `reference/INDEX.md`, `protocol/recall-gates.json`, `protocol/decision-authority.json`,
+`protocol/decision-ratifications.jsonl`) is modified, and inspect deleted paths (the retired
+PowerShell scripts and wrappers):
+
+```sh
+git diff --name-only refs/mdr/v0.2.0 refs/mdr/v2.0.0
+git diff --name-only --diff-filter=D refs/mdr/v0.2.0 refs/mdr/v2.0.0
+```
+
+Unpack both release trees into a temporary folder (`git archive`), three-way merge any
+distribution files you customized, take unedited files directly from `refs/mdr/v2.0.0`, and remove
+the retired files deleted between `v0.2.0` and `v2.0.0` (skipping `CLAUDE.md`, `AGENTS.md`,
+`GEMINI.md`, `protocol/advisory.md`, `protocol/rulings.json`, and `maps/*`, which Step 6
+regenerates). This block runs in your existing 0.2.0 PowerShell 7 shell on Windows or Linux:
+
+```powershell
+# PowerShell (Windows or Linux)
+$work = Join-Path ([IO.Path]::GetTempPath()) ('mdr-upgrade-' + [guid]::NewGuid().ToString('N'))
+foreach ($v in 'v0.2.0', 'v2.0.0') {
+  New-Item -ItemType Directory -Path (Join-Path $work $v) | Out-Null
+  git archive --format=tar -o (Join-Path $work "$v.tar") "refs/mdr/$v"
+  tar -xf (Join-Path $work "$v.tar") -C (Join-Path $work $v)
+}
+$regenerated = 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'protocol/advisory.md', 'protocol/rulings.json'
+$protected = '^(STATE[.]md$|DECISIONS[.]md$|[.]brain-root$|handoffs/|inbox/|[.]claude/|[.]codex/|reference/INDEX[.]md$|protocol/(recall-gates[.]json|decision-authority[.]json|decision-ratifications[.]jsonl)$)'
+$all = @(git diff --name-only refs/mdr/v0.2.0 refs/mdr/v2.0.0)
+if ($all -match $protected) { throw 'STOP: release touches a protected memory path' }
+$deleted = @(git diff --name-only --diff-filter=D refs/mdr/v0.2.0 refs/mdr/v2.0.0 | Where-Object { $_ -notin $regenerated -and $_ -notlike 'maps/*' })
+$changed = @(git diff --name-only --diff-filter=ACMR refs/mdr/v0.2.0 refs/mdr/v2.0.0 | Where-Object { $_ -notin $regenerated -and $_ -notlike 'maps/*' })
+$empty = Join-Path $work 'empty'; New-Item -ItemType File -Path $empty -Force | Out-Null
+$merged = @(); $conflicts = @()
+foreach ($p in $changed) {
+  $mine = git rev-parse -q --verify "HEAD:$p" 2>$null
+  $base = git rev-parse -q --verify "refs/mdr/v0.2.0:$p" 2>$null
+  if ($mine -eq $base) { git checkout refs/mdr/v2.0.0 -- $p; continue }
+  $baseFile = if ($base) { Join-Path $work "v0.2.0/$p" } else { $empty }
+  git merge-file --diff3 -L yours -L v0.2.0 -L v2.0.0 $p $baseFile (Join-Path $work "v2.0.0/$p")
+  if ($LASTEXITCODE -lt 0 -or $LASTEXITCODE -gt 127) { throw "STOP: merge-file failed on $p" }
+  $merged += $p; if ($LASTEXITCODE -gt 0) { $conflicts += $p }
+}
+foreach ($d in $deleted) { git rm -f --ignore-unmatch -- $d }
+"Conflicts to resolve: $(if ($conflicts) { $conflicts -join ', ' } else { 'none' })"
+```
+
+Resolve any conflict markers in `$merged`: in `protocol/CONTRACT.md`, adopt `BRAIN-CONTRACT v2`
+and re-apply any local rules; in `protocol/coordination-files.txt`, keep your custom entries and
+keep the 2.0 entries. Verify no conflict markers remain before proceeding.
+
+#### 5. Install `bin/mdr-kernel` (prebuilt release binary or source build)
+
+**Prebuilt release binary:** download the `v2.0.0` platform binary and `SHA256SUMS.txt`, verify
+the checksum, and place it at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows):
+
+- Windows (PowerShell):
+
+  ```powershell
+  $expected = ((Select-String -Path SHA256SUMS.txt -Pattern 'mdr-kernel-windows-x86_64\.exe$').Line -split '\s+')[0]
+  $actual = (Get-FileHash -Path mdr-kernel-windows-x86_64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
+  New-Item -ItemType Directory -Force -Path bin | Out-Null
+  Move-Item -Force mdr-kernel-windows-x86_64.exe bin/mdr-kernel.exe
+  ```
+
+- Linux (`bash`):
+
+  ```sh
+  sha256sum -c --ignore-missing SHA256SUMS.txt
+  mkdir -p bin && mv mdr-kernel-linux-x86_64 bin/mdr-kernel && chmod +x bin/mdr-kernel
+  ```
+
+**Or build from source:**
+
+```sh
+cargo build --locked --release --manifest-path native/Cargo.toml
+./native/target/release/mdr-kernel install   # .\native\target\release\mdr-kernel.exe install on Windows
+```
+
+#### 6. Validate gates and regenerate doors, rulings, and node map with the new binary
+
+Run these with `./bin/mdr-kernel` (or `.\bin\mdr-kernel.exe` on Windows):
+
+```sh
+./bin/mdr-kernel state-lock -CheckOwner -Model "$BRAIN_MODEL"
+./bin/mdr-kernel check-decision-history
+./bin/mdr-kernel build-rulings -Check
+./bin/mdr-kernel brain-recall -CheckGates
+./bin/mdr-kernel sync-doors
+./bin/mdr-kernel update-node-map
+```
+
+#### 7. Run tests, stage, and commit the upgrade
+
+If Rust is installed, run `cargo test --locked --manifest-path native/Cargo.toml`.
+
+Stage all updated distribution files (`$changed` from Step 4, or any hand-merged files) and
+regenerated doors/maps (`git rm` already staged the retired scripts), review `git status` and
+`git diff --cached --stat`, confirm `bin/mdr-kernel*` is ignored and unstaged, and commit with a
+`Least-file:` trailer (and `Brain-Model:` from `BRAIN_MODEL`):
+
+```powershell
+git add -- $changed CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps
+git status
+git diff --cached --stat
+git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m "Least-file: apply 2.0.0 release files and remove retired PowerShell scripts"
+```
+
+#### 8. Release lock, sync privately, and verify
+
+```sh
+./bin/mdr-kernel state-lock -Release -Model "$BRAIN_MODEL"
+unset BRAIN_LOCK_TOKEN
+# If brain.mode is private-remote:
+./bin/mdr-kernel remote-privacy -RequireApproved
+./bin/mdr-kernel sync-private
+```
+
+Verify the upgraded memory:
+
+1. `./bin/mdr-kernel doctor` must report `doctor: ok.` and exit 0.
+2. `./bin/mdr-kernel start-session -Model '<your-model-id>'` must end with `STARTUP_STATUS=READY`.
+3. If you have not already done a test `close-session` in a throwaway clone, run one before normal
+   session work to confirm pre-commit, commit-msg, and pre-push hooks fire cleanly through
+   `bin/mdr-kernel`.
+
+If your host config (`.claude/settings.json`, `.codex/hooks.json`, `.mcp.json`) still points at
+`pwsh -NoProfile -File bin/hook-recall.ps1`, update it to invoke `bin/mdr-kernel hook-recall`
+(or `bin/mdr-kernel mcp` for MCP hosts; see `docs/recall-hooks.md`).
+
+### Rollback (2.0.0 to 0.2.0)
+
+Roll back by reverting the upgrade commit (never `git reset` past later memory commits). Keep the
+decision authority boundary, ratifications, and any memory commits made after the upgrade:
+
+```sh
+upgrade=$(git log -1 --format=%H --grep '^Upgrade mdr-kernel 0\.2\.0 to 2\.0\.0$')
+test -n "$upgrade"
+acq=$(./bin/mdr-kernel state-lock -Acquire -Model "$BRAIN_MODEL" -Objective 'roll back mdr-kernel 2.0.0 upgrade')
+printf '%s\n' "$acq"
+export BRAIN_LOCK_TOKEN=$(printf '%s\n' "$acq" | sed -n 's/^session token: \([a-f0-9]\+\)$/\1/p')
+git revert --no-commit "$upgrade"
+for keep in protocol/decision-authority.json protocol/rulings.json protocol/decision-ratifications.jsonl; do
+  if git cat-file -e "HEAD:$keep" 2>/dev/null; then git checkout HEAD -- "$keep"; fi
+done
+rm -f bin/mdr-kernel bin/mdr-kernel.exe
+pwsh -NoProfile -File bin/sync-doors.ps1
+pwsh -NoProfile -File bin/update-node-map.ps1
+git add -- CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md maps
+git commit -m "Revert mdr-kernel 2.0.0 upgrade ($upgrade)"
+pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model "$BRAIN_MODEL"
+unset BRAIN_LOCK_TOKEN
+```
+
+Removing the gitignored `bin/mdr-kernel` / `bin/mdr-kernel.exe` ensures the restored 0.2.0 hooks
+run against the restored PowerShell scripts rather than an older 2.0 binary.
+
+## The procedure (0.1.0 to 0.2.0)
 
 Run every block in **one** PowerShell 7 window, from the root of your private memory, in order.
 The commands are the same on Windows and Linux; `tar` ships with both (on Windows 10 1803 and
@@ -92,11 +334,8 @@ function Must([string]$What) { if ($LASTEXITCODE -ne 0) { throw "STOP at '$What'
 if (git status --porcelain) { throw 'STOP: commit or close current work first; the tree must be clean' }
 if (Test-Path -LiteralPath STATE.lock) { throw 'STOP: STATE.lock is held; let its session close, or recover it by your current rules' }
 $installed = (Get-Content -Raw VERSION).Trim()
-$target = switch ($installed) {
-  '0.1.0' { '0.2.0' }
-  '0.2.0' { '2.0.0-rc.1' }
-  default { throw "STOP: no upgrade in this guide for VERSION $installed" }
-}
+if ($installed -ne '0.1.0') { throw "STOP: use the 0.2.0 to 2.0.0 section above for VERSION $installed" }
+$target = '0.2.0'
 $fromRef = "refs/mdr/v$installed"
 $toRef = "refs/mdr/v$target"
 git diff --quiet HEAD -- DECISIONS.md; Must 'DECISIONS.md must be committed unchanged'
@@ -111,11 +350,8 @@ never pushes.
 ```powershell
 # [U2] fetch the tagged release and name the installed version
 $mdr = 'https://github.com/StudioDoNotDisturb/mdr-kernel.git'
-$baseCommit = if ($installed -eq '0.1.0') { '8397591e8cd42ec25a09a311df160b74c0af2afb' } else { '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3' }
-$expected = if ($target -eq '0.2.0') { '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3' } else {
-  Read-Host 'Enter the full commit ID from the published v2.0.0-rc.1 prerelease'
-}
-if ($expected -notmatch '^[a-fA-F0-9]{40}$') { throw 'STOP: a full published commit ID is required' }
+$baseCommit = '8397591e8cd42ec25a09a311df160b74c0af2afb'
+$expected = '82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3'
 git fetch --no-tags $mdr "refs/tags/v${target}:${toRef}"; Must "fetch v$target"
 if ((git rev-parse "${toRef}^{commit}") -ne $expected) { throw 'STOP: release tag does not match its published commit' }
 git update-ref $fromRef $baseCommit; Must "name $installed"
@@ -240,8 +476,8 @@ foreach ($p in $merged) { git diff --no-index -- (Join-Path $work "v$target/$p")
 ```
 
 In `protocol/coordination-files.txt` keep the paths you added and the release entries. In
-`protocol/CONTRACT.md` keep your local rules in the contract block. Review BRAIN-CONTRACT v2
-when moving to the RC. U9 builds the doors from the merged contract.
+`protocol/CONTRACT.md` keep your local rules in the contract block. U9 builds the doors from the
+merged contract.
 
 ### U8 - Verify the lock and preserve decision authority
 
@@ -287,9 +523,6 @@ foreach ($suite in 'private-onboarding', 'node-map-retrieval', 'session-safety')
   pwsh -NoProfile -File (Join-Path $pristine "tests/$suite.ps1"); Must "release tests/$suite"
 }
 $env:BRAIN_LOCK_TOKEN = $keepToken; $env:BRAIN_MODEL = $model
-if ($target -eq '2.0.0-rc.1' -and (Get-Command cargo -ErrorAction SilentlyContinue)) {
-  cargo test --locked --manifest-path native/Cargo.toml; Must 'native history tests'
-}
 git add -- $changed CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md maps protocol/decision-authority.json protocol/rulings.json; Must 'stage'
 $left = @(git status --porcelain | Where-Object { $_ -notmatch '^[AMD] ' })
 if ($left) { $left; throw 'STOP: unstaged or untracked paths remain; review them before committing' }

@@ -4,6 +4,81 @@ Context: Describes portable changes in the distribution without treating a sourc
 
 # Changes
 
+## 2.0.0
+
+`mdr-kernel` 2.0 replaces the PowerShell script suite with a single compiled Rust binary
+(`mdr-kernel` / `mdr-kernel.exe`) for Windows and Linux, adds commit-ladder guards, repeat-suppressed
+recall, document lifecycle management, and a built-in MCP server, and trims the generated contract
+block by about two-thirds.
+
+### Native Rust engine (replaces PowerShell)
+
+- **One binary runs the full lifecycle:** `setup-private`, `bootstrap-clone`, `start-session`,
+  `session-stop`, `close-session`, `sync-private`, `state-lock`, `remote-privacy`, `doctor`,
+  `state-budget`, `secret-audit`, `sync-doors`, `brain-recall`, `hook-recall`, `prepare-work`,
+  `add-decision`, `check-decision-history`, `build-rulings`, `ratify-decision`,
+  `initialize-decision-authority`, `write-approval`, `update-node-map`, `envelope`, `find`,
+  `find-stale`, `archive-adopted`, and `mcp`.
+- **Direct hook execution and stale-binary guard:** `.githooks/pre-commit`,
+  `.githooks/prepare-commit-msg`, `.githooks/commit-msg`, and `.githooks/pre-push` call
+  `bin/mdr-kernel` directly. Each binary embeds a SHA-256 fingerprint of its `native/` sources and
+  refuses to run if the staged `native/` sources differ. `mdr-kernel install` copies a compiled
+  binary into `bin/`.
+- **PowerShell removed and tests moved to Cargo:** PowerShell 7 is no longer required. The legacy
+  `bin/*.ps1` scripts and POSIX wrapper twins are removed, and the test suites run through Cargo
+  and cold-clone tests instead of PowerShell scripts.
+- **Release binaries with checksums:** Tagged releases build `mdr-kernel-windows-x86_64.exe` and
+  `mdr-kernel-linux-x86_64` on `windows-latest` and `ubuntu-latest` with `SHA256SUMS.txt` attached.
+  Both prebuilt download verification and source builds (`cargo build --locked --release` plus
+  `mdr-kernel install`) are documented in `README.md`, with a full `0.2.0` to `2.0.0` upgrade
+  guide in `docs/upgrading.md`.
+
+### New 2.0 capabilities
+
+- **Compact contract and commit-ladder trailers:** `BRAIN-CONTRACT v2` trims the generated door
+  block from 10.3 KB to about 3.3 KB. `.githooks/commit-msg` enforces `Least-code:` (for new `bin/`
+  files or more than 60 added code lines) and `Least-file:` (for added files or folders beyond one
+  dated handoff and `inbox/` notes).
+- **Per-session recall receipts:** `hook-recall` stores trap fingerprints per `session_id` in the
+  OS temp folder (`mdr-kernel-recall-delivery/`) so unchanged traps are not repeated across prompts
+  in the same session, and re-arms automatically when a trap changes, a checkpoint changes, or a
+  `SessionStart` payload arrives (including after context compaction).
+- **Document lifecycle commands:** `mdr-kernel find-stale list` reports `[Ingested]`,
+  `[Superseded]`, `[Rejected]`, and un-cited 30-day-old `[Record]` documents.
+  `mdr-kernel archive-adopted` moves approved working documents or expired records under `archive/`
+  under your `STATE.lock`, redirects `INDEX.md` rows, refuses active main-file citations, and
+  checks for links or concurrent edits.
+- **Built-in read-only MCP server:** `mdr-kernel mcp` speaks newline-delimited JSON-RPC 2.0 on
+  stdio and exposes `recall_gates`, `get_gate_traps`, and `find_history` in-process with no Node or
+  Bun runtime required.
+- **Local history search hardening:** `mdr-kernel find` self-heals when its SQLite cache is corrupt
+  or has a foreign schema, skips non-UTF-8 handoffs with a warning instead of failing all search,
+  names the cache directory (`%LOCALAPPDATA%\mdr-kernel\history` / `~/.cache/mdr-kernel/history`),
+  and rejects `--`-prefixed values passed to value flags without `-Opt:--val` / `--opt:--val`.
+- **CI on pull requests and branches:** `.github/workflows/doctor.yml` checks out the tested commit
+  as local `main` so PR and branch CI runs end to end.
+
+### Behavior fixes
+
+- **Write-approval post-approval swap gate closed:** `write-approval` validation now compares git's
+  staged blob ID for the target path against `git hash-object --path=<target>` of the approved
+  content (applying the same line-ending filters as staging) and adds `--no-renames` defense in
+  depth, blocking content swaps after approval.
+- **Four node-map bugs fixed:** Kept tracked-set and issue-key `HashSet` collections intact instead
+  of unrolling them in PowerShell (fixing `update-node-map -Check` crashes on clean memories,
+  generation crashes on repositories with untracked Markdown, and false substring matches when only
+  one link issue existed) and enabled `core.quotepath=false` with UTF-8 decoding on
+  `git ls-files` so non-ASCII filenames track and resolve reliably.
+- **`sync-doors` case and exit-code fixes:** Door drift checks now compare case-sensitively (so
+  case-only contract edits are caught as drift), and usage errors exit with code 2 rather than 1.
+- **`doctor` pending-sync and lock-age fixes:** Fixed pending-sync counting (which previously read
+  the empty stdout of `git show-ref --quiet` and never ran) and fixed UTC `Z` lock-timestamp
+  parsing (which previously shifted calculated lock age by the local timezone offset).
+- **Closeout, `secret-audit`, and CLI forwarding fixes:** `close-session` now checks unmatched
+  `-Also` patterns on their own instead of treating regenerated `maps/*` as a match;
+  `secret-audit -CheckScannerCoverage` requires the native scanners; and wrapper hand-offs pass
+  values using `-Name:value` so `--`-prefixed payloads forward intact.
+
 ## 2.0.0-rc.1
 
 - Added `mdr-kernel find` for local history search. It indexes STATE, decision logs, and handoffs

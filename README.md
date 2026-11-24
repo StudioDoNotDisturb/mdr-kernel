@@ -202,23 +202,68 @@ comes after setup:
 
 ## [ INTAKE ] From Template to READY
 
-Requires **PowerShell 7+** (`pwsh`) and **git** — install those first. The scripts are
-intentionally plain PowerShell so the pattern can move between Windows, macOS, Linux, local
-models, and subscription CLI agents.
+Requires **Git**. Prebuilt release binaries run without PowerShell or Rust. Building from source
+requires a Rust toolchain and a C compiler (for bundled SQLite).
 
-```text
-Windows:  winget install Microsoft.PowerShell Git.Git
-macOS:    brew install powershell git
-Linux:    see Microsoft's "Installing PowerShell on Linux" page for your distro; git via your package manager
+The whole path is: **template -> private clone -> install binary -> setup -> one startup.**
+
+### Step 1: Install `bin/mdr-kernel`
+
+**Option A — Prebuilt release binary (recommended):**
+
+1. Download the binary for your platform (`mdr-kernel-windows-x86_64.exe` on Windows,
+   `mdr-kernel-linux-x86_64` on Linux) and `SHA256SUMS.txt` from the GitHub Release.
+2. Verify the SHA-256 checksum against `SHA256SUMS.txt` before placing or running the binary:
+
+   Windows (PowerShell):
+
+   ```powershell
+   $expected = ((Select-String -Path SHA256SUMS.txt -Pattern 'mdr-kernel-windows-x86_64\.exe$').Line -split '\s+')[0]
+   $actual = (Get-FileHash -Path mdr-kernel-windows-x86_64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+   if ($actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
+   ```
+
+   Linux:
+
+   ```sh
+   sha256sum -c --ignore-missing SHA256SUMS.txt
+   ```
+
+3. Place the verified binary at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows) inside your
+   cloned private repository (`bin/mdr-kernel*` is gitignored):
+
+   Windows (PowerShell):
+
+   ```powershell
+   New-Item -ItemType Directory -Force -Path bin | Out-Null
+   Move-Item -Force mdr-kernel-windows-x86_64.exe bin/mdr-kernel.exe
+   ```
+
+   Linux:
+
+   ```sh
+   mkdir -p bin && mv mdr-kernel-linux-x86_64 bin/mdr-kernel && chmod +x bin/mdr-kernel
+   ```
+
+**Option B — Build from source:**
+
+```sh
+cargo build --locked --release --manifest-path native/Cargo.toml
+./native/target/release/mdr-kernel install
 ```
 
-On macOS/Linux, every `bin/*.ps1` ships with an extension-less POSIX twin — call
-`./bin/setup-private`, `./bin/start-session`, and so on, and they launch `pwsh` for you.
+On Windows, run `.\native\target\release\mdr-kernel.exe install` (or
+`cargo run --locked --release --manifest-path native/Cargo.toml -- install`). `mdr-kernel install`
+copies the compiled binary to `bin/` and checks that its embedded source fingerprint matches
+`native/`.
 
-The whole path is: **template -> private clone -> open agent -> setup -> one startup.**
+There is no self-updater. Apply new releases deliberately by following
+[`docs/upgrading.md`](docs/upgrading.md).
 
-**Let the agent drive (recommended).** Open your AI tool with the fresh clone as its working
-directory and hand it:
+### Step 2: Run setup and first startup
+
+**Let the agent drive (recommended).** Once `bin/mdr-kernel` is in place, open your AI tool with
+the fresh clone as its working directory and hand it:
 
 ```text
 Read your front door (CLAUDE.md / AGENTS.md / GEMINI.md) and follow it: run setup with your
@@ -230,10 +275,17 @@ moves. Close the session with a handoff when done.
 The phase-zero door walks the agent through the same two commands below. Startup runs **once**;
 setup does not require a separate human pass first.
 
-**Or set up by hand.** Inside the private repository you cloned, run:
+**Or set up by hand.** Inside the private repository you cloned, run `mdr-kernel setup-private -Model '<id>'`
+using the installed binary (or with `bin/` on your `PATH`):
+
+```sh
+# Linux
+./bin/mdr-kernel setup-private -Model 'alex'
+```
 
 ```powershell
-mdr-kernel setup-private -Model 'alex'
+# Windows
+.\bin\mdr-kernel.exe setup-private -Model 'alex'
 ```
 
 `-Model` is the attribution name for setup's own lock and scaffold commit — type it without
@@ -242,11 +294,11 @@ angle brackets. Setup does not store it; later sessions name themselves with `-M
 works fine). An AI agent running setup passes its real model id instead, and every agent that
 works here later identifies itself the same way.
 
-Setup verifies that GitHub
-reports the destination private, pins it in local git config, arms hooks, creates the starter
-memory, and commits the scaffold. **Run setup once in every clone**, including a re-clone or a
-second computer: the destination approval and hooks intentionally live in that clone's local
-`.git/config`. Setup is safe to rerun. Use a real clone; ZIP/no-`.git` copies are unsupported.
+Setup verifies that GitHub reports the destination private, pins it in local git config, arms
+hooks, creates the starter memory, and commits the scaffold. **Run setup once in every clone**,
+including a re-clone or a second computer: the destination approval and hooks intentionally live
+in that clone's local `.git/config`. Setup is safe to rerun. Use a real clone; ZIP/no-`.git`
+copies are unsupported.
 
 Expected result:
 
@@ -257,38 +309,48 @@ Canonical branch: main
 Approved destination: github:<you>/<your-private-repo>
 ```
 
-Then the one startup — run it yourself to verify, or let your agent run it as its session start
+Then run the one startup yourself to verify, or let your agent run it as its session start
 (its front door is now the full contract door):
 
+```sh
+# Linux
+./bin/mdr-kernel start-session -Model '<your-model-id>'
+```
+
 ```powershell
-mdr-kernel start-session -Model '<your-model-id>'
+# Windows
+.\bin\mdr-kernel.exe start-session -Model '<your-model-id>'
 ```
 
 It should end with `STARTUP_STATUS=READY`. (An agent passes its real model id; a human uses
 the short name they chose at setup.)
 
 Every commit in a set-up clone needs an explicit identity. Committing by hand: set
-`$env:BRAIN_MODEL = '<name>'` or end the message with `Brain-Model: <name>`. A commit with
-neither, or with `unknown`, is refused. `git config brain.model` is display-only, and setup does
-not write it:
+`BRAIN_MODEL` in the shell or end the message with `Brain-Model: <name>`. A commit with neither,
+or with `unknown`, is refused. `git config brain.model` is display-only, and setup does not write
+it:
 
 ```powershell
 $env:BRAIN_MODEL = 'alex'
 ```
 
-If you must stop while offline, add `-OfflineCheckpoint` to the normal close-session command.
+```sh
+export BRAIN_MODEL='alex'
+```
+
+If you must stop while offline, add `-OfflineCheckpoint` to the normal `close-session` command.
 This exception works only after private-remote setup: it commits locally, never tries to push,
 and makes every later startup print a loud pending-sync warning. When connectivity returns, run:
 
-```powershell
-mdr-kernel sync-private
+```sh
+./bin/mdr-kernel sync-private
 ```
 
 That command is the one push implementation used by setup, normal close, and recovery. It
 re-verifies the destination's live privacy, rebases safely, pushes explicit `origin/main`, and
 allows only one bounded retry if the remote moves again. The stored destination pin is never
 treated as permission to push. Local-only users close normally and do not use either offline flag
-or sync-private.
+or `sync-private`.
 
 For deliberately local-only memory, use `mdr-kernel setup-private ... -LocalOnly`; setup removes
 `origin` before memory is created. Non-GitHub private hosts require `-ConfirmPrivateRemote`
@@ -300,10 +362,10 @@ item as live state, reference note, spec, handoff, inbox note, or skill. The shi
 [mdr-kernel skill](skills/mdr-kernel/SKILL.md) is the repeatable procedure an agent runs for that
 intake.
 
-For a compliance reading of a chaotic environment, run the optional diagnostic wrapper:
+To inspect repository health directly, run:
 
-```powershell
-mdr-kernel waffle-party
+```sh
+./bin/mdr-kernel waffle-party
 ```
 
 It is `mdr-kernel doctor` with a themed success footer. If the floor is not in compliance, it returns
