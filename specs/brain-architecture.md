@@ -64,7 +64,7 @@ files.
 - the full-participant contract → `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`
 - the advisory block → `protocol/advisory.md`
 
-`mdr-kernel sync-doors` regenerates the targets. `mdr-kernel sync-doors -Check` is used by `mdr-kernel doctor`
+`mdr-kernel sync-doors` regenerates the targets. `mdr-kernel sync-doors -Check` is used by `brain-doctor`
 and pre-commit to make drift loud. Edit the contract, never the generated doors.
 
 ### 2.4 Guardrails

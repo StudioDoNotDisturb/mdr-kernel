@@ -85,7 +85,7 @@ generated outputs with it. This keeps new documents in link-health truth as trac
 sweeping another session's work.
 
 The startup contract selects the reading slice from `STATE.md` plus `reference/INDEX.md`; the
-node map is not the router. `mdr-kernel doctor` warns if the generated outputs are not in exact parity
+node map is not the router. `brain-doctor` warns if the generated outputs are not in exact parity
 with tracked Markdown, and bootstrap regenerates them when a fresh clone creates its starter
 memory files. The generated map files are coordination files, so regenerate and commit them under
 your own `STATE.lock`.

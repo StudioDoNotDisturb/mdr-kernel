@@ -12,7 +12,7 @@ Use this when you are the human operator. The loop is simple:
 2. Let it run startup.
 3. Let it work.
 4. Have it close out before you stop.
-5. Confirm `mdr-kernel doctor` is green and the repo is clean.
+5. Confirm `brain-doctor` is green and the repo is clean.
 
 The repo is the shared brain. `STATE.md` is the live status. `protocol/CONTRACT.md` is the rules.
 
@@ -39,7 +39,7 @@ mdr-kernel start-session  -Model '<your model id>'
 (`-Model` is the attribution identity: an agent passes its real model id, e.g.
 `-Model 'claude-opus-5'`; a human driving by hand picks any short name, e.g. `-Model 'alex'`.)
 
-After setup, `mdr-kernel doctor` should report the verified private destination and `main`. The public
+After setup, `brain-doctor` should report the verified private destination and `main`. The public
 template, a public repository, a fork, a changed remote, or unverifiable GitHub visibility blocks
 setup and push. Use `-LocalOnly` if no remote backup is intended.
 
@@ -177,7 +177,7 @@ mdr-kernel state-lock -Release
 Acquire is fail-closed: it refuses a config-fallback identity, and a live same-model lock refuses
 a second session (token mismatch) instead of silently handing over.
 
-If `mdr-kernel doctor` says another live session holds the lock, do not ask a second model to edit
+If `brain-doctor` says another live session holds the lock, do not ask a second model to edit
 coordination files. It can still do research or write a standalone `inbox/` note; one session
 folds notes into `STATE.md` later.
 

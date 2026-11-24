@@ -66,7 +66,7 @@ mdr-kernel/
 |- mdr-kernel update-node-map    generated link-health map and node-link checker
 |- mdr-kernel sync-doors         regenerate the front doors from the contract
 |- mdr-kernel write-approval     approval gate for new reference notes and skills
-|- mdr-kernel waffle-party       optional themed wrapper around mdr-kernel doctor
+|- mdr-kernel waffle-party       optional themed wrapper around brain-doctor
 |- CLAUDE.md / AGENTS.md / GEMINI.md  phase-zero agent doors; setup regenerates them from the contract
 |- maps/node-roots.json       registry of roots to scan
 |- maps/NODE-MAP.md           generated human link-health dashboard
