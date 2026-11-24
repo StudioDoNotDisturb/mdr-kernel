@@ -25,8 +25,11 @@ block by about two-thirds.
   refuses to run if the staged `native/` sources differ. `mdr-kernel install` copies a compiled
   binary into `bin/`.
 - **PowerShell removed and tests moved to Cargo:** PowerShell 7 is no longer required. The legacy
-  `bin/*.ps1` scripts and POSIX wrapper twins are removed, and the test suites run through Cargo
-  and cold-clone tests instead of PowerShell scripts.
+  `bin/*.ps1` scripts and the `bin/brain-recall` shell twin are removed. The extension-less `bin/`
+  launchers (`bin/setup-private`, `bin/start-session` and the rest) remain and run the native
+  binary. The test suites run through Cargo and a cold-clone test instead of PowerShell scripts.
+- **Pinned toolchain:** `rust-toolchain.toml` pins Rust 1.99.1 with clippy and rustfmt, so CI and
+  release builds use the compiler the release was verified with.
 - **Release binaries with checksums:** Tagged releases build `mdr-kernel-windows-x86_64.exe` and
   `mdr-kernel-linux-x86_64` on `windows-latest` and `ubuntu-latest` with `SHA256SUMS.txt` attached.
   Both prebuilt download verification and source builds (`cargo build --locked --release` plus
