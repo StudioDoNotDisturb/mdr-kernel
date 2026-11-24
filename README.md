@@ -133,20 +133,23 @@ The cache rebuilds itself when a source changes or the cache file is damaged. To
 that folder; the next search rebuilds it. A handoff that is not UTF-8 is left out with a warning
 that names the file; re-save it as UTF-8 to make it searchable.
 
-### Native commit guards (optional in this release)
+### Native commit guards
 
-The same binary can run the git hooks. Install it into your memory's `bin/` folder:
+`bin/mdr-kernel` runs the repository's Git hooks (`.githooks/pre-commit`,
+`.githooks/prepare-commit-msg`, `.githooks/commit-msg`, and `.githooks/pre-push`). There is no
+legacy shell fallback: install the binary at `bin/mdr-kernel` (see [Step 1](#step-1-install-binmdr-kernel))
+or on `PATH` before committing or pushing.
 
-```powershell
+If you build from source or modify `native/` sources, install or update `bin/mdr-kernel` with:
+
+```sh
 cargo run --locked --release --manifest-path native/Cargo.toml -- install
 ```
 
-With `bin/mdr-kernel` installed, the hooks run the native engine. It applies the same pre-commit
-gates as the shell hooks, plus a `commit-msg` check for the `Least-code:` and `Least-file:`
-trailers that the contract asks for. Without the binary, the shell hooks run as before and the
-trailers are not checked. If you update the kernel's `native/` sources, the engine refuses to
-guard commits until you rebuild and reinstall it. To use the shell hooks for one commit, set
-`MDR_ENGINE=legacy`.
+With `bin/mdr-kernel` installed, the hooks run all pre-commit gates, stamp or validate
+`Brain-Model:`, enforce the `Least-code:` and `Least-file:` trailers in `commit-msg`, and verify
+remote privacy on push. If you update `native/` sources, the engine refuses to run until you
+rebuild and reinstall it.
 
 For version changes and instructions for existing memories, see [CHANGELOG.md](CHANGELOG.md)
 and the [upgrade guide](docs/upgrading.md).
@@ -213,28 +216,17 @@ The whole path is: **template -> private clone -> install binary -> setup -> one
 
 1. Download the binary for your platform (`mdr-kernel-windows-x86_64.exe` on Windows,
    `mdr-kernel-linux-x86_64` on Linux) and `SHA256SUMS.txt` from the GitHub Release.
-2. Verify the SHA-256 checksum against `SHA256SUMS.txt` before placing or running the binary:
+2. Verify the SHA-256 checksum and place the verified binary at `bin/mdr-kernel`
+   (`bin/mdr-kernel.exe` on Windows) inside your cloned private repository (`bin/mdr-kernel*` is
+   gitignored). Chaining verification with installation ensures a checksum failure stops before
+   installing the binary:
 
    Windows (PowerShell):
 
    ```powershell
    $expected = ((Select-String -Path SHA256SUMS.txt -Pattern 'mdr-kernel-windows-x86_64\.exe$').Line -split '\s+')[0]
    $actual = (Get-FileHash -Path mdr-kernel-windows-x86_64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-   if ($actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
-   ```
-
-   Linux:
-
-   ```sh
-   sha256sum -c --ignore-missing SHA256SUMS.txt
-   ```
-
-3. Place the verified binary at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows) inside your
-   cloned private repository (`bin/mdr-kernel*` is gitignored):
-
-   Windows (PowerShell):
-
-   ```powershell
+   if (-not $expected -or $actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
    New-Item -ItemType Directory -Force -Path bin | Out-Null
    Move-Item -Force mdr-kernel-windows-x86_64.exe bin/mdr-kernel.exe
    ```
@@ -242,14 +234,17 @@ The whole path is: **template -> private clone -> install binary -> setup -> one
    Linux:
 
    ```sh
-   mkdir -p bin && mv mdr-kernel-linux-x86_64 bin/mdr-kernel && chmod +x bin/mdr-kernel
+   grep -E '^[0-9a-f]{64}[[:space:]]+\*?mdr-kernel-linux-x86_64$' SHA256SUMS.txt | sha256sum -c - &&
+     mkdir -p bin &&
+     mv mdr-kernel-linux-x86_64 bin/mdr-kernel &&
+     chmod +x bin/mdr-kernel
    ```
 
 **Option B — Build from source:**
 
 ```sh
-cargo build --locked --release --manifest-path native/Cargo.toml
-./native/target/release/mdr-kernel install
+cargo build --locked --release --manifest-path native/Cargo.toml &&
+  ./native/target/release/mdr-kernel install
 ```
 
 On Windows, run `.\native\target\release\mdr-kernel.exe install` (or

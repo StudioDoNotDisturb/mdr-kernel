@@ -65,6 +65,12 @@ replacement of STATE, decisions, handoffs, references, local gates or your remot
   `.githooks/commit-msg`); `hook-recall` stores per-session delivery receipts with `SessionStart`
   compaction re-arming; `mdr-kernel mcp` serves read-only recall and search tools over stdio
   without Node or Bun; `find-stale` and `archive-adopted` manage document retirement.
+- **Cargo requirement during the upgrade commit:** Even if you install the prebuilt release
+  binary, upgrading from `0.2.0` to `2.0.0` commits new files under `native/` and `.githooks/`.
+  The `2.0.0` pre-commit hook runs Cargo regression suites against staged `native/` and hook
+  changes, so Rust, `cargo`, and a C compiler (for bundled SQLite) are required on the machine
+  performing the upgrade commit. After the upgrade lands, daily sessions using a prebuilt binary
+  do not invoke Cargo unless you change `native/` or `.githooks/`.
 - **Preserved untouched:** `STATE.md`, `DECISIONS.md`, `handoffs/`, `inbox/`, your `reference/`
   notes and `reference/INDEX.md`, `protocol/recall-gates.json`,
   `protocol/decision-authority.json`, `protocol/decision-ratifications.jsonl`, local git config
@@ -209,14 +215,15 @@ keep the 2.0 entries. Verify no conflict markers remain before proceeding.
 #### 5. Install `bin/mdr-kernel` (prebuilt release binary or source build)
 
 **Prebuilt release binary:** download the `v2.0.0` platform binary and `SHA256SUMS.txt`, verify
-the checksum, and place it at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows):
+the checksum, and place it at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows) in one chained
+step so any checksum failure stops before installing:
 
 - Windows (PowerShell):
 
   ```powershell
   $expected = ((Select-String -Path SHA256SUMS.txt -Pattern 'mdr-kernel-windows-x86_64\.exe$').Line -split '\s+')[0]
   $actual = (Get-FileHash -Path mdr-kernel-windows-x86_64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
+  if (-not $expected -or $actual -ne $expected) { throw "Checksum mismatch: expected $expected, got $actual" }
   New-Item -ItemType Directory -Force -Path bin | Out-Null
   Move-Item -Force mdr-kernel-windows-x86_64.exe bin/mdr-kernel.exe
   ```
@@ -224,24 +231,29 @@ the checksum, and place it at `bin/mdr-kernel` (`bin/mdr-kernel.exe` on Windows)
 - Linux (`bash`):
 
   ```sh
-  sha256sum -c --ignore-missing SHA256SUMS.txt
-  mkdir -p bin && mv mdr-kernel-linux-x86_64 bin/mdr-kernel && chmod +x bin/mdr-kernel
+  grep -E '^[0-9a-f]{64}[[:space:]]+\*?mdr-kernel-linux-x86_64$' SHA256SUMS.txt | sha256sum -c - &&
+    mkdir -p bin &&
+    mv mdr-kernel-linux-x86_64 bin/mdr-kernel &&
+    chmod +x bin/mdr-kernel
   ```
 
 **Or build from source:**
 
 ```sh
-cargo build --locked --release --manifest-path native/Cargo.toml
-./native/target/release/mdr-kernel install   # .\native\target\release\mdr-kernel.exe install on Windows
+cargo build --locked --release --manifest-path native/Cargo.toml &&
+  ./native/target/release/mdr-kernel install   # .\native\target\release\mdr-kernel.exe install on Windows
 ```
 
-#### 6. Validate gates and regenerate doors, rulings, and node map with the new binary
+#### 6. Validate gates and regenerate rulings, doors, and node map with the new binary
 
-Run these with `./bin/mdr-kernel` (or `.\bin\mdr-kernel.exe` on Windows):
+Run these with `./bin/mdr-kernel` (or `.\bin\mdr-kernel.exe` on Windows). Regenerate
+`protocol/rulings.json` before running `-Check`, because a `0.2.0` rulings file can report
+`STALE` against the `2.0.0` compiler:
 
 ```sh
 ./bin/mdr-kernel state-lock -CheckOwner -Model "$BRAIN_MODEL"
 ./bin/mdr-kernel check-decision-history
+./bin/mdr-kernel build-rulings
 ./bin/mdr-kernel build-rulings -Check
 ./bin/mdr-kernel brain-recall -CheckGates
 ./bin/mdr-kernel sync-doors
@@ -250,18 +262,37 @@ Run these with `./bin/mdr-kernel` (or `.\bin\mdr-kernel.exe` on Windows):
 
 #### 7. Run tests, stage, and commit the upgrade
 
-If Rust is installed, run `cargo test --locked --manifest-path native/Cargo.toml`.
+Cargo is required here even with a prebuilt binary, because pre-commit runs Cargo regression
+suites when `native/` and `.githooks/` are staged. Run the suite first to verify your toolchain:
+
+```sh
+cargo test --locked --manifest-path native/Cargo.toml
+```
 
 Stage all updated distribution files (`$changed` from Step 4, or any hand-merged files) and
 regenerated doors/maps (`git rm` already staged the retired scripts), review `git status` and
-`git diff --cached --stat`, confirm `bin/mdr-kernel*` is ignored and unstaged, and commit with a
-`Least-file:` trailer (and `Brain-Model:` from `BRAIN_MODEL`):
+`git diff --cached --stat`, and confirm `bin/mdr-kernel*` is ignored and unstaged. Because the
+upgrade adds `native/` code and new distribution files, `.githooks/commit-msg` requires **both**
+`Least-code:` and `Least-file:` trailers (in one contiguous trailer block at the end of the
+message, alongside `Brain-Model:` from `BRAIN_MODEL`):
+
+Windows (PowerShell):
 
 ```powershell
 git add -- $changed CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps
 git status
 git diff --cached --stat
-git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m "Least-file: apply 2.0.0 release files and remove retired PowerShell scripts"
+git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m "Least-code: apply upstream 2.0.0 native Rust engine and Git hooks.`nLeast-file: apply 2.0.0 release files and remove retired PowerShell scripts."
+```
+
+Linux (`bash`):
+
+```sh
+git add -- CLAUDE.md AGENTS.md GEMINI.md protocol/advisory.md protocol/rulings.json maps
+# Also `git add -- <file>` for any files you resolved by hand in Step 4.
+git status
+git diff --cached --stat
+git commit -m "Upgrade mdr-kernel 0.2.0 to 2.0.0" -m $'Least-code: apply upstream 2.0.0 native Rust engine and Git hooks.\nLeast-file: apply 2.0.0 release files and remove retired PowerShell scripts.'
 ```
 
 #### 8. Release lock, sync privately, and verify
