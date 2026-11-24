@@ -88,7 +88,7 @@ try {
   Check ($one+$two) $false 'wrong order refused' 'not strictly descending: D1 precedes D2'
   Check ((Ruled 3)+$one+$two) $false 'order checked across 3 entries' 'D1 precedes D2'
   Check ($two.Replace(' - 2026-01-02 - ',' — 2026-01-02 — ')+$one) $true 'em dash heading passes'
-  Check ($two.Replace('"Keep every verified receipt intact."','“Keep every verified receipt intact.”')+$one) $true 'curly-quoted operator words pass'
+  Check ($two.Replace('"Keep every verified receipt intact."','“🧾🧾🧾🧾🧾🧾”')+$one) $true 'curly-quoted operator words use UTF-16 length'
   Check ($one.Replace('**Authority:** proposed', '')) $false 'unclassified new entry refused' 'needs exactly one \*\*Authority:\*\* line.*found 0'
   Check ($one.Replace('**Authority:** proposed', "**Authority:** proposed`n`n**Authority:** operator-ruled")) $false 'duplicate Authority lines refused' 'needs exactly one \*\*Authority:\*\* line.*found 2'
   Check ($two.Replace('**Operator said (chat, 2026-01-02):** "Keep every verified receipt intact."','')+$one) $false 'invented ruling without quote refused' 'operator-ruled but has no \*\*Operator said'
@@ -174,10 +174,11 @@ try {
   Assert ($code -eq 3 -and $output -match 'started with -NonInteractive' -and -not (Test-Path -LiteralPath $ledger)) 'ratify refuses -NonInteractive and writes nothing'
 
   # --- build-rulings -------------------------------------------------------------------------------
-  Put 'protocol/recall-gates.json' '{"gates":[]}'
+  Put 'protocol/recall-gates.json' '{"gates":[{"id":"A-1","rulings":["D2"]},{"id":"A_1","rulings":["D2"]}]}'
   Run 'build-rulings.ps1' @()
   $compiled = Read 'protocol/rulings.json' | ConvertFrom-Json
-  Assert ($code -eq 0 -and $compiled.total -eq 1 -and $compiled.rulings[0].id -eq 'D2') 'compiler excludes unratified proposal'
+  Assert ($code -eq 0 -and $compiled.total -eq 1 -and $compiled.rulings[0].id -eq 'D2' -and
+    ($compiled.rulings[0].gates -join ',') -ceq 'A_1,A-1') 'compiler excludes unratified proposal and sorts gate IDs'
   Run 'build-rulings.ps1' @('-Check')
   Assert ($code -eq 0 -and $output -match 'RULINGS_STATUS=OK total=1') 'fresh compiled output passes -Check'
   Put 'DECISIONS.md' ((Ruled 3) + $two + $one)

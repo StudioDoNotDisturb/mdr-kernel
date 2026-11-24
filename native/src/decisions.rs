@@ -466,8 +466,17 @@ fn authority(
     errors: &mut Vec<String>,
 ) -> Result<(usize, usize), String> {
     let quote = regex(
-        r#"(?im)^\*\*Operator said \((?:chat|terminal|operator terminal|in person|email|phone)\b[^)\r\n]*?\d{4}-\d{2}-\d{2}[^)\r\n]*\):\*\* ["“][^\r\n]{12,}?["”]"#,
+        r#"(?im)^\*\*Operator said \((?:chat|terminal|operator terminal|in person|email|phone)\b[^)\r\n]*?\d{4}-\d{2}-\d{2}[^)\r\n]*\):\*\* ["“]([^\r\n]*)"#,
     );
+    // The legacy regex counts UTF-16 code units in the quoted text.
+    let has_quote = |text: &str| {
+        quote.captures_iter(text).any(|line| {
+            line[1]
+                .encode_utf16()
+                .skip(12)
+                .any(|unit| matches!(unit, 0x22 | 0x201d))
+        })
+    };
     let date = regex(r"^## D\d+ [-—] (\d{4}-\d{2}-\d{2})");
     let list = regex(r"(?i)^D\d+(?:\s*,\s*D\d+)*$");
     let proposed_line = regex(r"(?im)^\*\*Authority:\*\*[ \t]*proposed[ \t]*\r?$");
@@ -483,7 +492,7 @@ fn authority(
         }
         let class = &lines[0][1];
         match class.to_ascii_lowercase().as_str() {
-            "operator-ruled" if !quote.is_match(text) => errors.push(format!("D{id} is operator-ruled but has no **Operator said (<surface>, YYYY-MM-DD):** \"<quote of 12+ characters>\" line.")),
+            "operator-ruled" if !has_quote(text) => errors.push(format!("D{id} is operator-ruled but has no **Operator said (<surface>, YYYY-MM-DD):** \"<quote of 12+ characters>\" line.")),
             "operator-ruled" | "proposed" => (),
             "operator-ratified" => errors.push(format!("D{id} types operator-ratified; that class is set only by the operator's ratification record, never typed.")),
             "record" => errors.push(format!("D{id} is a record; a work report belongs in a handoff, not the decision log.")),
@@ -707,7 +716,8 @@ fn source(root: &Path, relative: &str, path: Option<&str>, indexed: bool) -> Str
 
 fn unique_gates(cites: &[String]) -> Vec<&str> {
     let mut result: Vec<_> = cites.iter().map(String::as_str).collect();
-    result.sort_by_cached_key(|name| name.to_lowercase());
+    // Sort-Object puts underscore before hyphen in the gate identifier alphabet.
+    result.sort_by_cached_key(|name| name.to_ascii_lowercase().replace('_', "!"));
     result.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     result
 }
