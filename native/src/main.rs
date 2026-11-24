@@ -9,6 +9,7 @@ mod git;
 mod health;
 mod hook;
 mod least_code;
+mod onboard;
 mod remote_privacy;
 mod session;
 mod state_lock;
@@ -27,6 +28,8 @@ const COMMANDS: &str =
        mdr-kernel sync-private [-PreserveWorkingTree]
        mdr-kernel state-budget [-Path <file>] [-MaxLines 90] [-MaxKB 10] [-Top 5] [-Detail]
        mdr-kernel secret-audit [-CheckScannerCoverage]
+       mdr-kernel setup-private -Model <id> [-LocalOnly | -ConfirmPrivateRemote]
+       mdr-kernel bootstrap-clone -Model <id> [-CommitScaffold]
        mdr-kernel sync-doors [-Check [-Staged]]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
@@ -61,6 +64,9 @@ fn main() {
         }
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
         Some((cmd, args)) if cmd == "sync-doors" => doors::cli(args),
+        Some((cmd, args)) if matches!(cmd.as_str(), "setup-private" | "bootstrap-clone") => {
+            onboard::cli(cmd, args)
+        }
         Some((cmd, _)) if matches!(cmd.as_str(), "hook" | "install") => hook::cli(&argv),
         Some((cmd, _)) => {
             eprintln!("Unknown command: {cmd}\n{COMMANDS}");
