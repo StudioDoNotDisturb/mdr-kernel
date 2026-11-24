@@ -300,3 +300,107 @@ fn hook_receipts_suppress_repeats_and_rearm() {
     }
     assert!(ask("two", "").contains("EXAMPLE-DOMAIN"));
 }
+
+/// The built-in MCP server, end to end over stdio: one request per line, one reply per request,
+/// none for a notification, and real tool results, not just a handshake.
+#[test]
+fn mcp_server_answers_over_stdio() {
+    use serde_json::Value;
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let fixture = Fixture::new();
+    let root = fixture.memory("memory");
+    fs::create_dir_all(root.join("protocol")).unwrap();
+    let example =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../protocol/recall-gates.example.json");
+    fs::copy(&example, root.join("protocol/recall-gates.json")).unwrap();
+    fs::write(
+        root.join("STATE.md"),
+        "Title: STATE\n\nquartz harbor plan\n",
+    )
+    .unwrap();
+    let requests = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}"#,
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"recall_gates","arguments":{"objective":"deploy again"}}}"#,
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_gate_traps","arguments":{"gate_id":"NOT-HERE"}}}"#,
+        r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"find_history","arguments":{"query":"quartz","limit":3}}}"#,
+        r#"{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"recall_gates","arguments":{"objective":"x","extra":1}}}"#,
+        r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"nope"}}"#,
+        r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_gate_traps","arguments":{"gate_id":"-bad id"}}}"#,
+        r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"find_history","arguments":{"query":"quartz","limit":11}}}"#,
+        "not json",
+        "[1,2]",
+        r#"{"jsonrpc":"2.0","id":10,"method":"ping"}"#,
+        r#"{"jsonrpc":"2.0","id":11,"method":"resources/list"}"#,
+        r#"{"jsonrpc":"2.0","id":12,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}"#,
+    ];
+    let mut child = Command::new(env!("CARGO_BIN_EXE_mdr-kernel"))
+        .args(["mcp", "-Root", &root.to_string_lossy()])
+        .env("XDG_CACHE_HOME", fixture.0.join("cache"))
+        .env("LOCALAPPDATA", fixture.0.join("cache"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all((requests.join("\n") + "\n").as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let replies: Vec<Value> = String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    // 15 lines in, one notification: 14 replies.
+    assert_eq!(replies.len(), 14, "{replies:#?}");
+    let by_id = |id: i64| replies.iter().find(|r| r["id"] == id).unwrap();
+    let text = |id: i64| {
+        by_id(id)["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let is_error = |id: i64| by_id(id)["result"]["isError"].as_bool().unwrap();
+
+    assert_eq!(by_id(1)["result"]["protocolVersion"], "2025-03-26");
+    assert_eq!(by_id(1)["result"]["serverInfo"]["name"], "mdr-kernel");
+    let names: Vec<&str> = by_id(2)["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["recall_gates", "get_gate_traps", "find_history"]);
+    assert!(
+        !is_error(3)
+            && text(3).contains("RECALL_STATUS=MATCHED")
+            && text(3).contains("EXAMPLE-DOMAIN")
+    );
+    assert!(is_error(4) && text(4).contains("unknown-gate-id"));
+    assert!(!is_error(5) && text(5).contains("STATE.md"), "{}", text(5));
+    assert!(is_error(6) && text(6).contains("Unknown argument: extra"));
+    assert_eq!(by_id(7)["error"]["code"], -32602);
+    assert!(is_error(8) && text(8).contains("gate_id is malformed"));
+    assert!(is_error(9) && text(9).contains("limit must be an integer from 1 to 10"));
+    let nulls: Vec<i64> = replies
+        .iter()
+        .filter(|r| r["id"].is_null())
+        .map(|r| r["error"]["code"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        nulls,
+        [-32700, -32600],
+        "parse error, then a batch array refused"
+    );
+    assert_eq!(by_id(10)["result"], serde_json::json!({}));
+    assert_eq!(by_id(11)["error"]["code"], -32601);
+    assert_eq!(by_id(12)["result"]["protocolVersion"], "2025-06-18");
+}

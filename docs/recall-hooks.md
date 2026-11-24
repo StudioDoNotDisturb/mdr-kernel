@@ -114,6 +114,28 @@ oversized, unreadable), the hook sends the reminder again; it never hides one. T
 session's receipts, delete that folder. Without the engine, the PowerShell adapter keeps no
 receipts and sends every matching trap each time.
 
+## MCP server for hosts without a shell
+
+`bin/mdr-kernel mcp` is a read-only MCP server built into the binary. It speaks newline-delimited
+JSON-RPC 2.0 on stdio and has three tools:
+
+- `recall_gates`: an objective's matched gates;
+- `get_gate_traps`: one gate in full;
+- `find_history`: evidence pointers from STATE, the decision log and handoffs.
+
+Each tool runs in the binary itself, so there is no separate backend to be down while the server
+looks connected. The tools change only when you rebuild. Output is capped at 24,000 characters per call.
+A binary built from other `native/` sources than the indexed ones answers every call with an error.
+
+For a host that reads a project `.mcp.json`:
+
+```json
+{ "mcpServers": { "mdr-kernel": { "command": "bin/mdr-kernel", "args": ["mcp"] } } }
+```
+
+A host listing the server as connected only shows that the process started. Before relying on it,
+call `recall_gates` with a real objective and check the gates it returns.
+
 ## Verify behavior without claiming a live hook receipt
 
 After bootstrap has created `protocol/recall-gates.json`, run:

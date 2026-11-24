@@ -316,7 +316,12 @@ fn discard(cache: &Path) -> Result<(), String> {
     })
 }
 
-fn search(query: &str, limit: usize, root: &Path, cache: Option<&Path>) -> Result<Found, String> {
+pub(crate) fn search(
+    query: &str,
+    limit: usize,
+    root: &Path,
+    cache: Option<&Path>,
+) -> Result<Found, String> {
     let root = absolute(root);
     let words = query_words(query);
     if words.is_empty() {

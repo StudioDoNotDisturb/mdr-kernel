@@ -11,6 +11,7 @@ mod git;
 mod health;
 mod hook;
 mod least_code;
+mod mcp;
 mod node_map;
 mod onboard;
 mod recall;
@@ -43,6 +44,7 @@ const COMMANDS: &str =
        mdr-kernel ratify-decision -Id <D#> [-Quote <words>]   (operator terminal only)
        mdr-kernel write-approval -Propose | -Approve | -List | -Show | -ValidateStagedApprovals ...
        mdr-kernel update-node-map [-Check] [-Path <file> [-Repair [-Apply]]]
+       mdr-kernel mcp   (read-only MCP server on stdio: recall_gates, get_gate_traps, find_history)
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
 
@@ -75,6 +77,7 @@ fn main() {
             health::cli(cmd, args)
         }
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
+        Some((cmd, args)) if cmd == "mcp" => mcp::cli(args),
         Some((cmd, args)) if cmd == "write-approval" => approval::cli(args),
         Some((cmd, args)) if cmd == "ratify-decision" => decisions::ratify_cli(args),
         Some((cmd, args)) if cmd == "sync-doors" => doors::cli(args),
