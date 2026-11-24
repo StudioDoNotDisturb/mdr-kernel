@@ -38,7 +38,7 @@ $engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScri
 if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
   # Arrays (-Also) travel comma-joined; the engine splits them as this script does.
   $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
-    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key)"; (@($p.Value) -join ',') }
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$(@($p.Value) -join ',')" }
   })
   & $engine close-session @forward
   exit $LASTEXITCODE
