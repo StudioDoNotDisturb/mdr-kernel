@@ -48,3 +48,56 @@ fn cold_clone_bootstraps_and_starts_clean() {
     fs::remove_file(root.join("handoffs/ci-search.md")).unwrap();
     assert!(git(&root, &["status", "--porcelain", "--untracked-files=all"]).is_empty());
 }
+
+#[test]
+fn initialized_memory_can_seed_a_fresh_regression_fixture() {
+    let sandbox = Sandbox::new();
+    let adopted = sandbox.clone_template("adopted");
+    let bootstrap = run(
+        &adopted,
+        &["bootstrap-clone", "-Model", "demo", "-CommitScaffold"],
+    );
+    assert_eq!(bootstrap.0, 0, "{}", bootstrap.1);
+    put(&adopted, "inbox/private-note.md", "fixture adopter data");
+    put(&adopted, ".codex/hooks.json", "fixture host config");
+    git(
+        &adopted,
+        &["add", "--", "inbox/private-note.md", ".codex/hooks.json"],
+    );
+    git(
+        &adopted,
+        &[
+            "-c",
+            "core.hooksPath=.no-hooks",
+            "commit",
+            "-qm",
+            "Add adopter data",
+        ],
+    );
+
+    let fresh = sandbox.clone_template_from(&adopted, "fresh");
+    assert!(adopted.join("STATE.md").exists());
+    assert!(adopted.join("inbox/private-note.md").exists());
+    for path in [
+        "STATE.md",
+        "DECISIONS.md",
+        "inbox/private-note.md",
+        ".codex/hooks.json",
+    ] {
+        assert!(!fresh.join(path).exists(), "{path}");
+    }
+    assert!(fs::read_to_string(fresh.join("AGENTS.md"))
+        .unwrap()
+        .contains("phase-zero"));
+    git(&fresh, &["config", "core.hooksPath", ".githooks"]);
+    let bootstrap = run(
+        &fresh,
+        &["bootstrap-clone", "-Model", "demo", "-CommitScaffold"],
+    );
+    assert_eq!(bootstrap.0, 0, "{}", bootstrap.1);
+    assert_eq!(
+        git(&fresh, &["log", "-1", "--format=%s"]).trim(),
+        "Initialize mdr-kernel memory scaffold"
+    );
+    assert!(git(&fresh, &["status", "--porcelain"]).is_empty());
+}

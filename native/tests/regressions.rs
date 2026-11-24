@@ -29,6 +29,10 @@ impl Sandbox {
     }
 
     fn clone_template(&self, name: &str) -> PathBuf {
+        self.clone_template_from(template(), name)
+    }
+
+    fn clone_template_from(&self, source: &Path, name: &str) -> PathBuf {
         let path = self.0.join(name);
         git(
             &self.0,
@@ -37,7 +41,7 @@ impl Sandbox {
                 "-q",
                 "--no-hardlinks",
                 "--",
-                template().to_str().unwrap(),
+                source.to_str().unwrap(),
                 path.to_str().unwrap(),
             ],
         );
@@ -51,6 +55,9 @@ impl Sandbox {
             "bin/mdr-kernel"
         };
         fs::copy(ENGINE, path.join(binary)).unwrap();
+        if path.join("STATE.md").exists() {
+            reset_scaffold_fixture(&path);
+        }
         path
     }
 
@@ -61,6 +68,49 @@ impl Sandbox {
         configure(&path);
         path
     }
+}
+
+// A staged Cargo run can start inside an adopted memory. Keep the candidate tools, but give
+// onboarding tests a fresh scaffold to create. This changes only the disposable fixture clone.
+fn reset_scaffold_fixture(root: &Path) {
+    git(
+        root,
+        &[
+            "rm",
+            "-qr",
+            "--ignore-unmatch",
+            "--",
+            "STATE.md",
+            "DECISIONS.md",
+            ".brain-root",
+            "handoffs",
+            "inbox",
+            "archive",
+            ".claude",
+            ".codex",
+            ".mcp.json",
+            "protocol/advisory.md",
+            "protocol/recall-gates.json",
+            "protocol/decision-authority.json",
+            "protocol/decision-ratifications.jsonl",
+            "protocol/rulings.json",
+        ],
+    );
+    for path in ["CLAUDE.md", "AGENTS.md", "GEMINI.md"] {
+        put(
+            root,
+            path,
+            format!(
+                "Title: {path} - phase-zero door\nType: Phase-Zero Agent Front Door\n\
+                 Context: Use mdr-kernel setup-private to initialize this fixture.\n"
+            ),
+        );
+    }
+    git(root, &["add", "--", "CLAUDE.md", "AGENTS.md", "GEMINI.md"]);
+    git(
+        root,
+        &["commit", "-qm", "Prepare fresh scaffold regression fixture"],
+    );
 }
 
 impl Drop for Sandbox {
