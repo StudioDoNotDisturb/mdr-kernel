@@ -23,6 +23,11 @@ $matcherPath = Join-Path $fixture 'bin/brain-recall.ps1'
 foreach ($name in @('brain-recall.ps1', 'hook-recall.ps1', 'prepare-work.ps1')) {
   Copy-Item -LiteralPath (Join-Path $root "bin/$name") -Destination (Join-Path $fixture "bin/$name")
 }
+# MDR_TEST_ENGINE names a built binary: the scripts then hand off to the native engine, and every
+# assertion below must hold for it exactly as for PowerShell. Without it, test PowerShell.
+if ($env:MDR_TEST_ENGINE) {
+  Copy-Item -LiteralPath $env:MDR_TEST_ENGINE -Destination (Join-Path $fixture "bin/mdr-kernel$(if ($IsWindows) { '.exe' })")
+}
 function Expect([string]$Name, [bool]$Condition, [string]$Detail = '') {
   $script:checks++
   if ($Condition) { Write-Host "PASS $Name" }

@@ -37,6 +37,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same recall when bin/mdr-kernel is installed (README); -FromStdin
+# text reaches it on the inherited stdin.
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine brain-recall @forward
+  exit $LASTEXITCODE
+}
 $gatePath = Join-Path $root 'protocol/recall-gates.json'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 

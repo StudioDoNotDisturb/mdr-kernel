@@ -1,7 +1,7 @@
 //! The public doctor. A port of `bin/brain-doctor.ps1`: advisory warnings for drift and
 //! non-compliance only for real hazards (a committed secret, broken startup wiring, a private
-//! memory that lost its origin, a failed authority or recall check). The recall schema,
-//! decision authority, hook-recall probe and node-map parity still run their PowerShell scripts
+//! memory that lost its origin, a failed authority or recall check). The hook-recall probe,
+//! decision authority and node-map parity still run their PowerShell scripts
 //! until their own checkpoints.
 //!
 //!   mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
@@ -482,7 +482,8 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
         }
     }
     if exists("bin/brain-recall.ps1") && exists("protocol/recall-gates.json") {
-        let (code, lines) = pwsh_all(root, "brain-recall.ps1", &["-CheckGates"], None);
+        let gates = crate::recall::check_gates(&root.join("protocol/recall-gates.json"));
+        let (code, lines) = (gates.code, read_lines((gates.out + &gates.err).as_bytes()));
         if code != 0 {
             r.fail(&format!("recall schema invalid: {}", lines.join(" ")));
         } else {

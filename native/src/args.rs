@@ -86,6 +86,12 @@ impl Args {
         self.values.get(&norm(name)).map(|s| s.as_str())
     }
 
+    /// Whether the option was passed at all, as `$PSBoundParameters.ContainsKey` reports it.
+    pub fn has(&self, name: &str) -> bool {
+        let n = norm(name);
+        self.values.contains_key(&n) || self.switches.contains_key(&n)
+    }
+
     pub fn switch(&self, name: &str) -> bool {
         self.switches.get(&norm(name)).copied().unwrap_or(false)
     }

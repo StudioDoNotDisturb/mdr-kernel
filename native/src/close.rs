@@ -76,7 +76,7 @@ fn utc_date(offset_days: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-fn local_date() -> String {
+pub(crate) fn local_date() -> String {
     #[cfg(windows)]
     {
         #[repr(C)]
