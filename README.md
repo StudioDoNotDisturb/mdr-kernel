@@ -28,8 +28,8 @@ treating the repository — not the chat memory — as the canonical state.
 
 `mdr-kernel` is engineered for clinical precision. It is built to make uncoordinated work difficult
 and standardized, state-aware refinement the path of least resistance. The metaphor of "severance"
-is used to describe this context isolation; the implementation is pure, plain, and intentionally
-boring engineering.
+is used to describe this context isolation; the implementation is one Rust binary and plain Git,
+intentionally boring.
 
 For the full philosophical mapping, see [FLOOR-GUIDE.md](FLOOR-GUIDE.md).
 
@@ -42,7 +42,7 @@ mdr-kernel/
 |- README.md                  public orientation
 |- CHANGELOG.md               changes by version
 |- VERSION                    distribution source version
-|- native/                    Rust command for local history search
+|- native/                    Rust source of the kernel; `mdr-kernel install` builds bin/mdr-kernel
 |- protocol/CONTRACT.md       the model-facing contract, generated into front doors
 |- protocol/RUNBOOK.md        human startup and closeout workflow
 |- protocol/coordination-files.txt  the files that need STATE.lock (pre-commit enforces it)
@@ -121,8 +121,7 @@ mdr-kernel find --query "D7" --limit 3
 ```
 
 The command returns file and line references from `STATE.md`, decision logs, and handoffs.
-Use `--json` for structured output. The search is optional. It requires Rust and a C compiler
-for bundled SQLite when building from source. The installed binary provides search and the session lifecycle.
+Use `--json` for structured output. Search is part of the installed binary and needs nothing else.
 
 The index contains excerpts from your memory. It stays in your user cache outside the repository:
 `%LOCALAPPDATA%\mdr-kernel\history` on Windows and `~/.cache/mdr-kernel/history` on Linux
@@ -215,7 +214,8 @@ The whole path is: **template -> private clone -> install binary -> setup -> one
 **Option A — Prebuilt release binary (recommended):**
 
 1. Download the binary for your platform (`mdr-kernel-windows-x86_64.exe` on Windows,
-   `mdr-kernel-linux-x86_64` on Linux) and `SHA256SUMS.txt` from the GitHub Release.
+   `mdr-kernel-linux-x86_64` on Linux) and `SHA256SUMS.txt` from the
+   [latest release](https://github.com/StudioDoNotDisturb/mdr-kernel/releases/latest).
 2. Verify the SHA-256 checksum and place the verified binary at `bin/mdr-kernel`
    (`bin/mdr-kernel.exe` on Windows) inside your cloned private repository (`bin/mdr-kernel*` is
    gitignored). Chaining verification with installation ensures a checksum failure stops before
@@ -406,7 +406,7 @@ should trust:
   improvements only by applying a release deliberately — there is no update command, and pulling
   from your private origin never fetches one. [`docs/upgrading.md`](docs/upgrading.md) is the
   exact, rehearsed walkthrough.
-- It is a **pattern, not a product.** No daemon, no service, no telemetry — just scripts, git, and
+- It is a **pattern, not a product.** No daemon, no service, no telemetry — one binary, git, and
   a contract. You adapt it to your stack rather than installing it.
 
 ## [ VERSION ] Release and Upgrade Policy

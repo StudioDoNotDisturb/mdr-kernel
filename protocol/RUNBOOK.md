@@ -75,7 +75,7 @@ Expected result:
 STARTUP_STATUS=READY
 ```
 
-The script runs the complete sequence: doctor, safe pull/rebase, then full STATE readback. The
+The command runs the complete sequence: doctor, safe pull/rebase, then full STATE readback. The
 model then reports Right now, blockers, and the top next action and waits unless you already
 assigned work.
 
@@ -122,7 +122,7 @@ mdr-kernel close-session -Topic '<short-topic>' -Model '<your model id>'
 
 The committing identity must be explicit — `-Model` or `$env:BRAIN_MODEL`; the clone's
 `git config brain.model` is a display fallback only and is refused for lock/close claims.
-That script verifies the closeout and commits with the `Brain-Model` trailer. What happens next
+That command verifies the closeout and commits with the `Brain-Model` trailer. What happens next
 depends on the memory's mode: a private-remote memory re-verifies and pushes the approved
 `origin/main`, releasing `STATE.lock` only after the push succeeds (a failed push keeps the lock);
 a local-only memory commits and releases the lock without attempting a push, by design. See below
