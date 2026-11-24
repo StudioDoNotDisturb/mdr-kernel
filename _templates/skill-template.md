@@ -6,7 +6,7 @@ name: <skill-name>
 description: >
   Use when the operator asks to <specific repeatable workflow or exact trigger phrase>.
   Do not use for <near miss that would be mistaken for this skill>.
-compatibility: Requires repo access, git, and PowerShell 7+. <Add any additional requirements.>
+compatibility: Requires repo access, Git, and the installed mdr-kernel binary. <Add any additional requirements.>
 metadata:
   mdr_kernel:
     status: draft
@@ -46,7 +46,7 @@ metadata:
                  Must match the directory name under skills/.
   description:   Block scalar. Line 1: the specific trigger phrase or condition.
                  Line 2: the near miss to exclude.
-  compatibility: Any requirements beyond repo access, git, and PowerShell 7+.
+  compatibility: Any requirements beyond repo access, Git, and the installed mdr-kernel binary.
   status:        draft | productive | retired
   posture:       read-first (default) | write-heavy
   network:       default-deny (default) | external-allowed

@@ -39,7 +39,7 @@ mdr-kernel update-node-map
 mdr-kernel update-node-map -Check
 ```
 
-`brain-doctor` runs the same parity check: it warns when tracked Markdown, JSON, the readable map,
+`mdr-kernel doctor` runs the same parity check: it warns when tracked Markdown, JSON, the readable map,
 or the Obsidian bridge disagree. The generated map files are coordination files, so regenerate and
 commit them under your own `STATE.lock`.
 

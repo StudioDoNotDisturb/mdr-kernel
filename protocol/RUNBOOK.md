@@ -12,7 +12,7 @@ Use this when you are the human operator. The loop is simple:
 2. Let it run startup.
 3. Let it work.
 4. Have it close out before you stop.
-5. Confirm `brain-doctor` is green and the repo is clean.
+5. Confirm `mdr-kernel doctor` is green and the repo is clean.
 
 The repo is the shared brain. `STATE.md` is the live status. `protocol/CONTRACT.md` is the rules.
 
@@ -39,7 +39,7 @@ mdr-kernel start-session  -Model '<your model id>'
 (`-Model` is the attribution identity: an agent passes its real model id, e.g.
 `-Model 'claude-opus-5'`; a human driving by hand picks any short name, e.g. `-Model 'alex'`.)
 
-After setup, `brain-doctor` should report the verified private destination and `main`. The public
+After setup, `mdr-kernel doctor` should report the verified private destination and `main`. The public
 template, a public repository, a fork, a changed remote, or unverifiable GitHub visibility blocks
 setup and push. Use `-LocalOnly` if no remote backup is intended.
 
@@ -75,7 +75,7 @@ Expected result:
 STARTUP_STATUS=READY
 ```
 
-The script runs the complete sequence: doctor, safe pull/rebase, then full STATE readback. The
+The command runs the complete sequence: doctor, safe pull/rebase, then full STATE readback. The
 model then reports Right now, blockers, and the top next action and waits unless you already
 assigned work.
 
@@ -122,7 +122,7 @@ mdr-kernel close-session -Topic '<short-topic>' -Model '<your model id>'
 
 The committing identity must be explicit — `-Model` or `$env:BRAIN_MODEL`; the clone's
 `git config brain.model` is a display fallback only and is refused for lock/close claims.
-That script verifies the closeout and commits with the `Brain-Model` trailer. What happens next
+That command verifies the closeout and commits with the `Brain-Model` trailer. What happens next
 depends on the memory's mode: a private-remote memory re-verifies and pushes the approved
 `origin/main`, releasing `STATE.lock` only after the push succeeds (a failed push keeps the lock);
 a local-only memory commits and releases the lock without attempting a push, by design. See below
@@ -177,7 +177,7 @@ mdr-kernel state-lock -Release
 Acquire is fail-closed: it refuses a config-fallback identity, and a live same-model lock refuses
 a second session (token mismatch) instead of silently handing over.
 
-If `brain-doctor` says another live session holds the lock, do not ask a second model to edit
+If `mdr-kernel doctor` says another live session holds the lock, do not ask a second model to edit
 coordination files. It can still do research or write a standalone `inbox/` note; one session
 folds notes into `STATE.md` later.
 

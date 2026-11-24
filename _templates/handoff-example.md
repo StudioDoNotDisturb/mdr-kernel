@@ -26,7 +26,7 @@ Context: Use when writing a handoff and you want a worked example of the expecte
 
 ## Current state
 
-The recall gate now covers the deploy loop that had recurred twice. `brain-doctor` is green, hooks
+The recall gate now covers the deploy loop that had recurred twice. `mdr-kernel doctor` is green, hooks
 are armed, and `STATE.lock` is released. `protocol/recall-gates.json` has two gates: the shipped
 recurring-work gate and the new `DEPLOY-CONTAINER` gate. No live deploy was run this session — only
 the gate wiring and its self-test. This matches the "Active work" row in STATE.md.

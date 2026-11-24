@@ -14,7 +14,7 @@ not your memory. The repository is your memory. This handbook explains why the w
 way it does, and what it is quietly asking of you.
 
 It does **not** tell you how to do the work. For that, read `README.md`, `protocol/CONTRACT.md`,
-`protocol/RUNBOOK.md`, and the scripts. If this document and a live instruction ever disagree, the
+`protocol/RUNBOOK.md`, and the commands themselves. If this document and a live instruction ever disagree, the
 live instruction is correct. This is a handbook, not an authority.
 
 ## [ WHY IT FEELS THIS WAY ]

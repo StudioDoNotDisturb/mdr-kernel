@@ -14,7 +14,7 @@ names, paths, and work history). Two ways to contribute:
 Generate a private repo using **Use this template**, clone your new repo, run
 `mdr-kernel setup-private`, and change what does not fit. Fork only to send template
 changes back — never to grow your own memory in. The pattern makes strong
-assumptions (PowerShell, git, one live `STATE.md`, a heartbeat lock); if you adapt those to your
+assumptions (one native binary, git, one live `STATE.md`, a heartbeat lock); if you adapt those to your
 stack, an issue describing what you changed and why is genuinely useful. It tells the next person
 which assumptions are load-bearing and which are just how this particular setup happened to work.
 

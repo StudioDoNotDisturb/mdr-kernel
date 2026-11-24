@@ -38,7 +38,7 @@ dangles) belong in a normal public issue — see [CONTRIBUTING.md](CONTRIBUTING.
 
 ## Scope
 
-This is a pattern of scripts, not a hosted service: there is no server-side attack surface, no
+This is a local command-line pattern, not a hosted service: there is no server-side attack surface, no
 telemetry, and no account system. The threat model is a *cooperating* multi-agent workflow
 protecting against accidental leaks (see the "Known Limits" section in [README.md](README.md)),
 not a defense against a malicious actor with write access to your machine or repo.
