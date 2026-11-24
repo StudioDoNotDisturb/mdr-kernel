@@ -1,5 +1,5 @@
-//! Session close and private sync. Ports of `bin/close-session.ps1` (close set, handoff and INDEX
-//! checks, lock, commit, push, release) and `bin/sync-private.ps1` (live privacy check, fetch and
+//! Session close and private sync. Ports of `mdr-kernel close-session` (close set, handoff and INDEX
+//! checks, lock, commit, push, release) and `mdr-kernel sync-private` (live privacy check, fetch and
 //! rebase, push with one retry). Node-map generation runs in process.
 //!
 //!   mdr-kernel close-session [-Topic <slug> | -NoHandoff] [-Model <id>] [-Token <token>]
@@ -135,7 +135,7 @@ fn also_match(n: &str, spec: &str) -> bool {
     n == a || n.starts_with(&format!("{a}/"))
 }
 
-/// `-Also a,b` arrives from `pwsh -File` as one string, so split on commas and drop quotes.
+/// Support comma-separated `-Also` paths and strip optional surrounding quotes.
 fn split_also(raw: Option<&str>) -> Vec<String> {
     raw.unwrap_or("")
         .split(',')
@@ -380,7 +380,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
         if !dry {
             set_pending_sync(root);
         }
-        c.fail("this memory is in private-remote mode but origin is missing — close refused, durable pending-sync recorded. Restore the remote (git remote add origin <approved-url>) or rerun bin/setup-private.ps1 (-LocalOnly to deliberately accept local-only), then rerun close");
+        c.fail("this memory is in private-remote mode but origin is missing — close refused, durable pending-sync recorded. Restore the remote (git remote add origin <approved-url>) or rerun mdr-kernel setup-private (-LocalOnly to deliberately accept local-only), then rerun close");
     }
     let branch = out(root, &["branch", "--show-current"]);
     if !branch.eq_ignore_ascii_case("main") {
@@ -398,7 +398,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
     } else if offline {
         // Case-sensitive: canonical pins must not re-conflate case-distinct paths.
         if approved != remote_privacy::identity(&push_url) {
-            c.fail("-OfflineCheckpoint refused because origin changed since approval; reconnect and rerun bin/setup-private.ps1 before closing");
+            c.fail("-OfflineCheckpoint refused because origin changed since approval; reconnect and rerun mdr-kernel setup-private before closing");
         } else {
             offline_ready = true;
         }
@@ -412,7 +412,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
             let v = remote_privacy::run(root, None, false, true, false, &Live);
             print!("{}", remote_privacy::report(&v));
             if v.code != 0 {
-                c.fail("private push destination is not verified and approved — run bin/setup-private.ps1 before closing");
+                c.fail("private push destination is not verified and approved — run mdr-kernel setup-private before closing");
             } else {
                 ok("push destination: approved private origin/main");
             }
@@ -702,15 +702,13 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
                 return 1;
             }
         }
-        if root.join("bin/update-node-map.ps1").exists() {
-            let mapped = crate::node_map::run(root, &crate::node_map::Opts::default());
-            crate::node_map::print(&mapped);
-            if mapped.code != 0 {
-                c.fail("node-map regeneration failed after staging — see output above");
-                return 1;
-            }
-            pending_paths = pending(root);
+        let mapped = crate::node_map::run(root, &crate::node_map::Opts::default());
+        crate::node_map::print(&mapped);
+        if mapped.code != 0 {
+            c.fail("node-map regeneration failed after staging — see output above");
+            return 1;
         }
+        pending_paths = pending(root);
         warn_unmatched(&also, &pending_paths);
         let (stage, leftover): (Vec<&String>, Vec<&String>) =
             pending_paths.iter().partition(|p| in_set(p));
@@ -735,7 +733,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
                     let name = lo.replace('\\', "/");
                     let name = name.rsplit('/').next().unwrap_or("").to_lowercase();
                     if !name.is_empty() && added.iter().any(|l| l.contains(&name)) {
-                        c.fail(&format!("{index} gains a row referencing left-behind '{lo}' — commit them together: rerun with -Also '{lo}' (a new reference/skill file also needs its bin/write-approval.ps1 audit entry, which rides automatically)"));
+                        c.fail(&format!("{index} gains a row referencing left-behind '{lo}' — commit them together: rerun with -Also '{lo}' (a new reference/skill file also needs its mdr-kernel write-approval audit entry, which rides automatically)"));
                         return 1;
                     }
                 }
@@ -783,7 +781,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
     // state and releases the lock without a push.
     if offline {
         set_pending_sync(root);
-        warn("OFFLINE CHECKPOINT: committed locally and did not push. Recovery: pwsh -NoProfile -File bin/sync-private.ps1");
+        warn("OFFLINE CHECKPOINT: committed locally and did not push. Recovery: mdr-kernel sync-private");
     } else if !has_remote {
         if local_only {
             ok("local-only memory: committed locally (no push by design)");
@@ -794,7 +792,7 @@ fn close_steps(root: &Path, args: &Args, model: &str, c: &mut Close) -> i32 {
         if sync(root, true) != 0 {
             c.keep_lock = true;
             set_pending_sync(root);
-            c.fail("private sync failed — STATE.lock kept. Resolve safely, run bin/sync-private.ps1, then release the lock");
+            c.fail("private sync failed — STATE.lock kept. Resolve safely, run mdr-kernel sync-private, then release the lock");
             return 1;
         }
         ok("pushed");
@@ -878,7 +876,7 @@ fn sync_steps(root: &Path, preserve: bool) -> Result<(), String> {
         return Err("this memory is local-only; there is no private remote to sync".into());
     }
     if out(root, &["remote", "get-url", "--push", "origin"]).is_empty() {
-        return Err("origin is missing; rerun bin/setup-private.ps1 after cloning or adding your PRIVATE repository".into());
+        return Err("origin is missing; rerun mdr-kernel setup-private after cloning or adding your PRIVATE repository".into());
     }
     if !out(root, &["branch", "--show-current"]).eq_ignore_ascii_case("main") {
         return Err("private memory sync runs only from main".into());
@@ -889,7 +887,7 @@ fn sync_steps(root: &Path, preserve: bool) -> Result<(), String> {
     let v = remote_privacy::run(root, None, false, true, false, &Live);
     print!("{}", remote_privacy::report(&v));
     if v.code != 0 {
-        return Err("origin is not live-verified as the approved private destination; run bin/setup-private.ps1".into());
+        return Err("origin is not live-verified as the approved private destination; run mdr-kernel setup-private".into());
     }
     update_from_origin(root, preserve)?;
     if shown(root, &["push", "origin", "main"]) != 0 {

@@ -1,5 +1,5 @@
 //! Envelope length check: the Markdown retrieval envelope is a label, not a summary.
-//! Port of `bin/envelope-check.ps1` (same limits, sentence rule and messages). Title is a name of
+//! Title is a name of
 //! at most 100 characters; Context is ONE sentence of at most 300 characters. A ratchet:
 //! pre-commit blocks a staged `.md` over the limits, and `count` reports the untouched rest.
 //!

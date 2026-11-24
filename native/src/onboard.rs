@@ -1,5 +1,5 @@
-//! First run and repair. Ports of `bin/setup-private.ps1` (verify and pin the destination, then
-//! bootstrap and push the first checkpoint) and `bin/bootstrap-clone.ps1` (arm hooks, scaffold
+//! First run and repair. Ports of `mdr-kernel setup-private` (verify and pin the destination, then
+//! bootstrap and push the first checkpoint) and `mdr-kernel bootstrap-clone` (arm hooks, scaffold
 //! the grow-your-own files under STATE.lock, optionally commit them, run the doctor).
 //! Rulings and the node map run in process.
 //!
@@ -56,7 +56,7 @@ Context: Append-only decision log; newer entries supersede older ones and explai
 # Decisions
 
 Append-only. Newest at the top. Don't edit old entries - if a decision changes, add a new one
-with `bin/add-decision.ps1` and an explicit supersession field. Each entry answers: what, why,
+with `mdr-kernel add-decision` and an explicit supersession field. Each entry answers: what, why,
 what it rules out. A proposal does not bind; an operator ruling includes the operator's words.
 
 ---
@@ -210,13 +210,6 @@ fn new_if_missing(root: &Path, rel: &str, content: &str) -> Result<(), String> {
 }
 
 fn node_map(root: &Path, required: bool) -> Result<(), String> {
-    if !root.join("bin/update-node-map.ps1").exists() {
-        if required {
-            return Err("bin/update-node-map.ps1 missing - cannot generate node map".into());
-        }
-        warn("bin/update-node-map.ps1 missing - node map not generated");
-        return Ok(());
-    }
     // In process; its report is indented under the step, as the script's output was.
     let mapped = crate::node_map::run(root, &crate::node_map::Opts::default());
     indent(&mapped.out);
@@ -336,7 +329,7 @@ fn bootstrap_steps(root: &Path, model: &str, current: &str, commit: bool) -> Res
         let v = remote_privacy::run(root, None, false, true, false, &Live);
         print!("{}", remote_privacy::report(&v));
         if v.code != 0 {
-            return Err("remote privacy is not verified and approved - run the adopter entry point: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-5')".into());
+            return Err("remote privacy is not verified and approved - run the adopter entry point: mdr-kernel setup-private -Model '<your model id>' (example: -Model 'claude-opus-5')".into());
         }
         ok("private remote verified and approved");
     }
@@ -393,14 +386,13 @@ fn bootstrap_steps(root: &Path, model: &str, current: &str, commit: bool) -> Res
 
     // 2b) The model front doors from the contract.
     step("generate front doors");
-    if root.join("bin/sync-doors.ps1").exists() {
-        let doors = crate::doors::sync(root, false, false);
-        indent(&doors.out);
-        eprint!("{}", doors.err);
-        ok("front doors generated (CLAUDE.md / AGENTS.md / GEMINI.md / protocol/advisory.md)");
-    } else {
-        warn("bin/sync-doors.ps1 missing - cannot generate front doors");
+    let doors = crate::doors::sync(root, false, false);
+    indent(&doors.out);
+    eprint!("{}", doors.err);
+    if doors.code != 0 {
+        return Err("Could not generate front doors.".into());
     }
+    ok("front doors generated (CLAUDE.md / AGENTS.md / GEMINI.md / protocol/advisory.md)");
     if !commit {
         step("generate node map");
         node_map(root, false)?;
@@ -478,7 +470,7 @@ fn bootstrap_steps(root: &Path, model: &str, current: &str, commit: bool) -> Res
     if !commit {
         println!("  # checkpoint scaffold first, or run bootstrap again with -CommitScaffold");
     }
-    println!("  pwsh -NoProfile -File bin/start-session.ps1 -Model '{model}'");
+    println!("  mdr-kernel start-session -Model '{model}'");
     Ok(doctor_exit)
 }
 
@@ -496,7 +488,7 @@ fn pad(s: &str, width: usize) -> String {
 pub fn setup(root: &Path, model: &str, local_only: bool, confirm: bool) -> i32 {
     println!("mdr-kernel private setup - {}\n", root.display());
     if model.trim().is_empty() {
-        return fail("missing -Model: the attribution name stamped on this clone's commits and locks. An agent passes its own model id; a human setting up by hand picks any short name (no angle brackets), for example: pwsh -NoProfile -File bin/setup-private.ps1 -Model 'alex'");
+        return fail("missing -Model: the attribution name stamped on this clone's commits and locks. An agent passes its own model id; a human setting up by hand picks any short name (no angle brackets), for example: mdr-kernel setup-private -Model 'alex'");
     }
     if text(root, &["rev-parse", "--is-inside-work-tree"]).is_empty() {
         return fail("run this inside the repository you created from the mdr-kernel template");
@@ -587,21 +579,19 @@ pub fn setup(root: &Path, model: &str, local_only: bool, confirm: bool) -> i32 {
         println!("Approved destination: {approved}");
     }
     println!("\nStart a session:");
-    println!("  pwsh -NoProfile -File bin/start-session.ps1 -Model '{model}'");
+    println!("  mdr-kernel start-session -Model '{model}'");
     if local_only {
         println!("Close a session (this commits locally):");
-        println!(
-            "  pwsh -NoProfile -File bin/close-session.ps1 -Topic '<short-topic>' -Model '{model}'"
-        );
+        println!("  mdr-kernel close-session -Topic '<short-topic>' -Model '{model}'");
     } else {
         println!("Close a session (this commits and pushes your private main):");
-        println!(
-            "  pwsh -NoProfile -File bin/close-session.ps1 -Topic '<short-topic>' -Model '{model}'"
-        );
+        println!("  mdr-kernel close-session -Topic '<short-topic>' -Model '{model}'");
         println!("If you must close while offline (private-remote mode only):");
-        println!("  pwsh -NoProfile -File bin/close-session.ps1 -Topic '<short-topic>' -Model '{model}' -OfflineCheckpoint");
+        println!(
+            "  mdr-kernel close-session -Topic '<short-topic>' -Model '{model}' -OfflineCheckpoint"
+        );
         println!("When connectivity returns, use the one recovery command shown by startup:");
-        println!("  pwsh -NoProfile -File bin/sync-private.ps1");
+        println!("  mdr-kernel sync-private");
     }
     0
 }

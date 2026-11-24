@@ -47,32 +47,32 @@ mdr-kernel/
 |- protocol/RUNBOOK.md        human startup and closeout workflow
 |- protocol/coordination-files.txt  the files that need STATE.lock (pre-commit enforces it)
 |- protocol/recall-gates.example.json  example trap gates; setup seeds your own gate file
-|- bin/setup-private.ps1      the one adopter entry: verify private destination -> scaffold -> push
-|- bin/bootstrap-clone.ps1    internal scaffold/repair primitive (setup-private calls it)
-|- bin/start-session.ps1      canonical startup: doctor -> safe pull -> STATE readback
-|- bin/close-session.ps1      closeout: verify, commit the close set, push, release the lock
-|- bin/sync-private.ps1       the one push path (setup, close, offline recovery)
-|- bin/brain-doctor.ps1       health check for stale state, links, locks, hooks, secrets
-|- bin/state-lock.ps1         heartbeat lock for coordination files
-|- bin/brain-recall.ps1       active-recall gate authority for recurring mistakes
-|- bin/hook-recall.ps1        prompt-hook adapter around brain-recall (configured != fired)
-|- bin/prepare-work.ps1       portable manual recall fallback
-|- bin/add-decision.ps1       append a proposed or quoted operator-ruled decision
-|- bin/check-decision-history.ps1  append-only history and authority check (pre-commit runs it)
-|- bin/build-rulings.ps1      compile protocol/rulings.json for recall; never hand-edit it
-|- bin/ratify-decision.ps1    human-only, hash-bound ratification
-|- bin/initialize-decision-authority.ps1  one-time authority boundary (-PreserveLegacy for old logs)
-|- bin/test-staged.ps1        runs affected suites against the staged scripts (pre-commit)
-|- bin/update-node-map.ps1    generated link-health map and node-link checker
-|- bin/sync-doors.ps1         regenerate the front doors from the contract
-|- bin/write-approval.ps1     approval gate for new reference notes and skills
-|- bin/waffle-party.ps1       optional themed wrapper around brain-doctor
+|- mdr-kernel setup-private      the one adopter entry: verify private destination -> scaffold -> push
+|- mdr-kernel bootstrap-clone    internal scaffold/repair primitive (setup-private calls it)
+|- mdr-kernel start-session      canonical startup: doctor -> safe pull -> STATE readback
+|- mdr-kernel close-session      closeout: verify, commit the close set, push, release the lock
+|- mdr-kernel sync-private       the one push path (setup, close, offline recovery)
+|- mdr-kernel doctor       health check for stale state, links, locks, hooks, secrets
+|- mdr-kernel state-lock         heartbeat lock for coordination files
+|- mdr-kernel brain-recall       active-recall gate authority for recurring mistakes
+|- mdr-kernel hook-recall        prompt-hook adapter around brain-recall (configured != fired)
+|- mdr-kernel prepare-work       portable manual recall fallback
+|- mdr-kernel add-decision       append a proposed or quoted operator-ruled decision
+|- mdr-kernel check-decision-history  append-only history and authority check (pre-commit runs it)
+|- mdr-kernel build-rulings      compile protocol/rulings.json for recall; never hand-edit it
+|- mdr-kernel ratify-decision    human-only, hash-bound ratification
+|- mdr-kernel initialize-decision-authority  one-time authority boundary (-PreserveLegacy for old logs)
+|- .githooks/pre-commit         runs affected Cargo tests against an isolated index snapshot
+|- mdr-kernel update-node-map    generated link-health map and node-link checker
+|- mdr-kernel sync-doors         regenerate the front doors from the contract
+|- mdr-kernel write-approval     approval gate for new reference notes and skills
+|- mdr-kernel waffle-party       optional themed wrapper around brain-doctor
 |- CLAUDE.md / AGENTS.md / GEMINI.md  phase-zero agent doors; setup regenerates them from the contract
 |- maps/node-roots.json       registry of roots to scan
 |- maps/NODE-MAP.md           generated human link-health dashboard
 |- maps/node-map.json         generated machine-readable link inventory
 |- .githooks/                 pre-commit, commit-message and pre-push enforcement
-|- tests/*.ps1                regression suites; the doctor workflow runs the offline ones on Windows and Linux
+|- native/tests/                regression suites; the doctor workflow runs the offline ones on Windows and Linux
 |- specs/node-map.md          node-map subsystem contract
 |- docs/adoption-guide.md     first-hour path for messy existing work
 |- docs/upgrading.md          merge a new version into an existing private memory
@@ -98,11 +98,11 @@ logged; none is skippable.
    source gets fixed.
 2. `protocol/CONTRACT.md` is the one doctrine every model receives. Claude, Codex, Gemini, local
    models, or any other CLI agent all start from the same rules.
-3. `bin/start-session.ps1` is the only startup path. It runs `brain-doctor`, refuses unsafe pulls
+3. `mdr-kernel start-session` is the only startup path. It runs `mdr-kernel doctor`, refuses unsafe pulls
    from a dirty tree, and prints the full current `STATE.md`.
 4. `STATE.md` and `reference/INDEX.md` choose the smallest relevant file set before broad search.
    Generated node maps check link integrity.
-5. `bin/hook-recall.ps1` or the portable `bin/prepare-work.ps1` fallback runs before assigned work. When an objective matches a known trap, the
+5. `mdr-kernel hook-recall` or the portable `mdr-kernel prepare-work` fallback runs before assigned work. When an objective matches a known trap, the
    agent must read the evidence before acting.
 6. `STATE.lock` protects coordination files. The pre-commit hook blocks protected edits unless
    the session holds the lock.
@@ -117,12 +117,12 @@ make uncoordinated work difficult to commit.
 After setting up your private memory, run from its root:
 
 ```powershell
-cargo run --locked --manifest-path native/Cargo.toml -- find --query "D7" --limit 3
+mdr-kernel find --query "D7" --limit 3
 ```
 
 The command returns file and line references from `STATE.md`, decision logs, and handoffs.
 Use `--json` for structured output. The search is optional. It requires Rust and a C compiler
-for bundled SQLite. Setup and the session lifecycle use Git and PowerShell 7.
+for bundled SQLite when building from source. The installed binary provides search and the session lifecycle.
 
 The index contains excerpts from your memory. It stays in your user cache outside the repository:
 `%LOCALAPPDATA%\mdr-kernel\history` on Windows and `~/.cache/mdr-kernel/history` on Linux
@@ -233,7 +233,7 @@ setup does not require a separate human pass first.
 **Or set up by hand.** Inside the private repository you cloned, run:
 
 ```powershell
-pwsh -NoProfile -File bin/setup-private.ps1 -Model 'alex'
+mdr-kernel setup-private -Model 'alex'
 ```
 
 `-Model` is the attribution name for setup's own lock and scaffold commit — type it without
@@ -242,7 +242,7 @@ angle brackets. Setup does not store it; later sessions name themselves with `-M
 works fine). An AI agent running setup passes its real model id instead, and every agent that
 works here later identifies itself the same way.
 
-On macOS/Linux, run `./bin/setup-private -Model 'alex'`. Setup verifies that GitHub
+Setup verifies that GitHub
 reports the destination private, pins it in local git config, arms hooks, creates the starter
 memory, and commits the scaffold. **Run setup once in every clone**, including a re-clone or a
 second computer: the destination approval and hooks intentionally live in that clone's local
@@ -261,7 +261,7 @@ Then the one startup — run it yourself to verify, or let your agent run it as 
 (its front door is now the full contract door):
 
 ```powershell
-pwsh -NoProfile -File bin/start-session.ps1 -Model '<your-model-id>'
+mdr-kernel start-session -Model '<your-model-id>'
 ```
 
 It should end with `STARTUP_STATUS=READY`. (An agent passes its real model id; a human uses
@@ -281,7 +281,7 @@ This exception works only after private-remote setup: it commits locally, never 
 and makes every later startup print a loud pending-sync warning. When connectivity returns, run:
 
 ```powershell
-pwsh -NoProfile -File bin/sync-private.ps1
+mdr-kernel sync-private
 ```
 
 That command is the one push implementation used by setup, normal close, and recovery. It
@@ -290,7 +290,7 @@ allows only one bounded retry if the remote moves again. The stored destination 
 treated as permission to push. Local-only users close normally and do not use either offline flag
 or sync-private.
 
-For deliberately local-only memory, use `setup-private.ps1 ... -LocalOnly`; setup removes
+For deliberately local-only memory, use `mdr-kernel setup-private ... -LocalOnly`; setup removes
 `origin` before memory is created. Non-GitHub private hosts require `-ConfirmPrivateRemote`
 because their visibility cannot be checked generically.
 
@@ -303,10 +303,10 @@ intake.
 For a compliance reading of a chaotic environment, run the optional diagnostic wrapper:
 
 ```powershell
-pwsh -NoProfile -File bin/waffle-party.ps1
+mdr-kernel waffle-party
 ```
 
-It is `brain-doctor` with a themed success footer. If the floor is not in compliance, it returns
+It is `mdr-kernel doctor` with a themed success footer. If the floor is not in compliance, it returns
 the same non-zero exit code as the doctor.
 
 ## Why Not a Vector Database?

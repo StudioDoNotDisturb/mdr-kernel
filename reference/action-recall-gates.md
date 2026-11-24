@@ -13,7 +13,7 @@ Run it after startup when an operator assigns work. A verified prompt adapter ca
 gate automatically; an unavailable, unverified or degraded hook requires the portable fallback:
 
 ```powershell
-pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'
+mdr-kernel prepare-work -Objective '<operator objective>'
 ```
 
 If the result is `MATCHED`, read the listed sources before advising, editing, or running recovery
@@ -63,7 +63,7 @@ Unicode-aware: letters in any script count as word characters, so a trigger insi
 
 Optional `rulings` is an array of live decision IDs such as `["D7"]`. Only operator-ruled or
 operator-ratified compiled entries can be shown. Build `protocol/rulings.json` with
-`bin/build-rulings.ps1`; never hand-edit it. Recall verifies its source hashes and fails visibly for
+`mdr-kernel build-rulings`; never hand-edit it. Recall verifies its source hashes and fails visibly for
 a stale index or missing/unknown citation. Normal, JSON and `-Header` output include the complete
 compiled rule; `-Brief` retains its ID and requires expansion. `-Ruling D7` or `-Ruling 'rule words'`
 looks up a live rule directly. Generic gates with no citations do not require a ruling index, and
@@ -74,17 +74,17 @@ the shipped example gates cite none.
 Once the decision log holds an operator-ruled or operator-ratified entry that governs a gate:
 
 1. Add `"rulings": ["D<n>"]` to that gate (decision IDs only; proposals never qualify).
-2. Run `pwsh -NoProfile -File bin/build-rulings.ps1` to compile `protocol/rulings.json`. The gate
+2. Run `mdr-kernel build-rulings` to compile `protocol/rulings.json`. The gate
    file is one of its hashed sources, so rebuild after every later gate edit, including `-Increment`.
-3. Run `pwsh -NoProfile -File bin/brain-recall.ps1 -CheckGates`, then an objective that should match;
+3. Run `mdr-kernel brain-recall -CheckGates`, then an objective that should match;
    the output must show `Ruling in force: D<n> ...`. A `RECALL_STATUS=BLOCKED reason=invalid-rulings`
    result means the index is missing, stale or names an unknown ID.
 
 Validate before using changed data:
 
 ```powershell
-pwsh -NoProfile -File bin/brain-recall.ps1 -CheckGates
-pwsh -NoProfile -File bin/brain-recall.ps1 -CheckGates -GatesPath protocol/recall-gates.example.json
+mdr-kernel brain-recall -CheckGates
+mdr-kernel brain-recall -CheckGates -GatesPath protocol/recall-gates.example.json
 ```
 
 `-GatesPath` is allowed only with `-CheckGates` and no other action. It cannot redirect matching,
@@ -100,7 +100,7 @@ token before changing the gate file. Increment the count, then record the observ
 handoff; a work report does not become an operator ruling:
 
 ```powershell
-pwsh -NoProfile -File bin/brain-recall.ps1 -Increment <trapId>
+mdr-kernel brain-recall -Increment <trapId>
 ```
 
 It bumps the trap and its parent gate, sets `updated`, rewrites the JSON as UTF-8 without BOM with
@@ -113,15 +113,15 @@ not more context at boot.
 
 ## Two seams
 
-1. **Objective-time.** A verified prompt hook or `bin/prepare-work.ps1 -Objective '…'` is required
+1. **Objective-time.** A verified prompt hook or `mdr-kernel prepare-work -Objective '…'` is required
    before assigned work and always when the operator says recurring, stuck, same loop, or amnesia.
-   `brain-recall.ps1` is the matching authority used by both adapters. Without verified hook firing,
+   `mdr-kernel brain-recall` is the matching authority used by both adapters. Without verified hook firing,
    use the portable wrapper; for large objectives, pipe the complete text to its `-FromStdin`.
    The 131,072-character limit rejects overflow rather than matching only a prefix.
    The matcher's `-Brief` emits nothing on healthy `CLEAR` and compact mandatory gate information on
    a match. A `CLEAR` result is a prompt to reconsider objective wording, not a green light.
 2. **Tool-time.** A fragile domain's own scripts can print the relevant gate's compact trap banner
-   at invocation via `bin/brain-recall.ps1 -GateId <id> -Header`, so the warning appears in output
+   at invocation via `mdr-kernel brain-recall -GateId <id> -Header`, so the warning appears in output
    the agent caused itself. Invalid data or an unknown ID returns a nonzero status; the caller must
    surface that failure and require fallback before acting. Add a surfacing point to domain scripts
    when their first real recurring traps appear.
@@ -136,5 +136,5 @@ add a tighter surfacing point inside the domain tool — do not add another remi
 
 Directory Path: reference/
 Next Sequential File: reference/INDEX.md
-Related Workflows: protocol/recall-gates.example.json, bin/brain-recall.ps1, docs/recall-hooks.md, specs/brain-active-recall.md
+Related Workflows: protocol/recall-gates.example.json, native/src/recall.rs, docs/recall-hooks.md, specs/brain-active-recall.md
 AI Execution Prompts: protocol/CONTRACT.md

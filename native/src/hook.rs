@@ -1,7 +1,4 @@
-//! Git hook entry points. `.githooks/*` exec these when `bin/mdr-kernel` is installed; the shell
-//! gates stay as the fallback (`MDR_ENGINE=legacy`, or no binary) until the release checkpoint.
-//! Gates not yet ported (doors, write approval, lock ownership, decisions, staged suites) still run
-//! their PowerShell scripts, in the same order and with the same messages as the shell hook.
+//! Native Git hook entry points. The Git hooks dispatch here and fail closed without the engine.
 //!
 //!   mdr-kernel hook pre-commit
 //!   mdr-kernel hook prepare-commit-msg <message-file>
@@ -9,7 +6,7 @@
 //!   mdr-kernel install            copy this binary to <repo>/bin, where the hooks find it
 
 use crate::fingerprint::{compiler_input, digest};
-use crate::git::{common_top, git, lossy, names, pwsh_to_stderr, top};
+use crate::git::{common_top, git, lossy, names, top};
 use regex::Regex;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -35,7 +32,7 @@ fn git_ok(dir: &Path, args: &[&str]) -> Result<bool, String> {
         .map_err(|e| format!("required utility 'git' is unavailable ({e})"))
 }
 
-/// The lock check or heartbeat, in process: the same code `bin/state-lock.ps1` hands off to.
+/// The lock check or heartbeat, in process: the same code `mdr-kernel state-lock` hands off to.
 pub(crate) fn lock_port(root: &Path, argv: &[&str]) -> Result<crate::state_lock::Report, String> {
     let mut all: Vec<String> = argv.iter().map(|a| a.to_string()).collect();
     all.extend(["-Root".to_string(), root.to_string_lossy().into_owned()]);
@@ -73,7 +70,7 @@ pub fn fresh(root: &Path) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "bin/mdr-kernel was built from different native/ sources than the staged ones.\n  Rebuild and reinstall it: {REBUILD}\n  (or set MDR_ENGINE=legacy to use the shell and PowerShell gates)"
+        "bin/mdr-kernel was built from different native/ sources than the staged ones.\n  Rebuild and reinstall it: {REBUILD}"
     ))
 }
 
@@ -287,22 +284,25 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
     {
         return Ok(block(&[
             "X mdr-kernel pre-commit: the STAGED contract/door set is internally drifted.".into(),
-            "  Run: pwsh -NoProfile -File bin/sync-doors.ps1   then re-stage the contract AND every door together.".into(),
+            "  Run: mdr-kernel sync-doors   then re-stage the contract AND every door together."
+                .into(),
         ]));
     }
     // 4) write approval for new live reference/skill files
     if let Err(said) = crate::approval::validate_staged(root) {
         return Ok(block(&[
             format!("X mdr-kernel pre-commit: {}", said.trim_end()),
-            "  Use: pwsh -NoProfile -File bin/write-approval.ps1 -Propose ... then -Approve ...".into(),
+            "  Use: mdr-kernel write-approval -Propose ... then -Approve ...".into(),
             "  The approve entry must be staged in inbox/write-approval-audit.jsonl with the new file.".into(),
         ]));
     }
     // 5) coordination files require STATE.lock, explicit identity and the session token
     let policy = coordination_paths(root)?;
-    let staged_coord: Vec<String> = staged_paths(root)?
-        .into_iter()
+    let staged = staged_paths(root)?;
+    let staged_coord: Vec<String> = staged
+        .iter()
         .filter(|p| policy.contains(p))
+        .cloned()
         .collect();
     let lock_path = common_top(root)
         .filter(|p| p.is_dir())
@@ -328,7 +328,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
         if !lock.exists {
             let mut lines = vec![
                 "X mdr-kernel pre-commit: coordination files are staged but STATE.lock is not held.".to_string(),
-                "  Acquire it first: pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<model-id>'".into(),
+                "  Acquire it first: mdr-kernel state-lock -Acquire -Model '<model-id>'".into(),
                 "  Staged coordination files:".into(),
             ];
             lines.extend(indent(&staged_coord));
@@ -352,7 +352,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
         if !token_ok {
             return Ok(block(&[
                 "X mdr-kernel pre-commit: coordination files are staged but BRAIN_LOCK_TOKEN does not match STATE.lock.".into(),
-                "  Use the token printed by bin/state-lock.ps1 -Acquire, or wait for the holder to release the lock.".into(),
+                "  Use the token printed by mdr-kernel state-lock -Acquire, or wait for the holder to release the lock.".into(),
             ]));
         }
         let owner = lock_port(root, &["-CheckOwner", "-Model", &model])?;
@@ -362,6 +362,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
             return Ok(1);
         }
     }
+    crate::staged::check_gates(root, &staged)?;
     // Decision authority uses index bytes and HEAD history.
     if git_ok(root, &["cat-file", "-e", ":DECISIONS.md"])?
         || git_ok(root, &["cat-file", "-e", "HEAD:DECISIONS.md"])?
@@ -382,15 +383,6 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
             return Ok(1);
         }
     }
-    // Staged suites run from index bytes; the runner itself runs from the working tree.
-    if !git_ok(root, &["diff", "--quiet", "--", "bin/test-staged.ps1"])? {
-        eprintln!("X mdr-kernel pre-commit: bin/test-staged.ps1 differs from its staged copy; stage or restore it first.");
-        return Ok(1);
-    }
-    if !pwsh_to_stderr(root, "test-staged.ps1", &[])? {
-        eprintln!("X mdr-kernel pre-commit: staged regression checks failed.");
-        return Ok(1);
-    }
     // 5b) Markdown envelope length, from the staged blobs
     let envelope = crate::envelope::staged(root)?;
     if !envelope.is_empty() {
@@ -402,6 +394,7 @@ fn pre_commit(root: &Path) -> Result<i32, String> {
             "  Move provenance, approvals, evidence and caveats into the body (reference/markdown-system-node-standard.md).".into(),
         ]));
     }
+    crate::staged::run_suites(root, &staged)?;
     // 6) commit-driven heartbeat for the verified holder; never blocks
     if lock.exists && !model.is_empty() && lock.holder == model && token_ok {
         let _ = lock_port(root, &["-Heartbeat"]);

@@ -1,9 +1,8 @@
 #!/bin/sh
-# POSIX twin of setup-private.ps1.
-dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if command -v pwsh >/dev/null 2>&1; then
-  exec pwsh -NoProfile -File "$dir/setup-private.ps1" "$@"
-else
-  echo "setup-private: PowerShell (pwsh) not found on PATH" >&2
-  exit 127
-fi
+dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+for engine in "$dir/mdr-kernel.exe" "$dir/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" setup-private "$@"; fi
+done
+if command -v mdr-kernel >/dev/null 2>&1; then exec mdr-kernel setup-private "$@"; fi
+echo 'mdr-kernel: install the native binary.' >&2
+exit 127

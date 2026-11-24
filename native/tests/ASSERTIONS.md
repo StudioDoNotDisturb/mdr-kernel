@@ -35,7 +35,7 @@ The node-map script has 13 named assertions. The engine-mode rerun emitted 13 as
 | empty lock never proves ownership | `lock_proof_and_recovery` |
 | unreadable lock can be recovered only by explicit evidence | `lock_proof_and_recovery` |
 | pre-commit fails closed when a required utility is absent | `hook_fails_closed_without_git_or_policy` |
-| pre-commit specifically refuses unavailable PowerShell | Retired. The old hook required a PowerShell interpreter. The release hook requires the binary. |
+| pre-commit specifically refuses unavailable PowerShell | Retired. The interpreter is no longer required. `git_hook_refuses_when_no_binary_is_installed` tests the native replacement requirement. |
 | pre-commit fails closed when a gate helper is absent | `hook_fails_closed_without_git_or_policy` |
 | config-only attribution refuses without modifying the message | `hook_attribution` |
 | explicit session identity adds exactly one trailer | `hook_attribution` |

@@ -19,9 +19,9 @@ Context: Use when writing a handoff and you want a worked example of the expecte
   triggers (`redeploy`, `container restart`, `stuck deploy`), one trap counting the "restart the
   service from the dashboard instead of rebuilding the image" mistake (`times_recurred: 2`).
 - Wired the tool-time banner into `bin/deploy.sh` so it prints the gate header at invocation via
-  `bin/brain-recall.ps1 -GateId DEPLOY-CONTAINER -Header`.
+  `mdr-kernel brain-recall -GateId DEPLOY-CONTAINER -Header`.
 - Recorded the choice as a `DECISIONS.md` entry (newest on top).
-- Verified the gate matches: `bin/prepare-work.ps1 -Objective 'the deploy is stuck again'` returned
+- Verified the gate matches: `mdr-kernel prepare-work -Objective 'the deploy is stuck again'` returned
   `RECALL_STATUS=MATCHED` and listed the trap and required reads.
 
 ## Current state
@@ -44,20 +44,20 @@ the gate wiring and its self-test. This matches the "Active work" row in STATE.m
 
 ## Operational continuity
 
-- Last successful diagnostic command + timestamp: `bin/brain-doctor.ps1` → ok, 2026-01-15 16:40.
+- Last successful diagnostic command + timestamp: `mdr-kernel doctor` → ok, 2026-01-15 16:40.
 - Connection state (network / auth / service): n/a — no external service touched.
 - Runtime/deploy method and current version: `bin/deploy.sh` (image rebuild path); not run this
   session.
 - Live-verified vs. only staged/built: gate wiring committed and self-tested; deploy path not
   re-run.
-- Exact resume command or UI path: `pwsh -NoProfile -File bin/start-session.ps1 -Model <id>`.
+- Exact resume command or UI path: `mdr-kernel start-session -Model <id>`.
 - Operator-only step still required: none.
 
 ## Next actions
 
 - [ ] On the next real deploy, follow the gate's right-move (rebuild image) and confirm the banner
       printed at invocation.
-- [ ] If the trap recurs, run `bin/brain-recall.ps1 -Increment <trapId>` and add a tighter surfacing
+- [ ] If the trap recurs, run `mdr-kernel brain-recall -Increment <trapId>` and add a tighter surfacing
       point in `bin/deploy.sh`.
 - [ ] Add a second domain gate only when a second domain has actually failed twice — do not
       pre-invent gates.

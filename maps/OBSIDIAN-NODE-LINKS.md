@@ -4,11 +4,11 @@ Context: Generated Markdown-link bridge that lets Markdown tools see mdr-kernel 
 
 # Obsidian Node Links
 
-Generated from `maps/node-map.json` by `bin/update-node-map.ps1`. Do not hand-edit.
+Generated from `maps/node-map.json` by `mdr-kernel update-node-map`. Do not hand-edit.
 
 This file gives Markdown graph tools real links for the node map. The source files remain canonical; this generated bridge exists so graph views, backlinks, and outgoing links can see the retrieval structure.
 
-generatedUtc: 2026-11-23T14:28:13.0106344Z
+generatedUtc: 2026-11-24T04:36:35.8275122Z
 
 ## [_templates/handoff-example.md](../_templates/handoff-example.md)
 
@@ -54,7 +54,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Phase-Zero Agent Front Door
 - Context: Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.
 - Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
-- Related Workflows: [README.md](../README.md), [bin/setup-private.ps1](../bin/setup-private.ps1), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- Related Workflows: [README.md](../README.md), [native/src/onboard.rs](../native/src/onboard.rs), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [CHANGELOG.md](../CHANGELOG.md)
@@ -72,7 +72,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Phase-Zero Agent Front Door
 - Context: Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.
 - Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
-- Related Workflows: [README.md](../README.md), [bin/setup-private.ps1](../bin/setup-private.ps1), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- Related Workflows: [README.md](../README.md), [native/src/onboard.rs](../native/src/onboard.rs), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [CONTRIBUTING.md](../CONTRIBUTING.md)
@@ -81,7 +81,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Public Contribution Guide
 - Context: Explains how to report cold-clone issues, portability gaps, and useful adaptations.
 - Next Sequential File: [README.md](../README.md)
-- Related Workflows: [README.md](../README.md), [docs/brand-manual.md](../docs/brand-manual.md), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md), [bin/brain-doctor.ps1](../bin/brain-doctor.ps1)
+- Related Workflows: [README.md](../README.md), [docs/brand-manual.md](../docs/brand-manual.md), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md), [native/src/doctor.rs](../native/src/doctor.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/adoption-guide.md](../docs/adoption-guide.md)
@@ -90,7 +90,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Operator Guide / First System Setup
 - Context: Practical path for turning an existing messy workspace into an mdr-kernel memory without importing chaos.
 - Next Sequential File: [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md)
-- Related Workflows: [protocol/RUNBOOK.md](../protocol/RUNBOOK.md), [_templates/skill-template.md](../_templates/skill-template.md), [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- Related Workflows: [protocol/RUNBOOK.md](../protocol/RUNBOOK.md), [_templates/skill-template.md](../_templates/skill-template.md), [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md), [native/src/node_map.rs](../native/src/node_map.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/brand-manual.md](../docs/brand-manual.md)
@@ -99,7 +99,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Public Style Guide / Brand Manual
 - Context: Use when writing public-facing docs, UX copy, terminal output or visual assets for mdr-kernel; it is the authoritative style.
 - Next Sequential File: [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md)
-- Related Workflows: [README.md](../README.md), [FLOOR-GUIDE.md](../FLOOR-GUIDE.md), [bin/brain-doctor.ps1](../bin/brain-doctor.ps1), [bin/waffle-party.ps1](../bin/waffle-party.ps1)
+- Related Workflows: [README.md](../README.md), [FLOOR-GUIDE.md](../FLOOR-GUIDE.md), [native/src/doctor.rs](../native/src/doctor.rs), [native/src/main.rs](../native/src/main.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/decision-authority.md](../docs/decision-authority.md)
@@ -108,7 +108,16 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Operator Guide / Decision Integrity
 - Context: Exactly what the decision tools do: proposals, quoted rulings, human ratification, compiled recall, the hashing rule and explicit migration of an existing log.
 - Next Sequential File: [docs/upgrading.md](../docs/upgrading.md)
-- Related Workflows: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/add-decision.ps1](../bin/add-decision.ps1), [bin/check-decision-history.ps1](../bin/check-decision-history.ps1), [bin/build-rulings.ps1](../bin/build-rulings.ps1), [bin/ratify-decision.ps1](../bin/ratify-decision.ps1), [bin/initialize-decision-authority.ps1](../bin/initialize-decision-authority.ps1)
+- Related Workflows: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [native/src/decisions.rs](../native/src/decisions.rs)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [docs/document-lifecycle.md](../docs/document-lifecycle.md)
+
+- Title: [Living] Document lifecycle
+- Type: Workflow Guide
+- Context: Use when promoting working notes, retiring records, or moving an eligible document into the archive.
+- Next Sequential File: [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
+- Related Workflows: [native/src/lifecycle.rs](../native/src/lifecycle.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md)
@@ -117,7 +126,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Operator Guide / Link-Health Workflow
 - Context: Shows how the generated node map checks link health and where reading selection actually comes from.
 - Next Sequential File: [specs/node-map.md](../specs/node-map.md)
-- Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [bin/update-node-map.ps1](../bin/update-node-map.ps1), [reference/INDEX.md](../reference/INDEX.md)
+- Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [native/src/node_map.rs](../native/src/node_map.rs), [reference/INDEX.md](../reference/INDEX.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/recall-hooks.md](../docs/recall-hooks.md)
@@ -126,7 +135,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Guide / Hook Integration
 - Context: Use when connecting a host's prompt event to the portable recall adapter, verifying its behavior, or falling back to explicit recall before assigned work.
 - Next Sequential File: [reference/action-recall-gates.md](../reference/action-recall-gates.md)
-- Related Workflows: [bin/brain-recall.ps1](../bin/brain-recall.ps1), [bin/hook-recall.ps1](../bin/hook-recall.ps1), [bin/prepare-work.ps1](../bin/prepare-work.ps1), [tests/recall.ps1](../tests/recall.ps1)
+- Related Workflows: [native/src/recall.rs](../native/src/recall.rs), [native/tests/ASSERTIONS.md](../native/tests/ASSERTIONS.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [docs/upgrading.md](../docs/upgrading.md)
@@ -153,7 +162,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Public Reference / Themed Glossary
 - Context: Defines the contained workplace metaphor used by mdr-kernel and maps each themed alias to its real mechanism.
 - Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
-- Related Workflows: [README.md](../README.md), [docs/brand-manual.md](../docs/brand-manual.md), [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/brain-recall.ps1](../bin/brain-recall.ps1)
+- Related Workflows: [README.md](../README.md), [docs/brand-manual.md](../docs/brand-manual.md), [protocol/CONTRACT.md](../protocol/CONTRACT.md), [native/src/recall.rs](../native/src/recall.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [GEMINI.md](../GEMINI.md)
@@ -162,7 +171,16 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Phase-Zero Agent Front Door
 - Context: Pre-setup instructions for an agent opened in a fresh clone; setup regenerates this file into the full contract door.
 - Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
-- Related Workflows: [README.md](../README.md), [bin/setup-private.ps1](../bin/setup-private.ps1), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- Related Workflows: [README.md](../README.md), [native/src/onboard.rs](../native/src/onboard.rs), [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+
+## [native/tests/ASSERTIONS.md](../native/tests/ASSERTIONS.md)
+
+- Title: [Living] Kernel regression assertion map
+- Type: Test reference
+- Context: Use when tracing a legacy suite assertion to its native Cargo test.
+- Next Sequential File: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
+- Related Workflows: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [protocol/CONTRACT.md](../protocol/CONTRACT.md)
@@ -171,7 +189,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Canonical Contract / Model Door Source
 - Context: Canonical contract source that generates the model front doors and defines participation rules.
 - Next Sequential File: [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
-- Related Workflows: [bin/sync-doors.ps1](../bin/sync-doors.ps1), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
+- Related Workflows: [native/src/doors.rs](../native/src/doors.rs), [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [protocol/RUNBOOK.md](../protocol/RUNBOOK.md)
@@ -180,7 +198,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Operator Runbook / Session Workflow
 - Context: Human-facing session startup, closeout, lock, and participant workflow guide.
 - Next Sequential File: [docs/adoption-guide.md](../docs/adoption-guide.md)
-- Related Workflows: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [docs/adoption-guide.md](../docs/adoption-guide.md), [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md), [docs/brand-manual.md](../docs/brand-manual.md), [bin/start-session.ps1](../bin/start-session.ps1), [bin/close-session.ps1](../bin/close-session.ps1)
+- Related Workflows: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [docs/adoption-guide.md](../docs/adoption-guide.md), [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md), [docs/brand-manual.md](../docs/brand-manual.md), [native/src/session.rs](../native/src/session.rs), [native/src/close.rs](../native/src/close.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [PUBLIC-EXPORT-AUDIT.md](../PUBLIC-EXPORT-AUDIT.md)
@@ -207,7 +225,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Reference / Active-Recall Protocol
 - Context: How to author and maintain objective-time recall gates so an agent surfaces recurrence-counted prior traps before acting.
 - Next Sequential File: [reference/INDEX.md](../reference/INDEX.md)
-- Related Workflows: [protocol/recall-gates.example.json](../protocol/recall-gates.example.json), [bin/brain-recall.ps1](../bin/brain-recall.ps1), [docs/recall-hooks.md](../docs/recall-hooks.md), [specs/brain-active-recall.md](../specs/brain-active-recall.md)
+- Related Workflows: [protocol/recall-gates.example.json](../protocol/recall-gates.example.json), [native/src/recall.rs](../native/src/recall.rs), [docs/recall-hooks.md](../docs/recall-hooks.md), [specs/brain-active-recall.md](../specs/brain-active-recall.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [reference/INDEX.md](../reference/INDEX.md)
@@ -225,7 +243,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Documentation Standard / Retrieval Envelope
 - Context: Defines the required AI-crawlable header and terminal node block for tracked Markdown in an mdr-kernel repo.
 - Next Sequential File: [reference/INDEX.md](../reference/INDEX.md)
-- Related Workflows: [_templates/markdown-file-template.md](../_templates/markdown-file-template.md), [_templates/handoff-template.md](../_templates/handoff-template.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- Related Workflows: [_templates/markdown-file-template.md](../_templates/markdown-file-template.md), [_templates/handoff-template.md](../_templates/handoff-template.md), [native/src/node_map.rs](../native/src/node_map.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [SECURITY.md](../SECURITY.md)
@@ -234,7 +252,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Security Policy
 - Context: How to report a vulnerability or a bug that could leak private memory content, privately and before public disclosure.
 - Next Sequential File: [CONTRIBUTING.md](../CONTRIBUTING.md)
-- Related Workflows: [CONTRIBUTING.md](../CONTRIBUTING.md), [README.md](../README.md), [bin/remote-privacy.ps1](../bin/remote-privacy.ps1), [tests/remote-privacy-unit.ps1](../tests/remote-privacy-unit.ps1)
+- Related Workflows: [CONTRIBUTING.md](../CONTRIBUTING.md), [README.md](../README.md), [native/src/remote_privacy.rs](../native/src/remote_privacy.rs), [native/tests/ASSERTIONS.md](../native/tests/ASSERTIONS.md)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ## [skills/mdr-kernel/SKILL.md](../skills/mdr-kernel/SKILL.md)
@@ -253,7 +271,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Context: Use when changing or explaining the objective-time recall gate: why storing knowledge is not enough, what a valid fix must satisfy and how the gate works (STATE.md and DECISIONS.md win for live status).
 - Next Sequential File: [specs/INDEX.md](../specs/INDEX.md)
 - Related Workflows: [specs/brain-architecture.md](../specs/brain-architecture.md), [STATE.md](../STATE.md), [DECISIONS.md](../DECISIONS.md), [reference/action-recall-gates.md](../reference/action-recall-gates.md)
-- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [native/src/node_map.rs](../native/src/node_map.rs)
 
 ## [specs/brain-architecture.md](../specs/brain-architecture.md)
 
@@ -262,7 +280,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Context: Use when you need the design rationale of the shared-memory kernel (invariant, surfaces, guardrails, residual failure modes); verify live status against STATE.md and DECISIONS.md before acting.
 - Next Sequential File: [specs/INDEX.md](../specs/INDEX.md)
 - Related Workflows: [specs/brain-active-recall.md](../specs/brain-active-recall.md), [STATE.md](../STATE.md), [DECISIONS.md](../DECISIONS.md)
-- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md), [native/src/node_map.rs](../native/src/node_map.rs)
 
 ## [specs/INDEX.md](../specs/INDEX.md)
 
@@ -279,7 +297,7 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 - Type: Spec / Link-Health Contract
 - Context: Defines the generated node-map subsystem that keeps mdr-kernel link health small, inspectable, and accurate.
 - Next Sequential File: [CONTRIBUTING.md](../CONTRIBUTING.md)
-- Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [maps/NODE-MAP.md](../maps/NODE-MAP.md), [maps/node-map.json](../maps/node-map.json), [bin/update-node-map.ps1](../bin/update-node-map.ps1)
+- Related Workflows: [maps/node-roots.json](../maps/node-roots.json), [maps/NODE-MAP.md](../maps/NODE-MAP.md), [maps/node-map.json](../maps/node-map.json), [native/src/node_map.rs](../native/src/node_map.rs)
 - AI Execution Prompts: [protocol/CONTRACT.md](../protocol/CONTRACT.md)
 
 ---
@@ -289,4 +307,4 @@ generatedUtc: 2026-11-23T14:28:13.0106344Z
 Directory Path: maps/
 Next Sequential File: maps/NODE-MAP.md
 Related Workflows: maps/node-map.json, maps/node-roots.json, specs/node-map.md, docs/node-map-usage-guide.md
-AI Execution Prompts: bin/update-node-map.ps1
+AI Execution Prompts: native/src/node_map.rs

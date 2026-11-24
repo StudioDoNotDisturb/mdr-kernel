@@ -10,7 +10,7 @@ reading router: `STATE.md` plus `reference/INDEX.md` choose what an agent reads 
 
 ## Agent workflow
 
-At startup, the model reads the `STATE.md` that `bin/start-session.ps1` prints. When assigned
+At startup, the model reads the `STATE.md` that `mdr-kernel start-session` prints. When assigned
 work, it uses `STATE.md` plus `reference/INDEX.md` to pick the smallest relevant file set, states
 that selection, and expands only when the first slice proves insufficient.
 
@@ -35,8 +35,8 @@ envelopes, or a missing node — not to decide what to read.
 After changing Markdown structure, regenerate the map:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
-pwsh -NoProfile -File bin/update-node-map.ps1 -Check
+mdr-kernel update-node-map
+mdr-kernel update-node-map -Check
 ```
 
 `brain-doctor` runs the same parity check: it warns when tracked Markdown, JSON, the readable map,
@@ -78,5 +78,5 @@ guaranteed ratio, and not as a reason to route through the map: selection now st
 
 Directory Path: docs/
 Next Sequential File: ../specs/node-map.md
-Related Workflows: ../maps/node-roots.json, ../bin/update-node-map.ps1, ../reference/INDEX.md
+Related Workflows: ../maps/node-roots.json, ../native/src/node_map.rs, ../reference/INDEX.md
 AI Execution Prompts: ../protocol/CONTRACT.md

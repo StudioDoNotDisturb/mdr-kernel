@@ -26,7 +26,7 @@ Do not hide this information in prose. The envelope is a label, not a summary:
 - Provenance, bylines, approval quotes, evidence lists, dates and caveats go in the body, e.g. an
   `> **About this file:** ...` note under the H1.
 
-`.githooks/pre-commit` runs `bin/envelope-check.ps1 -Staged` and blocks any staged `.md` over these
+`.githooks/pre-commit` runs `mdr-kernel envelope staged` and blocks any staged `.md` over these
 limits (a ratchet: older files are fixed when next touched, and the doctor reports the remaining
 count). Generators and templates that write an envelope must produce compliant values.
 
@@ -65,12 +65,12 @@ Use paths that another agent can resolve from the repo root. Prefer explicit fil
 references.
 
 Plain path values are valid and easiest for local and frontier models to parse. If a node field
-uses Markdown links (`[STATE](STATE.md)`) or wikilinks (`[[STATE]]`), `bin/update-node-map.ps1`
+uses Markdown links (`[STATE](STATE.md)`) or wikilinks (`[[STATE]]`), `mdr-kernel update-node-map`
 normalizes them back to the same path values for node-map checks. After node edits, regenerate the
 map so the link-health evidence and any graph view stay accurate:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
+mdr-kernel update-node-map
 ```
 
 ## Scope
@@ -103,5 +103,5 @@ come from `protocol/CONTRACT.md`.
 
 Directory Path: reference/
 Next Sequential File: reference/INDEX.md
-Related Workflows: _templates/markdown-file-template.md, _templates/handoff-template.md, bin/update-node-map.ps1
+Related Workflows: _templates/markdown-file-template.md, _templates/handoff-template.md, native/src/node_map.rs
 AI Execution Prompts: protocol/CONTRACT.md

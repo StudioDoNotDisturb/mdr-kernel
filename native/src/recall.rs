@@ -1,4 +1,4 @@
-//! Action-time recall. A port of `bin/brain-recall.ps1`: match an objective against
+//! Action-time recall. A port of `mdr-kernel brain-recall`: match an objective against
 //! `protocol/recall-gates.json` and print the required reads, recurrence-counted traps, stop signs
 //! and cited rulings before a model acts. Also `-CheckGates`, `-Ruling`, `-Increment`, `-Json`,
 //! `-Brief`, `-Header` and `-Quiet`, with the same exit codes (2 = BLOCKED).
@@ -229,18 +229,26 @@ fn validate(data: &Value) -> Result<(), String> {
 /// Read and validate the gate document. `Err` carries the BLOCKED reason.
 pub fn load(path: &Path) -> Result<Value, &'static str> {
     if !path.exists() {
-        return Err("missing-gate-data (run bin/bootstrap-clone.ps1)");
+        return Err("missing-gate-data (run mdr-kernel bootstrap-clone)");
     }
-    const INVALID: &str =
-        "invalid-gate-data (check v1 field types, unique IDs, arrays and nonnegative counts)";
-    // Parse errors can echo document contents: report a stable code, never the data.
     if std::fs::metadata(path).map_or(true, |m| m.len() > 2_097_152) {
-        return Err(INVALID);
+        return Err(INVALID_GATES);
     }
-    let data: Value = read_text(path)
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .ok_or(INVALID)?;
-    validate(&data).map_err(|_| INVALID)?;
+    parse_gates(&std::fs::read(path).map_err(|_| INVALID_GATES)?)
+}
+
+const INVALID_GATES: &str =
+    "invalid-gate-data (check v1 field types, unique IDs, arrays and nonnegative counts)";
+
+pub fn parse_gates(bytes: &[u8]) -> Result<Value, &'static str> {
+    // Parse errors can echo document contents. Report a stable code, never the data.
+    if bytes.len() > 2_097_152 {
+        return Err(INVALID_GATES);
+    }
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    let data: Value =
+        serde_json::from_str(&String::from_utf8_lossy(bytes)).map_err(|_| INVALID_GATES)?;
+    validate(&data).map_err(|_| INVALID_GATES)?;
     Ok(data)
 }
 
@@ -426,11 +434,9 @@ fn run_seen(
     if ruling.is_some() || cites {
         match load_rulings(root, &data) {
             Ok(r) => rulings = r,
-            Err(()) => {
-                return blocked(
-                    "invalid-rulings (run bin/build-rulings.ps1 -Check and repair before acting)",
-                )
-            }
+            Err(()) => return blocked(
+                "invalid-rulings (run mdr-kernel build-rulings -Check and repair before acting)",
+            ),
         }
     }
     if let Some(query) = ruling {
@@ -608,7 +614,7 @@ fn brief(matched: &[Matched], seen: &HashSet<String>) -> Result<(String, Vec<Str
         }
         lines.push(line);
     }
-    lines.push("For EACH gate ID: pwsh -NoProfile -File bin/brain-recall.ps1 -GateId <ID>".into());
+    lines.push("For EACH gate ID: mdr-kernel brain-recall -GateId <ID>".into());
     lines.push("NEEDS_READ=Full output has all traps, rulings and required reads; this reminder is not write authorization.".into());
     let mut banner = lines.join("\n");
     if units(&banner) > BRIEF_BUDGET {
@@ -775,7 +781,7 @@ fn header(matched: &[Matched]) -> String {
         }
         let _ = writeln!(
             out,
-            "  full: pwsh -NoProfile -File bin/brain-recall.ps1 -GateId {id} -Objective '(tool)'"
+            "  full: mdr-kernel brain-recall -GateId {id} -Objective '(tool)'"
         );
         let _ = writeln!(out, "##### END KNOWN TRAPS [{id}] #####");
     }
@@ -896,7 +902,7 @@ fn hook_wire(context: &str) -> String {
 }
 
 fn hook_degraded(reason: &str) -> String {
-    hook_wire(&format!("RECALL_HOOK_STATUS=DEGRADED reason={reason}; automatic recall was not evaluated. Before acting run pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>' (or pipe the complete objective with -FromStdin)."))
+    hook_wire(&format!("RECALL_HOOK_STATUS=DEGRADED reason={reason}; automatic recall was not evaluated. Before acting run mdr-kernel prepare-work -Objective '<operator objective>' (or pipe the complete objective with -FromStdin)."))
 }
 
 /// PowerShell property access ignores case: `$payload.user_input` also reads `User_Input`.

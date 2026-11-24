@@ -8,7 +8,7 @@ description: >
   an existing messy workspace, creating a first STATE/handoff/recall gate, or deciding where a
   workflow belongs. Do not use for ordinary coding once the repo has already routed the task to
   a project-specific file set.
-compatibility: Requires repo access, git, PowerShell 7+, and write permission on the clone.
+compatibility: Requires repo access, Git, the installed mdr-kernel binary, and write permission on the clone.
 metadata:
   mdr_kernel:
     status: productive
@@ -49,7 +49,7 @@ metadata:
    adopter entry point — never raw bootstrap:
 
 ```powershell
-pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
+mdr-kernel setup-private -Model '<your model id>'
 ```
 
    Pass your actual model id (`-LocalOnly` for memory with no remote backup). If the clone was
@@ -58,24 +58,24 @@ pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
    explicit identity) before it writes:
 
 ```powershell
-pwsh -NoProfile -File bin/bootstrap-clone.ps1 -Model '<your model id>' -CommitScaffold
+mdr-kernel bootstrap-clone -Model '<your model id>' -CommitScaffold
 ```
 
 2. Run the canonical startup once, if the surface can execute commands:
 
 ```powershell
-pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'
+mdr-kernel start-session -Model '<your model id>'
 ```
 
 Require `STARTUP_STATUS=READY` before proceeding.
 
 3. Before acting on assigned work, run active recall. A configured prompt hook runs
-   `bin/hook-recall.ps1` automatically, but configuration is not proof that the host fired it.
+   `mdr-kernel hook-recall` automatically, but configuration is not proof that the host fired it.
    Without a verified firing receipt, or when the hook reports DEGRADED, run the portable
    fallback (see `docs/recall-hooks.md`):
 
 ```powershell
-pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'
+mdr-kernel prepare-work -Objective '<operator objective>'
 ```
 
 If a gate matches, read the listed sources before giving implementation advice.
@@ -86,7 +86,7 @@ If a gate matches, read the listed sources before giving implementation advice.
 5. If the operator is adopting existing work, follow `docs/adoption-guide.md`: inventory first,
    then bucket material into `STATE.md`, `reference/`, `specs/`, `skills/`, `handoffs/`, or
    `inbox/`. New `reference/*.md` files and new skills are gated: create them through
-   `bin/write-approval.ps1` (`-Propose` then `-Approve`) — never a direct write — and name them
+   `mdr-kernel write-approval` (`-Propose` then `-Approve`) — never a direct write — and name them
    with `-Also` at close so the file, its INDEX row, and the audit entry land in one commit.
 
 6. If a repeatable procedure is needed, start from `_templates/skill-template.md` and create:
@@ -102,34 +102,34 @@ skills/<skill-name>/evals/trigger-queries.json
 8. For coordination-file edits, set `BRAIN_MODEL`, acquire `STATE.lock`, and carry the printed
    token as `BRAIN_LOCK_TOKEN`; if another session holds the lock, write a standalone handoff or
    inbox note instead. A stale heartbeat is not proof that the holder is gone. New decisions go
-   through `bin/add-decision.ps1` as `proposed` unless you can quote the operator's ruling.
+   through `mdr-kernel add-decision` as `proposed` unless you can quote the operator's ruling.
 
 9. Regenerate the node map after Markdown structure changes:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
-pwsh -NoProfile -File bin/update-node-map.ps1 -Check
+mdr-kernel update-node-map
+mdr-kernel update-node-map -Check
 ```
 
 ## Gotchas
 
 - Do not import a whole messy workspace. Point to large or private material from reference notes.
 - Do not turn every preference into a skill. Skills are for repeatable procedures with triggers.
-- Do not ask a new user to install every tool in someone else's setup. Git and PowerShell are the
+- Do not ask a new user to install every tool in someone else's setup. Git and the native binary are the
   load-bearing requirements; other tools are added when the user's work proves they are needed.
 - A clean doctor is necessary but not sufficient. The user still needs a real `STATE.md`.
 - If recall matches a gate, read the listed sources before giving implementation advice.
 - Every commit needs `BRAIN_MODEL` or an explicit `Brain-Model:` trailer; `git config
   brain.model` is display-only and the commit-message hook refuses a commit without either.
-- Never run `bin/ratify-decision.ps1`; ratification is the human operator's act.
+- Never run `mdr-kernel ratify-decision`; ratification is the human operator's act.
 
 ## Verification
 
-- `bin/setup-private.ps1 -Model '<actual model id>'` works in a fresh private clone (and
-  `bin/bootstrap-clone.ps1 ... -CommitScaffold` repairs an already-set-up one).
-- `bin/start-session.ps1 -Model '<actual model id>'` reaches `STARTUP_STATUS=READY`.
-- `bin/prepare-work.ps1 -Objective '<objective>'` prints useful traps for the example or newly
-  created gate, and `bin/brain-recall.ps1 -CheckGates` accepts the gate file.
+- `mdr-kernel setup-private -Model '<actual model id>'` works in a fresh private clone (and
+  `mdr-kernel bootstrap-clone ... -CommitScaffold` repairs an already-set-up one).
+- `mdr-kernel start-session -Model '<actual model id>'` reaches `STARTUP_STATUS=READY`.
+- `mdr-kernel prepare-work -Objective '<objective>'` prints useful traps for the example or newly
+  created gate, and `mdr-kernel brain-recall -CheckGates` accepts the gate file.
 - The node map check passes.
 - The repo has no secret-shaped strings and no private operational paths.
 

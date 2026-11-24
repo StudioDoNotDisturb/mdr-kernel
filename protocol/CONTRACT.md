@@ -6,12 +6,12 @@ Context: Canonical contract source that generates the model front doors and defi
 
 _Status: active - This file is the **single source**. The contract block between the markers below
 is generated into the model-facing doors (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) by
-`bin/sync-doors.ps1`. **Edit it here, then run sync.** A pre-commit check blocks commits where a
+`mdr-kernel sync-doors`. **Edit it here, then run sync.** A pre-commit check blocks commits where a
 door has drifted from this source._
 
 <!-- BEGIN BRAIN-CONTRACT v2 -->
 <!-- Canonical source: protocol/CONTRACT.md. In the front-door files this block is generated -
-     edit the source and run bin/sync-doors.ps1; do not edit the generated copies. -->
+     edit the source and run mdr-kernel sync-doors; do not edit the generated copies. -->
 
 ## mdr-kernel contract - every model follows this
 
@@ -21,26 +21,26 @@ never a model's private memory.** Hooks and scripts enforce most rules: when one
 recall banner appears, read it and do what it says. Rule specifics: `protocol/CONTRACT.md`
 § Rule detail. Procedures: `protocol/RUNBOOK.md`.
 
-**Start:** run `pwsh -NoProfile -File bin/start-session.ps1 -Model '<actual model id>'`. It runs
+**Start:** run `mdr-kernel start-session -Model '<actual model id>'`. It runs
 the doctor, pulls, and prints `STATE.md`. Never rebuild those steps from memory. Resolve every
 `NOTE=`, and write nothing until `STARTUP_STATUS=READY`. `STATE.md` is live truth: when another
-doc disagrees, STATE wins, and you fix the other doc. With no PowerShell or no writable clone,
+doc disagrees, STATE wins, and you fix the other doc. Without the native binary or a writable clone,
 you are not a full participant: read `STATE.md` and return an inbox-ready note.
 
 **Never:**
 - Put a secret value in a tracked file. Keep secrets outside the repo and reference them by name.
 - Treat your own choice as a ruling. **Only the operator's rulings bind.** Add decisions only
-  with `bin/add-decision.ps1`. Only the human runs `bin/ratify-decision.ps1`, in their own
+  with `mdr-kernel add-decision`. Only the human runs `mdr-kernel ratify-decision`, in their own
   terminal.
 - Edit a file listed in `protocol/coordination-files.txt` without holding `STATE.lock` yourself
-  (`bin/state-lock.ps1`; RUNBOOK § Lock rules), or force-recover another session's lock
+  (`mdr-kernel state-lock`; RUNBOOK § Lock rules), or force-recover another session's lock
   without independent evidence or the operator's direction. The lock is machine-local: two
   clones never share it, so keep sessions on different clones sequential.
 
 **While working:**
-- **Run recall before acting on assigned work.** A prompt hook runs `bin/hook-recall.ps1` only
+- **Run recall before acting on assigned work.** A prompt hook runs `mdr-kernel hook-recall` only
   if you configured one (`docs/recall-hooks.md`). Without a hook you have seen fire, run
-  `bin/prepare-work.ps1 -Objective '<operator objective>'`, which calls `bin/brain-recall.ps1`.
+  `mdr-kernel prepare-work -Objective '<operator objective>'`, which calls `mdr-kernel brain-recall`.
   When gates match, read their sources, state the traps and their counts, and say how they
   change your next step.
 - **Walk the least-code ladder before writing any code.** Go in order and stop at the first rung
@@ -59,7 +59,7 @@ you are not a full participant: read `STATE.md` and return an inbox-ready note.
   `handoffs/INDEX.md` or large logs into the conversation.
 
 **Close:** update `STATE.md` and write your handoff, then run
-`pwsh -NoProfile -File bin/close-session.ps1 -Topic <topic> -Model '<model-id>'`. It checks both,
+`mdr-kernel close-session -Topic <topic> -Model '<model-id>'`. It checks both,
 regenerates `maps/NODE-MAP.md`, commits, pushes when the memory has a private remote, and
 releases the lock.
 <!-- END BRAIN-CONTRACT -->
@@ -73,7 +73,7 @@ full explanation of each one lives in the file listed here. Read it when the rul
 
 | Rule | Full explanation |
 |---|---|
-| Startup, the reading slice, the report after startup | `protocol/RUNBOOK.md` § Full-participant kickoff; `bin/start-session.ps1` prints the reporting rule at the end of every startup |
+| Startup, the reading slice, the report after startup | `protocol/RUNBOOK.md` § Full-participant kickoff; `mdr-kernel start-session` prints the reporting rule at the end of every startup |
 | Recall gates, hooks and the manual fallback | `docs/recall-hooks.md`; gate format in `protocol/recall-gates.example.json` |
 | Decisions: proposals, rulings, Supersedes/Retires stamps, ratification, migrating an older log | `docs/decision-authority.md` |
 | `STATE.lock`: acquire, session token, resume, stale heartbeat, forced recovery | `protocol/RUNBOOK.md` § Lock rules |
@@ -94,12 +94,12 @@ Two rules have no other home:
 ## Advisory variant (chat apps that can't read the repo)
 
 The block below is for surfaces that cannot read the repo, run scripts, or touch git - a web/app
-chat assistant. `bin/sync-doors.ps1` generates it into `protocol/advisory.md`; paste that into a
+chat assistant. `mdr-kernel sync-doors` generates it into `protocol/advisory.md`; paste that into a
 custom-instruction field. Edit it here, then sync.
 
 <!-- BEGIN BRAIN-ADVISORY v1 -->
 <!-- Canonical source: protocol/CONTRACT.md. Generated into protocol/advisory.md by
-     bin/sync-doors.ps1; paste into a custom-instruction field. Edit the source, not copies. -->
+     mdr-kernel sync-doors; paste into a custom-instruction field. Edit the source, not copies. -->
 
 You are an **advisory participant** in a shared project/engineering memory (also driven by CLI
 coding agents). You are running in a chat app, so you have **no access** to the repo, git, or the
@@ -121,5 +121,5 @@ local machine. Act as a planning and reasoning advisor only.
 
 Directory Path: protocol/
 Next Sequential File: RUNBOOK.md
-Related Workflows: bin/sync-doors.ps1, protocol/RUNBOOK.md
+Related Workflows: native/src/doors.rs, protocol/RUNBOOK.md
 AI Execution Prompts: protocol/CONTRACT.md

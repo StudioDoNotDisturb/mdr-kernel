@@ -1,22 +1,23 @@
 {
-  "generatedUtc": "2026-11-23T14:28:13.0106344Z",
+  "generatedUtc": "2026-11-24T04:36:35.8275122Z",
   "roots": [
     {
       "name": "mdr-kernel",
       "path": ".",
       "counts": {
-        "total": 30,
-        "strictBoth": 29,
-        "legacy": 1,
+        "total": 32,
+        "strictBoth": 30,
+        "legacy": 2,
         "partial": 0,
         "missing": 0,
-        "tracked": 30,
+        "tracked": 32,
         "untracked": 0
       },
       "topDirs": [
         "_templates",
         "(root)",
         "docs",
+        "native",
         "protocol",
         "reference",
         "skills",
@@ -175,7 +176,7 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
         ],
         "aiExecutionPrompts": [
@@ -187,7 +188,7 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
         ],
         "aiExecutionPrompts": [
@@ -247,7 +248,7 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
         ],
         "aiExecutionPrompts": [
@@ -259,7 +260,7 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
         ],
         "aiExecutionPrompts": [
@@ -285,7 +286,7 @@
           "README.md",
           "docs/brand-manual.md",
           "protocol/RUNBOOK.md",
-          "bin/brain-doctor.ps1"
+          "native/src/doctor.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -298,7 +299,7 @@
           "README.md",
           "docs/brand-manual.md",
           "protocol/RUNBOOK.md",
-          "bin/brain-doctor.ps1"
+          "native/src/doctor.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -323,7 +324,7 @@
           "../protocol/RUNBOOK.md",
           "../_templates/skill-template.md",
           "../skills/mdr-kernel/SKILL.md",
-          "../bin/update-node-map.ps1"
+          "../native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "../protocol/CONTRACT.md"
@@ -336,7 +337,7 @@
           "protocol/RUNBOOK.md",
           "_templates/skill-template.md",
           "skills/mdr-kernel/SKILL.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -360,8 +361,8 @@
         "relatedWorkflows": [
           "../README.md",
           "../FLOOR-GUIDE.md",
-          "../bin/brain-doctor.ps1",
-          "../bin/waffle-party.ps1"
+          "../native/src/doctor.rs",
+          "../native/src/main.rs"
         ],
         "aiExecutionPrompts": [
           "../protocol/CONTRACT.md"
@@ -373,8 +374,8 @@
         "relatedWorkflows": [
           "README.md",
           "FLOOR-GUIDE.md",
-          "bin/brain-doctor.ps1",
-          "bin/waffle-party.ps1"
+          "native/src/doctor.rs",
+          "native/src/main.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -397,11 +398,7 @@
         "nextSequentialFile": "upgrading.md",
         "relatedWorkflows": [
           "protocol/CONTRACT.md",
-          "bin/add-decision.ps1",
-          "bin/check-decision-history.ps1",
-          "bin/build-rulings.ps1",
-          "bin/ratify-decision.ps1",
-          "bin/initialize-decision-authority.ps1"
+          "native/src/decisions.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -412,11 +409,39 @@
         "nextSequentialFile": "docs/upgrading.md",
         "relatedWorkflows": [
           "protocol/CONTRACT.md",
-          "bin/add-decision.ps1",
-          "bin/check-decision-history.ps1",
-          "bin/build-rulings.ps1",
-          "bin/ratify-decision.ps1",
-          "bin/initialize-decision-authority.ps1"
+          "native/src/decisions.rs"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "docs/document-lifecycle.md",
+      "title": "[Living] Document lifecycle",
+      "type": "Workflow Guide",
+      "context": "Use when promoting working notes, retiring records, or moving an eligible document into the archive.",
+      "envelopeTop": "strict",
+      "nodeBlock": "legacy",
+      "links": {
+        "directoryPath": "docs/",
+        "nextSequentialFile": "../protocol/RUNBOOK.md",
+        "relatedWorkflows": [
+          "../native/src/lifecycle.rs"
+        ],
+        "aiExecutionPrompts": [
+          "../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "docs",
+        "nextSequentialFile": "protocol/RUNBOOK.md",
+        "relatedWorkflows": [
+          "native/src/lifecycle.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -439,7 +464,7 @@
         "nextSequentialFile": "../specs/node-map.md",
         "relatedWorkflows": [
           "../maps/node-roots.json",
-          "../bin/update-node-map.ps1",
+          "../native/src/node_map.rs",
           "../reference/INDEX.md"
         ],
         "aiExecutionPrompts": [
@@ -451,7 +476,7 @@
         "nextSequentialFile": "specs/node-map.md",
         "relatedWorkflows": [
           "maps/node-roots.json",
-          "bin/update-node-map.ps1",
+          "native/src/node_map.rs",
           "reference/INDEX.md"
         ],
         "aiExecutionPrompts": [
@@ -474,10 +499,8 @@
         "directoryPath": "docs/",
         "nextSequentialFile": "reference/action-recall-gates.md",
         "relatedWorkflows": [
-          "bin/brain-recall.ps1",
-          "bin/hook-recall.ps1",
-          "bin/prepare-work.ps1",
-          "tests/recall.ps1"
+          "native/src/recall.rs",
+          "native/tests/ASSERTIONS.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -487,10 +510,8 @@
         "directoryPath": "docs",
         "nextSequentialFile": "reference/action-recall-gates.md",
         "relatedWorkflows": [
-          "bin/brain-recall.ps1",
-          "bin/hook-recall.ps1",
-          "bin/prepare-work.ps1",
-          "tests/recall.ps1"
+          "native/src/recall.rs",
+          "native/tests/ASSERTIONS.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -591,7 +612,7 @@
           "README.md",
           "docs/brand-manual.md",
           "protocol/CONTRACT.md",
-          "bin/brain-recall.ps1"
+          "native/src/recall.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -604,7 +625,7 @@
           "README.md",
           "docs/brand-manual.md",
           "protocol/CONTRACT.md",
-          "bin/brain-recall.ps1"
+          "native/src/recall.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -627,7 +648,7 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
         ],
         "aiExecutionPrompts": [
@@ -639,8 +660,40 @@
         "nextSequentialFile": "protocol/CONTRACT.md",
         "relatedWorkflows": [
           "README.md",
-          "bin/setup-private.ps1",
+          "native/src/onboard.rs",
           "protocol/CONTRACT.md"
+        ],
+        "aiExecutionPrompts": [
+          "protocol/CONTRACT.md"
+        ]
+      },
+      "issues": [],
+      "waivedIssues": [],
+      "tracked": true
+    },
+    {
+      "root": "mdr-kernel",
+      "relPath": "native/tests/ASSERTIONS.md",
+      "title": "[Living] Kernel regression assertion map",
+      "type": "Test reference",
+      "context": "Use when tracing a legacy suite assertion to its native Cargo test.",
+      "envelopeTop": "strict",
+      "nodeBlock": "strict",
+      "links": {
+        "directoryPath": "native/tests/",
+        "nextSequentialFile": "../../protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "../../CONTRIBUTING.md"
+        ],
+        "aiExecutionPrompts": [
+          "../../protocol/CONTRACT.md"
+        ]
+      },
+      "resolvedLinks": {
+        "directoryPath": "native/tests",
+        "nextSequentialFile": "protocol/CONTRACT.md",
+        "relatedWorkflows": [
+          "CONTRIBUTING.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -662,7 +715,7 @@
         "directoryPath": "protocol/",
         "nextSequentialFile": "RUNBOOK.md",
         "relatedWorkflows": [
-          "bin/sync-doors.ps1",
+          "native/src/doors.rs",
           "protocol/RUNBOOK.md"
         ],
         "aiExecutionPrompts": [
@@ -673,7 +726,7 @@
         "directoryPath": "protocol",
         "nextSequentialFile": "protocol/RUNBOOK.md",
         "relatedWorkflows": [
-          "bin/sync-doors.ps1",
+          "native/src/doors.rs",
           "protocol/RUNBOOK.md"
         ],
         "aiExecutionPrompts": [
@@ -700,8 +753,8 @@
           "../docs/adoption-guide.md",
           "../skills/mdr-kernel/SKILL.md",
           "../docs/brand-manual.md",
-          "bin/start-session.ps1",
-          "bin/close-session.ps1"
+          "native/src/session.rs",
+          "native/src/close.rs"
         ],
         "aiExecutionPrompts": [
           "CONTRACT.md"
@@ -715,8 +768,8 @@
           "docs/adoption-guide.md",
           "skills/mdr-kernel/SKILL.md",
           "docs/brand-manual.md",
-          "bin/start-session.ps1",
-          "bin/close-session.ps1"
+          "native/src/session.rs",
+          "native/src/close.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -815,7 +868,7 @@
         "nextSequentialFile": "reference/INDEX.md",
         "relatedWorkflows": [
           "protocol/recall-gates.example.json",
-          "bin/brain-recall.ps1",
+          "native/src/recall.rs",
           "docs/recall-hooks.md",
           "specs/brain-active-recall.md"
         ],
@@ -828,7 +881,7 @@
         "nextSequentialFile": "reference/INDEX.md",
         "relatedWorkflows": [
           "protocol/recall-gates.example.json",
-          "bin/brain-recall.ps1",
+          "native/src/recall.rs",
           "docs/recall-hooks.md",
           "specs/brain-active-recall.md"
         ],
@@ -886,7 +939,7 @@
         "relatedWorkflows": [
           "_templates/markdown-file-template.md",
           "_templates/handoff-template.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -898,7 +951,7 @@
         "relatedWorkflows": [
           "_templates/markdown-file-template.md",
           "_templates/handoff-template.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -922,8 +975,8 @@
         "relatedWorkflows": [
           "CONTRIBUTING.md",
           "README.md",
-          "bin/remote-privacy.ps1",
-          "tests/remote-privacy-unit.ps1"
+          "native/src/remote_privacy.rs",
+          "native/tests/ASSERTIONS.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -935,8 +988,8 @@
         "relatedWorkflows": [
           "CONTRIBUTING.md",
           "README.md",
-          "bin/remote-privacy.ps1",
-          "tests/remote-privacy-unit.ps1"
+          "native/src/remote_privacy.rs",
+          "native/tests/ASSERTIONS.md"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"
@@ -1001,7 +1054,7 @@
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ]
       },
       "resolvedLinks": {
@@ -1015,7 +1068,7 @@
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ]
       },
       "issues": [],
@@ -1040,7 +1093,7 @@
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ]
       },
       "resolvedLinks": {
@@ -1053,7 +1106,7 @@
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ]
       },
       "issues": [],
@@ -1107,7 +1160,7 @@
           "../maps/node-roots.json",
           "../maps/NODE-MAP.md",
           "../maps/node-map.json",
-          "../bin/update-node-map.ps1"
+          "../native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "../protocol/CONTRACT.md"
@@ -1120,7 +1173,7 @@
           "maps/node-roots.json",
           "maps/NODE-MAP.md",
           "maps/node-map.json",
-          "bin/update-node-map.ps1"
+          "native/src/node_map.rs"
         ],
         "aiExecutionPrompts": [
           "protocol/CONTRACT.md"

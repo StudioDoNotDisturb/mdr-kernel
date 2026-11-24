@@ -18,6 +18,7 @@ mod onboard;
 mod recall;
 mod remote_privacy;
 mod session;
+mod staged;
 mod state_lock;
 
 /// `find` usage; `find --help` prints it.
@@ -49,6 +50,7 @@ const COMMANDS: &str =
        mdr-kernel find-stale list
        mdr-kernel archive-adopted (-Adopt <path> | -Expired <path>) [-Model <id>] [-Token <t>]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
+       mdr-kernel waffle-party [doctor options]
        mdr-kernel install";
 
 fn main() {
@@ -80,6 +82,17 @@ fn main() {
             health::cli(cmd, args)
         }
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
+        Some((cmd, args)) if cmd == "waffle-party" => {
+            println!("---\nMDR KERNEL: Waffle Party protocol review.\nCompliance diagnostic in progress.\n---");
+            let code = doctor::cli(args);
+            let outcome = if code == 0 {
+                "Waffle Party protocol authorized. Your continued dedication to the Work has been recorded."
+            } else {
+                "[ALERT]: Non-compliance event(s) remain. Waffle Party protocol denied pending correction."
+            };
+            println!("---\n{outcome}\n---");
+            code
+        }
         Some((cmd, args)) if cmd == "mcp" => mcp::cli(args),
         Some((cmd, args)) if cmd == "write-approval" => approval::cli(args),
         Some((cmd, args)) if cmd == "ratify-decision" => decisions::ratify_cli(args),

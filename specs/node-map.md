@@ -37,7 +37,7 @@ Public `mdr-kernel` ships with one root: the repo itself.
 Run:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
+mdr-kernel update-node-map
 ```
 
 The script scans registered Markdown files, parses the top envelope, parses the terminal
@@ -56,13 +56,13 @@ Check mode fails when any generated output differs from current tracked Markdown
 the generation timestamp), or when a new broken, ambiguous, or unreadable issue appears:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1 -Check
+mdr-kernel update-node-map -Check
 ```
 
 Path mode prints the parsed node record for one file:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1 -Path README.md
+mdr-kernel update-node-map -Path README.md
 ```
 
 Repair mode fixes a narrow, mechanical class of terminal node-block defects: missing separator
@@ -70,8 +70,8 @@ before `SYSTEM NODE LINKS` or trailing content after the four canonical fields. 
 inside roots marked `repair-allowed`:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1 -Repair -Path README.md
-pwsh -NoProfile -File bin/update-node-map.ps1 -Repair -Path README.md -Apply
+mdr-kernel update-node-map -Repair -Path README.md
+mdr-kernel update-node-map -Repair -Path README.md -Apply
 ```
 
 ## Startup contract and link resolution
@@ -80,7 +80,7 @@ Links are resolved from their source file first and then from the registered roo
 both author-facing link text and resolved root coordinates; the Obsidian bridge uses the resolved
 coordinates so a source-relative link cannot be reinterpreted from `maps/` and escape the repo.
 
-`close-session.ps1` stages only its owned close set and then regenerates the map, staging the
+`mdr-kernel close-session` stages only its owned close set and then regenerates the map, staging the
 generated outputs with it. This keeps new documents in link-health truth as tracked files without
 sweeping another session's work.
 
@@ -96,5 +96,5 @@ your own `STATE.lock`.
 
 Directory Path: specs/
 Next Sequential File: ../CONTRIBUTING.md
-Related Workflows: ../maps/node-roots.json, ../maps/NODE-MAP.md, ../maps/node-map.json, ../bin/update-node-map.ps1
+Related Workflows: ../maps/node-roots.json, ../maps/NODE-MAP.md, ../maps/node-map.json, ../native/src/node_map.rs
 AI Execution Prompts: ../protocol/CONTRACT.md

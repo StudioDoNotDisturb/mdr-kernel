@@ -1,6 +1,6 @@
-//! Structured advisory lock for coordination files. Port of `bin/state-lock.ps1`: the same JSON
+//! Structured advisory lock for coordination files. Port of `mdr-kernel state-lock`: the same JSON
 //! body, identity rules, token sealing, `-Wait` queueing and recovery refusals, with the same
-//! messages. `bin/state-lock.ps1` hands its arguments here when the binary is installed.
+//! messages. `mdr-kernel state-lock` hands its arguments here when the binary is installed.
 
 use crate::args::Args;
 use crate::git::{common_top, git, lossy, top};
@@ -543,8 +543,8 @@ fn act(s: &Session, args: &Args, source: &str, out: &mut Vec<String>) -> i32 {
                     "  {}",
                     record.as_ref().map_or_else(String::new, describe)
                 ));
-                say("  queue instead:      bin/state-lock.ps1 -Acquire -Wait".into());
-                say("  your own lock?      bin/state-lock.ps1 -Release -Token <token>   (printed by YOUR -Acquire)".into());
+                say("  queue instead:      mdr-kernel state-lock -Acquire -Wait".into());
+                say("  your own lock?      mdr-kernel state-lock -Release -Token <token>   (printed by YOUR -Acquire)".into());
                 say("  abandonment independently established despite the fresh heartbeat? set MDR_FORCE_LIVE_LOCK=1 and supply -AbandonmentReason.".into());
                 return 1;
             }

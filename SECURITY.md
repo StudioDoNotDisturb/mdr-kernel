@@ -6,7 +6,7 @@ Context: How to report a vulnerability or a bug that could leak private memory c
 
 ## Reporting a vulnerability or a privacy bug
 
-This pattern's core promise is that `bin/setup-private.ps1` and `bin/remote-privacy.ps1` refuse to
+This pattern's core promise is that `mdr-kernel setup-private` and `mdr-kernel remote-privacy` refuse to
 let your memory land anywhere but a private destination you approved. **A bug that breaks that
 promise — a way to push private content to a public or unintended remote, bypass a hook, or leak a
 secret into a tracked file — is a privacy bug and should be reported privately, not as a public
@@ -24,10 +24,10 @@ example private-repo URLs in the public issue itself.
 
 - Setup, doctor, close-session, or the pre-push hook accepting a public repo, a fork, or an
   unverifiable-visibility remote as an approved private destination.
-- A code path that pushes before `remote-privacy.ps1` has verified the destination, or that skips
-  verification on retry/recovery (`sync-private.ps1`, `-OfflineCheckpoint` recovery).
+- A code path that pushes before `mdr-kernel remote-privacy` has verified the destination, or that skips
+  verification on retry/recovery (`mdr-kernel sync-private`, `-OfflineCheckpoint` recovery).
 - A secret-shaped string (API key, token, credential) that the pre-commit scan or
-  `bin/secret-audit.ps1` fails to catch.
+  `mdr-kernel secret-audit` fails to catch.
 - The maintainer's export step (it does not ship in this repository) writing outside its intended
   output root, or shipping private content into the public distribution.
 
@@ -46,12 +46,12 @@ not a defense against a malicious actor with write access to your machine or rep
 ## Pull request checklist
 
 Before opening a PR that touches privacy/security-relevant code
-(`bin/remote-privacy.ps1`, `bin/setup-private.ps1`, `bin/sync-private.ps1`,
-`bin/secret-audit.ps1`, `.githooks/*`):
+(`mdr-kernel remote-privacy`, `mdr-kernel setup-private`, `mdr-kernel sync-private`,
+`mdr-kernel secret-audit`, `.githooks/*`):
 
-- [ ] `bin/brain-doctor.ps1` is green.
-- [ ] `tests/remote-privacy-unit.ps1` passes (hermetic; no live network needed).
-- [ ] If the change affects live GitHub visibility detection, `tests/remote-privacy-live.ps1`
+- [ ] `mdr-kernel doctor` is green.
+- [ ] `cargo test --locked --manifest-path native/Cargo.toml remote_privacy::` passes (hermetic; no live network needed).
+- [ ] If the change affects live GitHub visibility detection, the manual privacy live smoke workflow
       was run manually against a real private/public repo pair and the result is in the PR
       description.
 - [ ] The change was tested in a throwaway clone with `origin` removed, not in a clone of the
@@ -63,5 +63,5 @@ Before opening a PR that touches privacy/security-relevant code
 
 Directory Path: ./
 Next Sequential File: CONTRIBUTING.md
-Related Workflows: CONTRIBUTING.md, README.md, bin/remote-privacy.ps1, tests/remote-privacy-unit.ps1
+Related Workflows: CONTRIBUTING.md, README.md, native/src/remote_privacy.rs, native/tests/ASSERTIONS.md
 AI Execution Prompts: protocol/CONTRACT.md

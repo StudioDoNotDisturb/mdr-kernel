@@ -17,5 +17,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Isolate the checkout and fetch locked dependencies
+        shell: bash
+        run: |
+          git remote remove origin
+          git checkout -B main
+          test -z "$(git remote)"
+          cargo fetch --locked --manifest-path native/Cargo.toml
       - name: Refuse a known public GitHub repository
-        run: pwsh -NoProfile -File tests/remote-privacy-live.ps1
+        shell: bash
+        run: cargo test --locked --offline --manifest-path native/Cargo.toml --test regressions live_public_repo_is_refused -- --ignored

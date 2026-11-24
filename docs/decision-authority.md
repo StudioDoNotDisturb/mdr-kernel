@@ -14,7 +14,7 @@ prove who spoke on a shared account.
 
 ## What the checker enforces
 
-`bin/check-decision-history.ps1` prints `DECISION_HISTORY_STATUS=OK ...` and exits 0, or prints
+`mdr-kernel check-decision-history` prints `DECISION_HISTORY_STATUS=OK ...` and exits 0, or prints
 `DECISION_HISTORY_STATUS=FAIL` plus one `ERROR=` line per problem and exits 1. It checks:
 
 - **Structure.** Headings `## D<n> - YYYY-MM-DD - Title` (a hyphen or an em dash), unique ids,
@@ -38,12 +38,12 @@ prove who spoke on a shared account.
   `-RatificationsBaselinePath`). The live ledger binds only the canonical `DECISIONS.md`; a `-Path`
   fixture is checked against `-RatificationsPath` or no ledger.
 
-**The hashing rule** (one rule, used by the checker, `ratify-decision.ps1` and `-HashOf`): take
+**The hashing rule** (one rule, used by the checker, `mdr-kernel ratify-decision` and `-HashOf`): take
 the entry from its heading to the next heading, or for the oldest entry to the
 `<!-- Template for a new entry` comment or the `---` line before `## SYSTEM NODE LINKS`; remove
 stamp lines; fold CRLF to LF; drop trailing whitespace; SHA-256 the UTF-8 bytes. A BOM, line-ending
 style, a later supersession stamp or a footer edit never changes it. Print it with
-`pwsh -NoProfile -File bin/check-decision-history.ps1 -HashOf D1`.
+`mdr-kernel check-decision-history -HashOf D1`.
 
 ## Adding an entry
 
@@ -51,7 +51,7 @@ Hold your own sealed `STATE.lock` (`-Model`/`-LockToken` or `BRAIN_MODEL`/`BRAIN
 before changing the canonical log. Write the body to a file and run:
 
 ```powershell
-pwsh -NoProfile -File bin/add-decision.ps1 -Title 'A concrete decision' -BodyPath proposal.md
+mdr-kernel add-decision -Title 'A concrete decision' -BodyPath proposal.md
 ```
 
 A proposal body can be as small as:
@@ -62,7 +62,7 @@ A proposal body can be as small as:
 **Decision:** Preserve the source receipt with each imported record.
 ```
 
-`add-decision.ps1` validates the existing log, prepends the next id (replacing
+`mdr-kernel add-decision` validates the existing log, prepends the next id (replacing
 `_No decisions yet._` on an empty log), stamps every target named in a supersession field, keeps
 the file's line endings and BOM, validates the result and restores the original bytes on failure
 ("rolled back"). It prints `DECISION_APPEND_STATUS=OK id=D<n>`; any refusal exits 1. Only an append
@@ -76,12 +76,11 @@ An operator can ratify an entry after reviewing its exact contents. In their own
 with their own identity and acquired lock token, the human runs:
 
 ```powershell
-pwsh -File bin/ratify-decision.ps1 -Id D1 -Model '<operator identity>'
+mdr-kernel ratify-decision -Id D1 -Model '<operator identity>'
 ```
 
 The tool refuses before reading anything, prints `RATIFICATION_STATUS=REFUSED` with the reason
-and exits 3 when standard input is redirected, the process is not interactive, or PowerShell was
-started with `-NonInteractive` (how model tool shells run). Otherwise it shows the heading and
+and exits 3 unless standard input and output are attached to an interactive terminal. Otherwise it shows the heading and
 hash, asks for optional words and the exact phrase `RATIFY D1` (a mismatch exits 1 and writes
 nothing), verifies the lock, re-hashes the entry, runs the checker, appends one record, and
 rebuilds rulings. An entry already ratified at the same hash prints `RATIFICATION_STATUS=ALREADY`.
@@ -91,7 +90,7 @@ deliberately. It is not a security sandbox or an identity-signing service.
 
 ## Rules reach the next task
 
-`bin/build-rulings.ps1` runs the checker, then compiles `protocol/rulings.json`. A live ruling is
+`mdr-kernel build-rulings` runs the checker, then compiles `protocol/rulings.json`. A live ruling is
 not superseded or retired and is either hash-ratified (`operator-ratified`) or carries
 `**Authority:** operator-ruled` with an `**Operator said (...)**` line (`operator-ruled`). The full
 Decision body is kept; a superseded-in-part ruling stays with a note. Proposals, unclassified
@@ -100,13 +99,13 @@ live ids in its `rulings` array; any other citation fails with "not live rulings
 1 with `RULINGS_STATUS=STALE` when the file no longer matches its sources.
 
 After changing gates or decision sources, compile and stage the generated output together with
-its sources. Pre-commit runs the checker and `build-rulings.ps1 -Check` against the index. Recall
+its sources. Pre-commit runs the checker and `mdr-kernel build-rulings -Check` against the index. Recall
 checks source hashes before presenting rulings. A compact NEEDS_READ output is a reading
 instruction, never a claim that the sources have been read.
 
 ```powershell
-pwsh -NoProfile -File bin/build-rulings.ps1
-pwsh -NoProfile -File bin/brain-recall.ps1 -Ruling D1
+mdr-kernel build-rulings
+mdr-kernel brain-recall -Ruling D1
 ```
 
 ## Existing logs require an explicit boundary
@@ -118,7 +117,7 @@ rewritten or ratified automatically; without a boundary its entries fail the aut
 until you migrate. Commit the history unchanged, review it, and with your own lock run:
 
 ```powershell
-pwsh -NoProfile -File bin/initialize-decision-authority.ps1 -PreserveLegacy
+mdr-kernel initialize-decision-authority -PreserveLegacy
 ```
 
 It refuses without your lock, refuses an existing boundary ("immutable"), refuses an existing
@@ -142,5 +141,5 @@ on it explicitly in a new entry. See [upgrading.md](upgrading.md) for safe integ
 
 Directory Path: docs/
 Next Sequential File: upgrading.md
-Related Workflows: protocol/CONTRACT.md, bin/add-decision.ps1, bin/check-decision-history.ps1, bin/build-rulings.ps1, bin/ratify-decision.ps1, bin/initialize-decision-authority.ps1
+Related Workflows: protocol/CONTRACT.md, native/src/decisions.rs
 AI Execution Prompts: protocol/CONTRACT.md

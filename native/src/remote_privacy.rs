@@ -1,5 +1,5 @@
-//! Verifies that the push destination is private and approved. Port of `bin/remote-privacy.ps1`
-//! and `bin/remote-identity.ps1`: the same statuses, messages and pin rules. GitHub remotes are
+//! Verifies that the push destination is private and approved. Port of `mdr-kernel remote-privacy`
+//! and `mdr-kernel remote-privacy`: the same statuses, messages and pin rules. GitHub remotes are
 //! checked live: `gh repo view` when available, else the public API (via curl) plus an
 //! authenticated `git ls-remote`. A 404 with git access proves "not publicly visible" only; it
 //! cannot tell PRIVATE from Enterprise INTERNAL.
@@ -242,7 +242,7 @@ pub fn check(
     } else {
         // Pin comparisons are case-sensitive: identities are already canonical.
         if !confirm_private && approved != id {
-            return verdict("UNVERIFIED_HOST", "this host has no built-in visibility check; rerun setup-private.ps1 with -ConfirmPrivateRemote only after verifying access controls", id, 1);
+            return verdict("UNVERIFIED_HOST", "this host has no built-in visibility check; rerun mdr-kernel setup-private with -ConfirmPrivateRemote only after verifying access controls", id, 1);
         }
         "non-GitHub remote privacy explicitly confirmed and URL pinned".into()
     };
@@ -254,7 +254,7 @@ pub fn check(
         };
         return verdict(
             "UNAPPROVED",
-            format!("{detail}; rerun bin/setup-private.ps1 to verify and approve it"),
+            format!("{detail}; rerun mdr-kernel setup-private to verify and approve it"),
             id,
             1,
         );
@@ -263,7 +263,7 @@ pub fn check(
     let suffix = if pinned {
         "; destination pin matches"
     } else {
-        "; run setup-private.ps1 to approve it"
+        "; run mdr-kernel setup-private to approve it"
     };
     verdict("PRIVATE", format!("{message}{suffix}"), id, 0)
 }
@@ -317,7 +317,7 @@ pub fn run(
         // lost origin has silently stopped backing up.
         let pinned = config(root, "brain.approvedRemote");
         if config(root, "brain.mode") == "private-remote" || !pinned.is_empty() {
-            return verdict("MISSING_ORIGIN", "this memory was approved for a private remote but origin is missing; restore it (git remote add origin <approved-url>) or deliberately rerun bin/setup-private.ps1 -LocalOnly", pinned, 1);
+            return verdict("MISSING_ORIGIN", "this memory was approved for a private remote but origin is missing; restore it (git remote add origin <approved-url>) or deliberately rerun mdr-kernel setup-private -LocalOnly", pinned, 1);
         }
         return verdict(
             "LOCAL_ONLY",

@@ -1150,13 +1150,13 @@ fn handoff_dates_and_staged_coordination() {
     );
     git(root, &["reset", "--hard", "-q"]);
     let policy = fs::read_to_string(root.join("protocol/coordination-files.txt")).unwrap();
-    let legacy = ["bin/remote-identity.", "ps1"].concat();
-    let audit = ["bin/secret-audit.", "ps1"].concat();
+    let identity = "native/src/remote_privacy.rs";
+    let audit = "native/src/health.rs";
     let protected = |path: &str| policy.lines().any(|line| line.trim() == path);
     check(
         "pre-push/remote-identity/secret-audit are on the coordination allowlist",
         protected(".githooks/pre-push")
-            && ((protected(&legacy) && protected(&audit))
+            && ((protected(identity) && protected(audit))
                 || (protected("native/src/remote_privacy.rs") && protected("native/src/hook.rs"))),
         policy,
     );

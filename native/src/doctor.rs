@@ -1,19 +1,12 @@
-//! The public doctor. A port of `bin/brain-doctor.ps1`: advisory warnings for drift and
-//! non-compliance only for real hazards (a committed secret, broken startup wiring, a private
-//! memory that lost its origin, a failed authority or recall check). The hook-recall probe
-//! and node-map parity still run their PowerShell scripts
-//! until their own checkpoints.
-//!
-//!   mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
+//! Repository diagnostics for startup, coordination, and release guards.
 
 use crate::args::Args;
-use crate::git::{common_top, git, lossy, names, pwsh_command, text, top};
+use crate::git::{common_top, git, lossy, names, text, top};
 use crate::health::read_lines;
 use crate::remote_privacy::{self, Live};
 use regex::Regex;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 
 pub struct Options {
     pub hard_only: bool,
@@ -36,11 +29,7 @@ impl Default for Options {
 /// The tracked-file secret scan: the fast set plus generic credential assignments. PowerShell's
 /// `-match` ignores case, so the whole pattern does.
 const SECRETS: &str = r#"(?i)sk-ant-[A-Za-z0-9_-]{20,}|sk-(?:proj|svcacct)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[\w-]*(api[_-]?key|secret|passwd|password|access[_-]?token)\b\s*[:=]\s*["'][^"']{8,}["']"#;
-const SECRET_SKIP: [&str; 3] = [
-    ".githooks/pre-commit",
-    "bin/brain-doctor.ps1",
-    "native/src/doctor.rs",
-];
+const SECRET_SKIP: [&str; 2] = [".githooks/pre-commit", "native/src/doctor.rs"];
 /// Files bootstrap scaffolds: absent on a pristine clone, so their absence points at bootstrap.
 const SCAFFOLDED: [&str; 14] = [
     ".brain-root",
@@ -102,38 +91,6 @@ fn read_text(path: &Path) -> Option<String> {
     })
 }
 
-/// Combined stdout and stderr of a PowerShell child, with its exit code (`2>&1`).
-fn pwsh_all(root: &Path, script: &str, args: &[&str], input: Option<&str>) -> (i32, Vec<String>) {
-    let mut command = pwsh_command(root, script, args);
-    command
-        .stdin(if input.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let output = command.spawn().and_then(|mut child| {
-        if let (Some(text), Some(mut stdin)) = (input, child.stdin.take()) {
-            use std::io::Write;
-            let _ = stdin.write_all(format!("{text}\n").as_bytes());
-        }
-        child.wait_with_output()
-    });
-    match output {
-        Ok(o) => {
-            let mut lines = read_lines(&o.stdout);
-            lines.extend(read_lines(&o.stderr));
-            (o.status.code().unwrap_or(1), lines)
-        }
-        Err(e) => (
-            1,
-            vec![format!("required utility 'pwsh' is unavailable ({e})")],
-        ),
-    }
-}
-
-/// Files `Get-ChildItem` lists without `-Force`: hidden entries are skipped.
 fn visible(entry: &std::fs::DirEntry) -> bool {
     #[cfg(windows)]
     {
@@ -276,7 +233,7 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
                 r.warn(&format!("not in canonical root - here: {top_dir} ; canonical: {}. You may be in a mirror clone; avoid writing.", marker.trim()));
             }
         }
-        None => r.warn(".brain-root marker missing - run bin/bootstrap-clone.ps1"),
+        None => r.warn(".brain-root marker missing - run mdr-kernel bootstrap-clone"),
     }
 
     // 2) Working tree: only uncommitted changes to tracked files block a clean report.
@@ -315,10 +272,10 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
             if lines <= max_lines && bytes <= max_bytes {
                 r.ok(&format!("STATE.md within budget ({lines}/{max_lines} lines, {bytes}/{max_bytes} bytes; headroom {} bytes / {} lines)", max_bytes - bytes, max_lines - lines));
             } else {
-                r.warn(&format!("STATE.md over budget ({lines}/{max_lines} lines, {bytes}/{max_bytes} bytes) - run bin/state-budget.ps1 for the per-section/fattest-line breakdown; drop completed items into handoffs"));
+                r.warn(&format!("STATE.md over budget ({lines}/{max_lines} lines, {bytes}/{max_bytes} bytes) - run mdr-kernel state-budget for the per-section/fattest-line breakdown; drop completed items into handoffs"));
             }
         }
-        None => r.warn("STATE.md missing - first run: bin/setup-private.ps1 -Model '<your model id>'; repairing an already-set-up clone: bin/bootstrap-clone.ps1"),
+        None => r.warn("STATE.md missing - first run: mdr-kernel setup-private -Model '<your model id>'; repairing an already-set-up clone: mdr-kernel bootstrap-clone"),
     }
 
     // 4) Hooks armed for this clone: git does not version core.hooksPath.
@@ -327,26 +284,22 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
         r.ok("git hooks armed (core.hooksPath=.githooks)");
     } else if !hooks_path.is_empty() {
         r.warn(&format!(
-            "core.hooksPath is '{hooks_path}', expected .githooks - run bin/bootstrap-clone.ps1"
+            "core.hooksPath is '{hooks_path}', expected .githooks - run mdr-kernel bootstrap-clone"
         ));
     } else {
-        r.warn("core.hooksPath not set - run: git config core.hooksPath .githooks (or bin/bootstrap-clone.ps1)");
+        r.warn("core.hooksPath not set - run: git config core.hooksPath .githooks (or mdr-kernel bootstrap-clone)");
     }
 
     // 4a) Remote privacy: live visibility and the approved destination pin.
-    if !exists("bin/remote-privacy.ps1") {
-        r.warn("remote privacy verifier missing - restore bin/remote-privacy.ps1");
-    } else {
-        let v = remote_privacy::run(root, None, false, true, false, &Live);
-        match v.status {
-            "PRIVATE" | "LOCAL_ONLY" => r.ok(&format!("remote privacy: {}", v.message)),
-            // A private-remote memory without origin silently stops backing up: a hazard.
-            "MISSING_ORIGIN" => r.fail(&format!("remote privacy: {}", v.message)),
-            status => r.warn(&format!(
-                "remote privacy NOT READY ({status}): {}",
-                v.message
-            )),
-        }
+    let v = remote_privacy::run(root, None, false, true, false, &Live);
+    match v.status {
+        "PRIVATE" | "LOCAL_ONLY" => r.ok(&format!("remote privacy: {}", v.message)),
+        // A private-remote memory without origin silently stops backing up: a hazard.
+        "MISSING_ORIGIN" => r.fail(&format!("remote privacy: {}", v.message)),
+        status => r.warn(&format!(
+            "remote privacy NOT READY ({status}): {}",
+            v.message
+        )),
     }
 
     // 4aa) A deliberately offline close must be impossible to forget.
@@ -371,7 +324,7 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
             format!("{a} local commit(s) ahead of origin/main")
         });
         r.warn(&format!(
-            "PENDING PRIVATE SYNC: {count}. Run: pwsh -NoProfile -File bin/sync-private.ps1"
+            "PENDING PRIVATE SYNC: {count}. Run: mdr-kernel sync-private"
         ));
     } else if ahead.is_some() {
         r.ok("private sync: no local commits pending");
@@ -394,52 +347,42 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
 
     // 5) Doors in sync with the contract (advisory; pre-commit still blocks a drifted door).
     if !o.hard_only {
-        if exists("bin/sync-doors.ps1") {
-            let doors = crate::doors::sync(root, true, false);
-            let (code, lines) = (doors.code, read_lines((doors.out + &doors.err).as_bytes()));
-            if code == 0 {
-                r.ok("front doors in sync with protocol/CONTRACT.md");
-            } else {
-                let missing: Vec<&str> = [
-                    "CLAUDE.md",
-                    "AGENTS.md",
-                    "GEMINI.md",
-                    "protocol/advisory.md",
-                ]
-                .into_iter()
-                .filter(|d| !exists(d))
-                .collect();
-                if !missing.is_empty() {
-                    r.warn(&format!("front doors not generated yet ({}) - first run: bin/setup-private.ps1; repair: bin/sync-doors.ps1", missing.join(", ")));
-                } else if !exists("STATE.md") {
-                    r.warn("phase-zero front doors present (setup has not run) - run bin/setup-private.ps1 -Model '<your model id>' to generate the full contract doors");
-                } else {
-                    r.warn("front doors drifted from CONTRACT - run: pwsh -NoProfile -File bin/sync-doors.ps1");
-                }
-            }
-            for line in lines
-                .iter()
-                .filter(|l| l.to_lowercase().starts_with("warn:"))
-            {
-                r.warn(line);
-            }
+        let doors = crate::doors::sync(root, true, false);
+        let (code, lines) = (doors.code, read_lines((doors.out + &doors.err).as_bytes()));
+        if code == 0 {
+            r.ok("front doors in sync with protocol/CONTRACT.md");
         } else {
-            r.warn("bin/sync-doors.ps1 missing");
+            let missing: Vec<&str> = [
+                "CLAUDE.md",
+                "AGENTS.md",
+                "GEMINI.md",
+                "protocol/advisory.md",
+            ]
+            .into_iter()
+            .filter(|d| !exists(d))
+            .collect();
+            if !missing.is_empty() {
+                r.warn(&format!("front doors not generated yet ({}) - first run: mdr-kernel setup-private; repair: mdr-kernel sync-doors", missing.join(", ")));
+            } else if !exists("STATE.md") {
+                r.warn("phase-zero front doors present (setup has not run) - run mdr-kernel setup-private -Model '<your model id>' to generate the full contract doors");
+            } else {
+                r.warn("front doors drifted from CONTRACT - run: mdr-kernel sync-doors");
+            }
+        }
+        for line in lines
+            .iter()
+            .filter(|l| l.to_lowercase().starts_with("warn:"))
+        {
+            r.warn(line);
         }
     }
 
-    // 5b) Canonical startup wiring: the core scripts are a hard block.
+    // 5b) Canonical startup and Git hook wiring are hard requirements.
     let contract = read_text(&root.join("protocol/CONTRACT.md"));
     let mut problems = Vec::new();
-    if !exists("bin/start-session.ps1") {
-        problems.push("bin/start-session.ps1 missing");
-    }
-    if !exists("bin/session-stop.ps1") {
-        problems.push("bin/session-stop.ps1 missing");
-    }
     match &contract {
-        Some(c) if !c.to_lowercase().contains("bin/start-session.ps1") => {
-            problems.push("CONTRACT does not route startup through bin/start-session.ps1")
+        Some(c) if !c.to_lowercase().contains("mdr-kernel start-session") => {
+            problems.push("CONTRACT does not route startup through mdr-kernel start-session")
         }
         None => problems.push("protocol/CONTRACT.md missing"),
         _ => {}
@@ -452,11 +395,16 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
             problems.join("; ")
         ));
     }
-    for hook in ["pre-commit", "prepare-commit-msg", "pre-push"] {
+    for hook in ["pre-commit", "prepare-commit-msg", "commit-msg", "pre-push"] {
         let path = root.join(".githooks").join(hook);
         if !path.is_file() {
             r.fail(&format!("required Git hook missing: {hook}"));
             continue;
+        }
+        if !hook_wired(root, hook) {
+            r.fail(&format!(
+                "Git hook does not dispatch to the native engine: {hook}"
+            ));
         }
         #[cfg(unix)]
         {
@@ -469,20 +417,14 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
             }
         }
     }
-    for helper in [
-        "brain-recall",
-        "hook-recall",
-        "prepare-work",
-        "check-decision-history",
-        "build-rulings",
-        "test-staged",
+    for path in [
+        "protocol/recall-gates.example.json",
+        "protocol/recall-gates.json",
     ] {
-        if !exists(&format!("bin/{helper}.ps1")) {
-            r.fail(&format!("required safeguard missing: bin/{helper}.ps1"));
+        if path == "protocol/recall-gates.json" && !exists("STATE.md") && !exists(path) {
+            continue;
         }
-    }
-    if exists("bin/brain-recall.ps1") && exists("protocol/recall-gates.json") {
-        let gates = crate::recall::check_gates(&root.join("protocol/recall-gates.json"));
+        let gates = crate::recall::check_gates(&root.join(path));
         let (code, lines) = (gates.code, read_lines((gates.out + &gates.err).as_bytes()));
         if code != 0 {
             r.fail(&format!("recall schema invalid: {}", lines.join(" ")));
@@ -491,7 +433,7 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
         }
     }
     // build-rulings -Check runs the decision-history check first and fails on either.
-    if exists("DECISIONS.md") && exists("bin/build-rulings.ps1") {
+    if exists("DECISIONS.md") {
         let rulings = crate::decisions::build_default(root, true);
         let result = read_lines((rulings.out + &rulings.err).as_bytes()).join(" ");
         if rulings.code != 0 {
@@ -534,6 +476,15 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
     r.finish()
 }
 
+fn hook_wired(root: &Path, name: &str) -> bool {
+    read_text(&root.join(".githooks").join(name)).is_some_and(|script| {
+        script.lines().any(|line| {
+            let line = line.trim_start();
+            !line.starts_with('#') && line.contains(&format!(" hook {name} "))
+        })
+    })
+}
+
 /// Recall hook configuration, the node map, envelope lengths and the folder indexes.
 fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
     let mut adapter = false;
@@ -550,7 +501,7 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
                     serde_json::Value::String(s) => !s.is_empty(),
                     _ => true,
                 };
-                if configured && raw.to_lowercase().contains("hook-recall.ps1") {
+                if configured && hook.to_string().to_lowercase().contains(" hook-recall") {
                     adapter = true;
                     r.ok(&format!("prompt recall CONFIGURED in {config}"));
                 }
@@ -559,18 +510,12 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
         }
     }
     if !adapter {
-        r.warn("prompt recall not configured; run bin/prepare-work.ps1 for each objective. See docs/recall-hooks.md.");
+        r.warn("prompt recall not configured; run mdr-kernel prepare-work for each objective. See docs/recall-hooks.md.");
     } else {
         // Configured (above), adapter tested (this probe), fired (never observable here).
-        let (code, lines) = pwsh_all(
-            root,
-            "hook-recall.ps1",
-            &[],
-            Some(r#"{"prompt":"mdr doctor adapter probe"}"#),
-        );
-        let probe = lines.join(" ");
-        if code == 0 && !probe.to_uppercase().contains("RECALL_HOOK_STATUS=DEGRADED") {
-            r.ok("prompt recall adapter TESTED: bin/hook-recall.ps1 answered a probe prompt");
+        let probe = crate::recall::hook(root, r#"{"prompt":"mdr doctor adapter probe"}"#);
+        if !probe.contains("RECALL_HOOK_STATUS=DEGRADED") {
+            r.ok("prompt recall adapter TESTED: mdr-kernel hook-recall answered a probe prompt");
         } else {
             r.warn(&format!(
                 "prompt recall adapter DEGRADED on a probe prompt: {probe}"
@@ -581,9 +526,6 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
 
     // 5d) The generated node map checks link health.
     let mut problems = Vec::new();
-    if !root.join("bin/update-node-map.ps1").exists() {
-        problems.push("bin/update-node-map.ps1 missing");
-    }
     if !root.join("maps/node-roots.json").exists() {
         problems.push("maps/node-roots.json missing");
     }
@@ -600,7 +542,7 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
             problems.join("; ")
         ));
     } else if !json.exists() || !root.join("maps/NODE-MAP.md").exists() {
-        r.warn("node map missing - run: pwsh -NoProfile -File bin/update-node-map.ps1");
+        r.warn("node map missing - run: mdr-kernel update-node-map");
     } else {
         match read_text(&json).and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) {
             Some(map) => {
@@ -615,25 +557,18 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
                 };
                 let code = crate::node_map::run(root, &check).code;
                 if code != 0 {
-                    r.warn("node map differs from tracked Markdown or generated bridge output - run: pwsh -NoProfile -File bin/update-node-map.ps1");
+                    r.warn("node map differs from tracked Markdown or generated bridge output - run: mdr-kernel update-node-map");
                 } else {
                     r.ok(&format!("node map exact parity ({} tracked files; {with_issues} file(s) with active issues)", files.len()));
                 }
             }
-            None => r.warn(
-                "node map unreadable - regenerate with: pwsh -NoProfile -File bin/update-node-map.ps1",
-            ),
+            None => r.warn("node map unreadable - regenerate with: mdr-kernel update-node-map"),
         }
     }
 
     // 5e) Envelope length: pre-commit ratchets touched files; this counts the rest.
-    let armed = root.join("bin/envelope-check.ps1").exists()
-        && read_text(&root.join(".githooks/pre-commit")).is_some_and(|t| {
-            t.to_lowercase()
-                .contains(r#"bin/envelope-check.ps1" -staged"#)
-        });
-    if !armed {
-        r.warn("envelope length ratchet UNARMED: .githooks/pre-commit does not run bin/envelope-check.ps1 -Staged");
+    if !hook_wired(root, "pre-commit") {
+        r.warn("envelope length ratchet UNARMED: .githooks/pre-commit does not dispatch to the native hook");
     } else {
         match crate::envelope::count(root) {
             Ok((over, tracked)) => {
@@ -643,10 +578,10 @@ fn advisory_wiring(r: &mut Report, root: &Path, contract: Option<&str>) {
                         "{line} (Title <= 100, Context <= 300 chars / 1 sentence)"
                     ));
                 } else {
-                    r.warn(&format!("{line} - fix with: pwsh -NoProfile -File bin/envelope-check.ps1 -Count -List (pre-commit enforces on touch)"));
+                    r.warn(&format!("{line} - fix with: mdr-kernel envelope count --list (pre-commit enforces on touch)"));
                 }
             }
-            Err(_) => r.warn("envelope length check failed to run (bin/envelope-check.ps1)"),
+            Err(_) => r.warn("envelope length check failed to run (mdr-kernel envelope count)"),
         }
     }
 
@@ -751,7 +686,7 @@ fn advisory_memory(r: &mut Report, root: &Path, top_dir: &str, state: Option<&[u
                     entries.len()
                 ));
             } else if real.is_empty() {
-                r.warn(&format!("coordination-files.txt lists {} not-yet-scaffolded file(s) - run bin/bootstrap-clone.ps1", missing.len()));
+                r.warn(&format!("coordination-files.txt lists {} not-yet-scaffolded file(s) - run mdr-kernel bootstrap-clone", missing.len()));
             } else {
                 r.warn(&format!(
                     "coordination-files.txt names missing file(s): {} - fix the list or restore the file",

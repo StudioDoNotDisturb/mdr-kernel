@@ -48,13 +48,12 @@ Handoffs directly under `handoffs/` need that row. Other documents can be
 unindexed. Archive one file per call. Review the resulting Git changes for the
 move and any updated registry row.
 
-`bin/find-stale.ps1` and `bin/archive-adopted.ps1` use the installed native
-engine. The same model and token environment variables used by
-`mdr-kernel state-lock` apply to `archive-adopted`.
+The model and token environment variables used by `mdr-kernel state-lock`
+also apply to `mdr-kernel archive-adopted`.
 
 ## SYSTEM NODE LINKS
 
 Directory Path: docs/
 Next Sequential File: ../protocol/RUNBOOK.md
-Related Workflows: ../bin/find-stale.ps1, ../bin/archive-adopted.ps1
+Related Workflows: ../native/src/lifecycle.rs
 AI Execution Prompts: ../protocol/CONTRACT.md

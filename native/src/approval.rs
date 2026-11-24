@@ -1,5 +1,5 @@
 //! Write approval for new agent-authored reference notes and skills. A port of
-//! `bin/write-approval.ps1`: propose into ignored local staging, approve into the repo with an
+//! `mdr-kernel write-approval`: propose into ignored local staging, approve into the repo with an
 //! audit JSONL entry, list or show proposals, and the pre-commit's staged-approval check.
 //!
 //!   mdr-kernel write-approval -Propose -Target <path> -Source <file> -Reason <why> [-DryRun]
@@ -332,7 +332,7 @@ fn run(root: &Path, args: &Args) -> Result<String, String> {
             fs::copy(&source_full, dir.join("content.md")).map_err(|e| e.to_string())?;
             fs::write(dir.join("metadata.json"), to_json(&meta) + "\n")
                 .map_err(|e| e.to_string())?;
-            out.push_str(&format!("PROPOSAL_ID={id}\nTARGET={target_rel}\nNEXT=pwsh -NoProfile -File bin/write-approval.ps1 -Approve -ProposalId {id} -Reason '<review outcome>'\n"));
+            out.push_str(&format!("PROPOSAL_ID={id}\nTARGET={target_rel}\nNEXT=mdr-kernel write-approval -Approve -ProposalId {id} -Reason '<review outcome>'\n"));
         }
         "Approve" => {
             let (Some(id), Some(reason)) = (value("ProposalId"), value("Reason")) else {

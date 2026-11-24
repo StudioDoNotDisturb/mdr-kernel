@@ -19,9 +19,9 @@ will contain your file names, local paths, and work history. Before the first se
 
 - On GitHub, use **Use this template**, choose **Private**, then clone the new repository you own.
 - Never adopt inside a **public fork** — GitHub forks of public repos are always public.
-- Run `bin/setup-private.ps1` inside that clone. It verifies and pins the private destination;
+- Run `mdr-kernel setup-private` inside that clone. It verifies and pins the private destination;
   bootstrap, doctor, closeout, and pre-push all enforce the same result.
-- Local-only mode is explicit: `bin/setup-private.ps1 -Model '<id>' -LocalOnly` removes `origin`
+- Local-only mode is explicit: `mdr-kernel setup-private -Model '<id>' -LocalOnly` removes `origin`
   before creating memory.
 
 ## Minimum setup
@@ -29,7 +29,7 @@ will contain your file names, local paths, and work history. Before the first se
 You need:
 
 - git
-- PowerShell 7+ (`pwsh`)
+- The installed `mdr-kernel` binary
 - one AI coding surface that can read/write the clone and run shell commands
 
 Everything else is optional. Do not install every tool this repository mentions. Add tools only
@@ -41,8 +41,8 @@ when your own work needs them, and record the setup in a file.
 2. Run private setup and canonical start:
 
 ```powershell
-pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
-pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'
+mdr-kernel setup-private -Model '<your model id>'
+mdr-kernel start-session -Model '<your model id>'
 ```
 
 3. Give the first full participant a narrow adoption objective. Do not ask it to absorb your whole
@@ -108,8 +108,8 @@ a new `reference/*.md` or skill entrypoint unless a matching approve entry is st
 The flow is two commands, not a direct file write:
 
 ```powershell
-pwsh -NoProfile -File bin/write-approval.ps1 -Propose -Target reference/<slug>.md -Source <draft> -Reason '<why>'
-pwsh -NoProfile -File bin/write-approval.ps1 -Approve -ProposalId <id-printed-by-propose>
+mdr-kernel write-approval -Propose -Target reference/<slug>.md -Source <draft> -Reason '<why>'
+mdr-kernel write-approval -Approve -ProposalId <id-printed-by-propose>
 ```
 
 Approve writes the file and appends the audit record (`inbox/write-approval-audit.jsonl`), which
@@ -127,9 +127,9 @@ commit; when closing, name the new file with `-Also reference/<slug>.md` (multip
 
 If you bring an older `DECISIONS.md` along, do not paste it in and commit: the pre-commit history
 check expects every entry to carry an authority class. Follow the explicit migration in
-`docs/decision-authority.md` (`bin/initialize-decision-authority.ps1 -PreserveLegacy`, run under
+`docs/decision-authority.md` (`mdr-kernel initialize-decision-authority -PreserveLegacy`, run under
 your own lock after the old log is committed unchanged). It preserves old entries without
-ratifying them; new entries go through `bin/add-decision.ps1`.
+ratifying them; new entries go through `mdr-kernel add-decision`.
 
 ## External folders
 
@@ -150,8 +150,8 @@ you add another root, make it `index-only` first:
 Run:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
-pwsh -NoProfile -File bin/update-node-map.ps1 -Check
+mdr-kernel update-node-map
+mdr-kernel update-node-map -Check
 ```
 
 `-Check` is not just an issue diff. It also fails when the generated map artifacts are stale and no
@@ -223,5 +223,5 @@ one.
 
 Directory Path: docs/
 Next Sequential File: ../skills/mdr-kernel/SKILL.md
-Related Workflows: ../protocol/RUNBOOK.md, ../_templates/skill-template.md, ../skills/mdr-kernel/SKILL.md, ../bin/update-node-map.ps1
+Related Workflows: ../protocol/RUNBOOK.md, ../_templates/skill-template.md, ../skills/mdr-kernel/SKILL.md, ../native/src/node_map.rs
 AI Execution Prompts: ../protocol/CONTRACT.md

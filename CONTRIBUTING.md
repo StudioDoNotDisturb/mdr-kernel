@@ -12,7 +12,7 @@ names, paths, and work history). Two ways to contribute:
 ## Adaptations (the main thing)
 
 Generate a private repo using **Use this template**, clone your new repo, run
-`bin/setup-private.ps1`, and change what does not fit. Fork only to send template
+`mdr-kernel setup-private`, and change what does not fit. Fork only to send template
 changes back — never to grow your own memory in. The pattern makes strong
 assumptions (PowerShell, git, one live `STATE.md`, a heartbeat lock); if you adapt those to your
 stack, an issue describing what you changed and why is genuinely useful. It tells the next person
@@ -24,8 +24,8 @@ Report things that should be reliable but are not:
 
 - **Cold-clone breakage** — anything that fails on a fresh clone after the standard sequence:
   private repo from **Use this template** →
-  `pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'` →
-  `pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'`.
+  `mdr-kernel setup-private -Model '<your model id>'` →
+  `mdr-kernel start-session -Model '<your model id>'`.
   This path should always be green. If it is not, that is a bug.
 - **Dangling references** — a doc that points at a file this repo does not ship.
 - **Portability** — a script that assumes Windows paths where it should not, or a doctor check
@@ -57,7 +57,7 @@ escape valve to push upstream.
   `DECISIONS.md` (append-only, newest on top).
 - Follow `docs/brand-manual.md` for terminal, docs, and visual style. Do not theme parser-facing
   status lines, exit codes, protected filenames, or required workflow names.
-- Run `bin/brain-doctor.ps1` before you open a PR. Green, or explain why not.
+- Run `mdr-kernel doctor` before you open a PR. Green, or explain why not.
 
 MIT licensed. By contributing you agree your contribution is licensed the same way.
 
@@ -67,5 +67,5 @@ MIT licensed. By contributing you agree your contribution is licensed the same w
 
 Directory Path: ./
 Next Sequential File: README.md
-Related Workflows: README.md, docs/brand-manual.md, protocol/RUNBOOK.md, bin/brain-doctor.ps1
+Related Workflows: README.md, docs/brand-manual.md, protocol/RUNBOOK.md, native/src/doctor.rs
 AI Execution Prompts: protocol/CONTRACT.md

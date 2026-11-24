@@ -12,7 +12,7 @@ where agents arrive without trusted private context, read the record, perform th
 handoff, and leave the next session a cleaner record.
 
 The public style is precise, over-lit, procedural, and slightly uncomfortable. The machinery
-remains plain PowerShell and git.
+remains the native binary and Git.
 
 ## Voice
 
@@ -51,7 +51,7 @@ funniest when it sounds completely serious.
 - **Failure is bureaucratic.** Hard blocks are non-compliance events with the correction named
   plainly. Flavor is allowed around the edges; it must never hide the actual problem.
 - **Rewards are corporate.** The Waffle Party protocol belongs to clean session exit or the
-  explicit `bin/waffle-party.ps1` wrapper — not every successful diagnostic.
+  explicit `mdr-kernel waffle-party` wrapper — not every successful diagnostic.
 - **Parser-facing lines stay stable.** Do not theme or rename `STARTUP_STATUS=READY`,
   `RECALL_STATUS=MATCHED`, exit codes, script filenames, or protected file names.
 
@@ -153,5 +153,5 @@ The product name is `mdr-kernel`. The show-inspired language is an homage in ton
 
 Directory Path: docs/
 Next Sequential File: node-map-usage-guide.md
-Related Workflows: ../README.md, ../FLOOR-GUIDE.md, ../bin/brain-doctor.ps1, ../bin/waffle-party.ps1
+Related Workflows: ../README.md, ../FLOOR-GUIDE.md, ../native/src/doctor.rs, ../native/src/main.rs
 AI Execution Prompts: ../protocol/CONTRACT.md

@@ -1,4 +1,4 @@
-//! The node map: a port of `bin/update-node-map.ps1`. Generation writes `maps/node-map.json`,
+//! The node map: a port of `mdr-kernel update-node-map`. Generation writes `maps/node-map.json`,
 //! `maps/NODE-MAP.md` and `maps/OBSIDIAN-NODE-LINKS.md` byte-identically to the script (only
 //! `generatedUtc` differs); `-Check` reports new link issues and stale output; `-Path` prints one
 //! file's record; `-Path -Repair [-Apply]` fixes the two mechanical node-block shape defects.
@@ -1383,7 +1383,7 @@ fn obsidian_markdown(data: &Data) -> String {
         "",
         "# Obsidian Node Links",
         "",
-        "Generated from `maps/node-map.json` by `bin/update-node-map.ps1`. Do not hand-edit.",
+        "Generated from `maps/node-map.json` by `mdr-kernel update-node-map`. Do not hand-edit.",
         "",
         "This file gives Markdown graph tools real links for the node map. The source files remain canonical; this generated bridge exists so graph views, backlinks, and outgoing links can see the retrieval structure.",
         "",
@@ -1454,7 +1454,7 @@ fn obsidian_markdown(data: &Data) -> String {
             "Directory Path: maps/",
             "Next Sequential File: maps/NODE-MAP.md",
             "Related Workflows: maps/node-map.json, maps/node-roots.json, specs/node-map.md, docs/node-map-usage-guide.md",
-            "AI Execution Prompts: bin/update-node-map.ps1",
+            "AI Execution Prompts: native/src/node_map.rs",
         ]
         .map(String::from),
     );
@@ -1469,7 +1469,7 @@ fn node_map_markdown(data: &Data, roots: &[Root]) -> String {
         "",
         "# Node Map",
         "",
-        "Generated from `maps/node-roots.json` by `bin/update-node-map.ps1`.",
+        "Generated from `maps/node-roots.json` by `mdr-kernel update-node-map`.",
         "",
     ]
     .map(String::from)
@@ -1633,7 +1633,7 @@ fn node_map_markdown(data: &Data, roots: &[Root]) -> String {
             "Directory Path: maps/",
             "Next Sequential File: maps/node-map.json",
             "Related Workflows: maps/node-roots.json, specs/node-map.md, docs/node-map-usage-guide.md",
-            "AI Execution Prompts: bin/update-node-map.ps1",
+            "AI Execution Prompts: mdr-kernel update-node-map",
         ]
         .map(String::from),
     );
@@ -1966,7 +1966,7 @@ fn exec(root: &Path, opts: &Opts, out: &mut String) -> Result<i32, String> {
         }
         if !stale.is_empty() {
             return Err(format!(
-                "Generated node-map output is stale: {}. Run bin/update-node-map.ps1.",
+                "Generated node-map output is stale: {}. Run mdr-kernel update-node-map.",
                 stale.join(", ")
             ));
         }

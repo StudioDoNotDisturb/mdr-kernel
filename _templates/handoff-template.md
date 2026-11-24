@@ -26,7 +26,7 @@ Context: End-of-session transfer note that lets another full participant resume 
   1. Save this file as `handoffs/YYYY-MM-DD-<short-topic>.md`.
   2. Add a one-line row to `handoffs/INDEX.md`.
   3. Update `STATE.md` to reflect current state and next actions.
-  4. Run `bin/close-session.ps1 -Topic <short-topic> -Model <your-model-id>` to commit, push, and release STATE.lock.
+  4. Run `mdr-kernel close-session -Topic <short-topic> -Model <your-model-id>` to commit, push, and release STATE.lock.
 -->
 
 ## What landed this session
@@ -44,7 +44,7 @@ to integrate new verified evidence under your own lock.)
 
 ## Decisions made
 
-(Quoted operator rulings and durable proposals use bin/add-decision.ps1 with the appropriate
+(Quoted operator rulings and durable proposals use mdr-kernel add-decision with the appropriate
 authority. Proposals are not rules. Work reports and session choices stay in this handoff;
 label choices "Session choices (not rulings)". Never write the human ratification ledger.)
 

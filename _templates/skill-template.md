@@ -71,11 +71,11 @@ metadata:
 
 ## Procedure
 
-1. Run canonical startup: `pwsh -NoProfile -File bin/start-session.ps1 -Model '<actual model id>'`.
+1. Run canonical startup: `mdr-kernel start-session -Model '<actual model id>'`.
    Require `STARTUP_STATUS=READY` before proceeding.
-2. Run active recall. A verified prompt hook runs `bin/hook-recall.ps1` automatically; otherwise,
+2. Run active recall. A verified prompt hook runs `mdr-kernel hook-recall` automatically; otherwise,
    or when it reports DEGRADED, run
-   `pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'`.
+   `mdr-kernel prepare-work -Objective '<operator objective>'`.
    If a gate matches, read the listed sources before acting.
 3. Read the smallest relevant file set chosen from `STATE.md` plus `reference/INDEX.md`. State what
    you selected and what you are intentionally not reading yet.
@@ -84,7 +84,7 @@ metadata:
    decision with a named outcome.>
 6. Verify the output against the Verification section below.
 7. Write durable results back into the repo. Set `BRAIN_MODEL`, acquire `STATE.lock` and carry its
-   token before editing coordination files. Run `bin/update-node-map.ps1` if Markdown structure
+   token before editing coordination files. Run `mdr-kernel update-node-map` if Markdown structure
    changed.
 
 ## Gotchas

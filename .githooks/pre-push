@@ -1,21 +1,10 @@
 #!/bin/sh
-# mdr-kernel pre-push: fail-closed private-destination gate.
-# Delegates to the same verifier used by setup, bootstrap, doctor, and close-session.
-# git calls this hook as: pre-push <remote-name> <remote-url>
-
-root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
-# The native engine runs the same verifier when installed in bin/ (MDR_ENGINE=legacy skips it).
-if [ "${MDR_ENGINE:-}" != legacy ]; then
-  for engine in "$root/bin/mdr-kernel.exe" "$root/bin/mdr-kernel"; do
-    if [ -x "$engine" ]; then exec "$engine" hook pre-push "$1" "$2"; fi
-  done
+repo=$(git rev-parse --show-toplevel) || exit 1
+for engine in "$repo/bin/mdr-kernel.exe" "$repo/bin/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" hook pre-push "$@"; fi
+done
+if command -v mdr-kernel >/dev/null 2>&1; then
+    exec mdr-kernel hook pre-push "$@"
 fi
-script="$root/bin/remote-privacy.ps1"
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoProfile -File "$script" -RemoteUrl "$2" -RequireApproved
-  exit $?
-else
-  echo "X mdr-kernel pre-push: PowerShell (pwsh) is required to verify remote privacy" >&2
-  exit 1
-fi
-exit 0
+echo 'mdr-kernel: install the native binary to run the Git hooks.' >&2
+exit 1

@@ -23,6 +23,7 @@ fn cold_clone_bootstraps_and_starts_clean() {
         "{}",
         startup.1
     );
+    // First-run advisories cover optional host recall, the bootstrap lock, and the shell identity.
     for line in bootstrap.1.lines().chain(startup.1.lines()) {
         assert!(!line.starts_with("NOTE="), "{line}");
         if let Some(warning) = line.strip_prefix("[warn] ") {
@@ -38,4 +39,12 @@ fn cold_clone_bootstraps_and_starts_clean() {
     assert!(git(&root, &["status", "--porcelain", "--untracked-files=all"]).is_empty());
     assert!(git(&root, &["remote"]).is_empty());
     assert!(!root.join("STATE.lock").exists());
+
+    put(&root, "handoffs/ci-search.md", "fixture quartz");
+    let search = run(&root, &["find", "--query", "quartz", "--json"]);
+    assert_eq!(search.0, 0, "{}", search.1);
+    let hits: serde_json::Value = serde_json::from_str(&search.1).unwrap();
+    assert_eq!(hits[0]["path"], "handoffs/ci-search.md");
+    fs::remove_file(root.join("handoffs/ci-search.md")).unwrap();
+    assert!(git(&root, &["status", "--porcelain", "--untracked-files=all"]).is_empty());
 }

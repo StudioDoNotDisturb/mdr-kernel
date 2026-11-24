@@ -4,7 +4,7 @@ Context: Pre-setup instructions for an agent opened in a fresh clone; setup rege
 
 # GEMINI.md - mdr-kernel phase-zero door
 
-_This clone has not been set up yet. When `bin/setup-private.ps1` runs, this file is regenerated
+_This clone has not been set up yet. When `mdr-kernel setup-private` runs, this file is regenerated
 from `protocol/CONTRACT.md` into the full agent front door._
 
 ## You woke up in a fresh mdr-kernel clone
@@ -19,7 +19,7 @@ context. The safe first run is one setup command, then one startup:
    picks any short name instead):
 
    ```powershell
-   pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
+   mdr-kernel setup-private -Model '<your model id>'
    ```
 
    For memory with no remote backup, add `-LocalOnly`. Setup verifies the destination is
@@ -28,15 +28,15 @@ context. The safe first run is one setup command, then one startup:
 3. **Run the one startup and require readiness:**
 
    ```powershell
-   pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'
+   mdr-kernel start-session -Model '<your model id>'
    ```
 
    It must end with `STARTUP_STATUS=READY` before you write anything.
 
-`bin/setup-private.ps1` is the only adopter entry point. `bin/bootstrap-clone.ps1` is an
+`mdr-kernel setup-private` is the only adopter entry point. `mdr-kernel bootstrap-clone` is an
 internal setup/repair primitive - do not run it directly on first run. If `STATE.md` exists but
 you are still reading this phase-zero text, the doors were never regenerated: run
-`pwsh -NoProfile -File bin/sync-doors.ps1`.
+`mdr-kernel sync-doors`.
 
 ---
 
@@ -44,5 +44,5 @@ you are still reading this phase-zero text, the doors were never regenerated: ru
 
 Directory Path: ./
 Next Sequential File: protocol/CONTRACT.md
-Related Workflows: README.md, bin/setup-private.ps1, protocol/CONTRACT.md
+Related Workflows: README.md, native/src/onboard.rs, protocol/CONTRACT.md
 AI Execution Prompts: protocol/CONTRACT.md

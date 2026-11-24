@@ -1,10 +1,8 @@
 #!/bin/sh
-# POSIX twin of bin/brain-doctor.ps1 — delegates to the canonical PowerShell implementation
-# so bash-based harnesses and adopters on macOS/Linux can call ./bin/brain-doctor directly.
-dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if command -v pwsh >/dev/null 2>&1; then
-  exec pwsh -NoProfile -File "$dir/brain-doctor.ps1" "$@"
-else
-  echo "brain-doctor: PowerShell (pwsh) not found on PATH" >&2
-  exit 127
-fi
+dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+for engine in "$dir/mdr-kernel.exe" "$dir/mdr-kernel"; do
+    if [ -x "$engine" ]; then exec "$engine" doctor "$@"; fi
+done
+if command -v mdr-kernel >/dev/null 2>&1; then exec mdr-kernel doctor "$@"; fi
+echo 'mdr-kernel: install the native binary.' >&2
+exit 127

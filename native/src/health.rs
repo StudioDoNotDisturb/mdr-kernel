@@ -1,5 +1,5 @@
-//! Memory health reports. Ports of `bin/state-budget.ps1` (the STATE.md size verdict and its
-//! breakdown) and `bin/secret-audit.ps1` (the wide on-demand secret scan and the scanner-coverage
+//! Memory health reports. Ports of `mdr-kernel state-budget` (the STATE.md size verdict and its
+//! breakdown) and `mdr-kernel secret-audit` (the wide on-demand secret scan and the scanner-coverage
 //! check). The doctor reuses the line reader and the budget numbers.
 //!
 //!   mdr-kernel state-budget [-Path <file>] [-MaxLines 90] [-MaxKB 10] [-Top 5] [-Detail]
@@ -137,31 +137,7 @@ pub fn state_budget(path: &Path, max_lines: i64, max_kb: i64, top: usize, detail
 // ---------- secret-audit ----------
 
 /// Scanners that must keep both modern key shapes and generic credential assignments.
-const COVERAGE: [(&str, &str, [&str; 2]); 6] = [
-    (
-        "pre-commit fast staged scan",
-        ".githooks/pre-commit",
-        [
-            r"(?m)^\s*patterns=.*sk-\(proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}",
-            r"(?m)^\s*patterns=.*api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token",
-        ],
-    ),
-    (
-        "brain-doctor tracked-file scan",
-        "bin/brain-doctor.ps1",
-        [
-            r"(?s)\$patterns\s*=\s*@\(.*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}",
-            r"(?s)\$patterns\s*=\s*@\(.*api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token",
-        ],
-    ),
-    (
-        "secret-audit deep scan",
-        "bin/secret-audit.ps1",
-        [
-            r"(?m)^\s*'fast-scan set'\s*=\s*'.*sk-\(\?:proj\|svcacct\)-\[A-Za-z0-9_-\]\{20,\}",
-            r"(?m)^\s*'credential assignment'\s*=\s*'.*api\[_-\]\?key\|secret\|passwd\|password\|access\[_-\]\?token",
-        ],
-    ),
+const COVERAGE: [(&str, &str, [&str; 2]); 3] = [
     (
         "native pre-commit staged scan",
         "native/src/hook.rs",
@@ -221,10 +197,9 @@ const PATTERNS: [(&str, &str); 7] = [
 ];
 
 /// Files whose job is to describe secret shapes.
-const SKIP: [&str; 4] = [
-    ".githooks/pre-commit",
-    "bin/brain-doctor.ps1",
-    "bin/secret-audit.ps1",
+const SKIP: [&str; 3] = [
+    "native/src/hook.rs",
+    "native/src/doctor.rs",
     "native/src/health.rs",
 ];
 
@@ -418,7 +393,7 @@ mod tests {
         let fast = Regex::new(&format!("(?i){}", PATTERNS[0].1)).unwrap();
         assert!(fast.is_match(&format!("akia{}", "a".repeat(16))));
         let source = include_str!("health.rs");
-        for pattern in COVERAGE[4].2 {
+        for pattern in COVERAGE[1].2 {
             assert!(
                 Regex::new(&format!("(?i){pattern}"))
                     .unwrap()
@@ -427,7 +402,7 @@ mod tests {
             );
         }
         let hook = include_str!("hook.rs");
-        for pattern in COVERAGE[3].2 {
+        for pattern in COVERAGE[0].2 {
             assert!(Regex::new(pattern).unwrap().is_match(hook), "{pattern}");
         }
     }

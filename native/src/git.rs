@@ -1,8 +1,7 @@
-//! Process helpers shared by the commit guards: git reads and the PowerShell gates that later
-//! checkpoints port.
+//! Git process helpers shared by the commit guards.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 pub fn lossy(bytes: Vec<u8>) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
@@ -59,24 +58,4 @@ pub fn common_top(dir: &Path) -> Option<PathBuf> {
     .ok()?;
     let common = dir.join(lossy(common).trim());
     common.parent().map(Path::to_path_buf)
-}
-
-pub fn pwsh_command(root: &Path, script: &str, args: &[&str]) -> Command {
-    let mut command = Command::new("pwsh");
-    command
-        .current_dir(root)
-        .arg("-NoProfile")
-        .arg("-File")
-        .arg(root.join("bin").join(script))
-        .args(args);
-    command
-}
-
-/// A PowerShell gate whose stdout and stderr both go to this process's stderr, as `>&2` does.
-pub fn pwsh_to_stderr(root: &Path, script: &str, args: &[&str]) -> Result<bool, String> {
-    let status = pwsh_command(root, script, args)
-        .stdout(Stdio::from(std::io::stderr()))
-        .status()
-        .map_err(|e| format!("required utility 'pwsh' is unavailable ({e})"))?;
-    Ok(status.success())
 }

@@ -174,3 +174,6 @@ mod private_onboarding;
 
 #[path = "regressions/cold_clone.rs"]
 mod cold_clone;
+
+#[path = "regressions/native_release.rs"]
+mod native_release;

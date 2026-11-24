@@ -4,15 +4,15 @@ Context: Generated dashboard for Markdown retrieval envelopes and SYSTEM NODE LI
 
 # Node Map
 
-Generated from `maps/node-roots.json` by `bin/update-node-map.ps1`.
+Generated from `maps/node-roots.json` by `mdr-kernel update-node-map`.
 
-generatedUtc: 2026-11-23T05:03:37.0641730Z
+generatedUtc: 2026-11-24T04:36:35.8275122Z
 
 ## Root Counts
 
 | Root | Total | Strict Both | Legacy | Partial | Missing | Tracked | Untracked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mdr-kernel | 30 | 29 | 1 | 0 | 0 | 30 | 0 |
+| mdr-kernel | 32 | 30 | 2 | 0 | 0 | 32 | 0 |
 
 ## Indexed Files
 
@@ -29,12 +29,14 @@ generatedUtc: 2026-11-23T05:03:37.0641730Z
 | mdr-kernel | [docs/adoption-guide.md](../docs/adoption-guide.md) | Adoption guide | strict | strict |  |
 | mdr-kernel | [docs/brand-manual.md](../docs/brand-manual.md) | mdr-kernel brand manual | strict | strict |  |
 | mdr-kernel | [docs/decision-authority.md](../docs/decision-authority.md) | Decision authority and preserved history | strict | strict |  |
+| mdr-kernel | [docs/document-lifecycle.md](../docs/document-lifecycle.md) | [Living] Document lifecycle | strict | legacy |  |
 | mdr-kernel | [docs/node-map-usage-guide.md](../docs/node-map-usage-guide.md) | Node map usage guide | strict | strict |  |
 | mdr-kernel | [docs/recall-hooks.md](../docs/recall-hooks.md) | Prompt recall adapters and their verification limits | strict | strict |  |
 | mdr-kernel | [docs/upgrading.md](../docs/upgrading.md) | Upgrade the kernel while preserving your memory | strict | strict |  |
 | mdr-kernel | [employee-handbook.md](../employee-handbook.md) | Employee handbook | strict | strict |  |
 | mdr-kernel | [FLOOR-GUIDE.md](../FLOOR-GUIDE.md) | Floor Guide | strict | strict |  |
 | mdr-kernel | [GEMINI.md](../GEMINI.md) | GEMINI.md - mdr-kernel phase-zero door | strict | strict |  |
+| mdr-kernel | [native/tests/ASSERTIONS.md](../native/tests/ASSERTIONS.md) | [Living] Kernel regression assertion map | strict | strict |  |
 | mdr-kernel | [protocol/CONTRACT.md](../protocol/CONTRACT.md) | CONTRACT - the canonical mdr-kernel contract | strict | strict |  |
 | mdr-kernel | [protocol/RUNBOOK.md](../protocol/RUNBOOK.md) | RUNBOOK - how to start and end an mdr-kernel session | strict | strict |  |
 | mdr-kernel | [PUBLIC-EXPORT-AUDIT.md](../PUBLIC-EXPORT-AUDIT.md) | Public export audit | strict | strict |  |
@@ -56,6 +58,7 @@ generatedUtc: 2026-11-23T05:03:37.0641730Z
 
 ### Legacy or Off-Shape Nodes
 - mdr-kernel/_templates/markdown-file-template.md - top strict, node legacy
+- mdr-kernel/docs/document-lifecycle.md - top strict, node legacy
 
 ### Missing or Partial Nodes
 - None outside known waived files.
@@ -74,4 +77,4 @@ generatedUtc: 2026-11-23T05:03:37.0641730Z
 Directory Path: maps/
 Next Sequential File: maps/node-map.json
 Related Workflows: maps/node-roots.json, specs/node-map.md, docs/node-map-usage-guide.md
-AI Execution Prompts: bin/update-node-map.ps1
+AI Execution Prompts: mdr-kernel update-node-map

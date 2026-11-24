@@ -1,5 +1,5 @@
-//! Session start and stop. Ports of `bin/start-session.ps1` (doctor, pull, STATE readback, one
-//! STARTUP_STATUS line) and `bin/session-stop.ps1` (a read-only Stop-hook nudge). The doctor
+//! Session start and stop. Ports of `mdr-kernel start-session` (doctor, pull, STATE readback, one
+//! STARTUP_STATUS line) and `mdr-kernel session-stop` (a read-only Stop-hook nudge). The doctor
 //! runs in process.
 //!
 //!   mdr-kernel start-session [-Model <id>] [-FullDoctor]
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 const RESPONSE: &str = "RESPONSE_CONTRACT=Report Right now, blockers, and top next action from STATE.md; if work was assigned, use STATE.md plus reference/INDEX.md to pick the smallest relevant file set before reading broadly; the generated node map checks link health.";
 const SHARED: &str = "SHARED_MEMORY_CONTRACT=Anything another model needs must be written into the repo; never rely on private model memory.";
-const RECALL: &str = "RECALL_CONTRACT=Before acting on assigned work, recall must run: a verified prompt hook (bin/hook-recall.ps1) or pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action.";
+const RECALL: &str = "RECALL_CONTRACT=Before acting on assigned work, recall must run: a verified prompt hook (mdr-kernel hook-recall) or mdr-kernel prepare-work -Objective '<operator objective>'; if gates match, read the listed sources and state how the traps change the next action.";
 
 fn lines(root: &Path, args: &[&str]) -> Vec<String> {
     git(root, args)
@@ -85,7 +85,7 @@ pub fn start(root: &Path, model: Option<&str>, full_doctor: bool) -> i32 {
                 println!("{line}");
             }
         }
-        println!("({hidden} ok checks passed, not shown; full output: pwsh -NoProfile -File bin/brain-doctor.ps1)");
+        println!("({hidden} ok checks passed, not shown; full output: mdr-kernel doctor)");
     }
     if doctor_exit != 0 {
         status = "BLOCKED";
@@ -152,7 +152,7 @@ pub fn start(root: &Path, model: Option<&str>, full_doctor: bool) -> i32 {
         Ok(bytes) => println!("{}", lossy(bytes)),
         Err(_) => {
             status = "BLOCKED";
-            notes.push("STATE.md is missing - first run: pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>' (example: -Model 'claude-opus-5'); repairing a clone that was already set up: bin/bootstrap-clone.ps1.".into());
+            notes.push("STATE.md is missing - first run: mdr-kernel setup-private -Model '<your model id>' (example: -Model 'claude-opus-5'); repairing a clone that was already set up: mdr-kernel bootstrap-clone.".into());
             println!("MISSING: STATE.md");
         }
     }
@@ -168,7 +168,7 @@ pub fn start(root: &Path, model: Option<&str>, full_doctor: bool) -> i32 {
 pub fn stop(root: &Path) -> String {
     let mut messages = Vec::new();
     if !lines(root, &["status", "--porcelain"]).is_empty() {
-        messages.push("mdr-kernel has uncommitted changes — close out with: pwsh -NoProfile -File bin/close-session.ps1 -Topic <handoff-slug> -Model <your-model-id> (verifies handoff/STATE, commits with your trailer, pushes, releases the lock).".to_string());
+        messages.push("mdr-kernel has uncommitted changes — close out with: mdr-kernel close-session -Topic <handoff-slug> -Model <your-model-id> (verifies handoff/STATE, commits with your trailer, pushes, releases the lock).".to_string());
     }
     let lock = common_top(root)
         .filter(|p| p.is_dir())
@@ -180,7 +180,7 @@ pub fn stop(root: &Path) -> String {
             .ok()
             .and_then(|v| v.get("model").and_then(|m| m.as_str()).map(str::to_string))
             .unwrap_or_else(|| raw.split_whitespace().next().unwrap_or("").to_string());
-        messages.push(format!("STATE.lock is still held by '{holder}' — fine mid-session; close-session releases it after a successful push; a lock you hold outside close: pwsh -NoProfile -File bin/state-lock.ps1 -Release -Model <your-model-id> -Token <your acquired token>."));
+        messages.push(format!("STATE.lock is still held by '{holder}' — fine mid-session; close-session releases it after a successful push; a lock you hold outside close: mdr-kernel state-lock -Release -Model <your-model-id> -Token <your acquired token>."));
     }
     if messages.is_empty() {
         return "{}".into();

@@ -68,10 +68,10 @@ labels, not replacements.
 | **The Protocol** | The canonical rules every full participant receives. | `protocol/` |
 | **The Intake** | Unrefined notes waiting to be classified and folded into state, reference, specs, or handoffs. | `inbox/` |
 | **The macrodata table** | The generated link-health view of every Markdown node (not the reading router). | `maps/NODE-MAP.md`, `maps/node-map.json` |
-| **The Break Room** | The active-recall gate that forces known mistakes back into view before action. | `bin/brain-recall.ps1` (via `bin/hook-recall.ps1` or `bin/prepare-work.ps1`) |
+| **The Break Room** | The active-recall gate that forces known mistakes back into view before action. | `mdr-kernel brain-recall` (via `mdr-kernel hook-recall` or `mdr-kernel prepare-work`) |
 | **The Perpetuity Wing** | The durable record of decisions and indexed handoffs. | `DECISIONS.md`, `handoffs/` |
-| **The elevator** | Session closeout: the worker exits, the record remains. | `handoffs/YYYY-MM-DD-topic.md`, `bin/close-session.ps1` |
-| **The waffle party** | Optional success flavor around a clean diagnostic. Narrow use only — never the formal workflow name. | `bin/waffle-party.ps1` |
+| **The elevator** | Session closeout: the worker exits, the record remains. | `handoffs/YYYY-MM-DD-topic.md`, `mdr-kernel close-session` |
+| **The waffle party** | Optional success flavor around a clean diagnostic. Narrow use only — never the formal workflow name. | `mdr-kernel waffle-party` |
 
 ## [ LAW ] STATE Wins
 
@@ -90,5 +90,5 @@ less dependent on the previous worker's context window.
 
 Directory Path: ./
 Next Sequential File: protocol/CONTRACT.md
-Related Workflows: README.md, docs/brand-manual.md, protocol/CONTRACT.md, bin/brain-recall.ps1
+Related Workflows: README.md, docs/brand-manual.md, protocol/CONTRACT.md, native/src/recall.rs
 AI Execution Prompts: protocol/CONTRACT.md

@@ -26,14 +26,14 @@ to run it is to open your AI tool in the fresh clone and hand it the first promp
 the shipped phase-zero front doors (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) route the agent
 through the same two commands below, and setup regenerates those doors into full contract doors.
 
-`bin/setup-private.ps1` is the **only** adopter entry point (`bin/bootstrap-clone.ps1` is its
+`mdr-kernel setup-private` is the **only** adopter entry point (`mdr-kernel bootstrap-clone` is its
 internal primitive, used directly only to repair an already-set-up clone). Setup runs once per
 clone: it verifies and pins the destination, arms hooks, scaffolds the memory, checkpoints it,
 regenerates doors and the node map, and runs the doctor. Then startup runs **once**:
 
 ```powershell
-pwsh -NoProfile -File bin/setup-private.ps1 -Model '<your model id>'
-pwsh -NoProfile -File bin/start-session.ps1  -Model '<your model id>'
+mdr-kernel setup-private -Model '<your model id>'
+mdr-kernel start-session  -Model '<your model id>'
 ```
 
 (`-Model` is the attribution identity: an agent passes its real model id, e.g.
@@ -57,7 +57,7 @@ work.
 
 | Surface | What it can do | Kickoff |
 |---|---|---|
-| **Full participant** (any CLI coding agent: Claude Code, Codex, Gemini CLI, ...) | Read/write the repo, run scripts, commit/push | `bin/start-session.ps1` (below) |
+| **Full participant** (any CLI coding agent: Claude Code, Codex, Gemini CLI, ...) | Read/write the repo, run scripts, commit/push | `mdr-kernel start-session` (below) |
 | **Read-only local model** | Read allow-listed files, produce inbox-ready notes; never writes | Point it at `STATE.md`; it returns notes you fold in |
 | **Advisory chat** (a web/app assistant, no repo access) | Reason and plan only; you paste `STATE.md` to ground it | Paste the relevant excerpt from STATE and name the question for review |
 
@@ -66,7 +66,7 @@ work.
 Run this at the start of a session:
 
 ```powershell
-pwsh -NoProfile -File bin/start-session.ps1 -Model '<your model id>'
+mdr-kernel start-session -Model '<your model id>'
 ```
 
 Expected result:
@@ -85,7 +85,7 @@ described in the README. The generated node map checks links. If it is missing o
 regenerate it under your coordination lock:
 
 ```powershell
-pwsh -NoProfile -File bin/update-node-map.ps1
+mdr-kernel update-node-map
 ```
 
 When you assign work, a verified prompt hook runs recall automatically. Until the host firing
@@ -93,7 +93,7 @@ is verified, or if it reports DEGRADED, run the portable fallback before acting
 (see `docs/recall-hooks.md`):
 
 ```powershell
-pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>'
+mdr-kernel prepare-work -Objective '<operator objective>'
 ```
 
 If a gate matches, it reads the listed sources and states how the surfaced traps change the next
@@ -117,7 +117,7 @@ At the end of a session, have the model update `STATE.md`, append any new decisi
 Markdown changed, then run:
 
 ```powershell
-pwsh -NoProfile -File bin/close-session.ps1 -Topic '<short-topic>' -Model '<your model id>'
+mdr-kernel close-session -Topic '<short-topic>' -Model '<your model id>'
 ```
 
 The committing identity must be explicit — `-Model` or `$env:BRAIN_MODEL`; the clone's
@@ -130,7 +130,7 @@ for the offline exception. It stages only coordination files, the current handof
 maps, and paths named with `-Also` (multiple paths: `-Also 'a.md,b.md'`); unrelated files are
 listed and left untouched. Inbox notes are never adopted folder-wide: name the notes this session
 owns with `-Also`. Unrelated staged work blocks the close and stays staged. New `reference/*.md`
-files and skills go through `bin/write-approval.ps1` first (see
+files and skills go through `mdr-kernel write-approval` first (see
 `docs/adoption-guide.md`); their audit entry rides the close automatically, and the close refuses
 to commit an INDEX row whose target would be left behind.
 
@@ -138,14 +138,14 @@ If connectivity is unavailable, and only after normal private-remote setup, make
 explicit:
 
 ```powershell
-pwsh -NoProfile -File bin/close-session.ps1 -Topic '<short-topic>' -Model '<your model id>' -OfflineCheckpoint
+mdr-kernel close-session -Topic '<short-topic>' -Model '<your model id>' -OfflineCheckpoint
 ```
 
 This commits without pushing, releases the lock, and leaves a persistent warning. Startup names
 the same recovery command every time until it succeeds:
 
 ```powershell
-pwsh -NoProfile -File bin/sync-private.ps1
+mdr-kernel sync-private
 ```
 
 `sync-private` is the shared push implementation used by setup, normal close, and recovery. It
@@ -167,11 +167,11 @@ contract/front-door files, protocol scripts, and hooks. The exact enforced list 
 If a model is going to edit those files, it must hold the lock:
 
 ```powershell
-pwsh -NoProfile -File bin/state-lock.ps1 -Acquire -Model '<your model id>' -Objective '<short objective>'
+mdr-kernel state-lock -Acquire -Model '<your model id>' -Objective '<short objective>'
 $env:BRAIN_MODEL = '<your model id>'
 $env:BRAIN_LOCK_TOKEN = '<token printed by your own acquire>'
-pwsh -NoProfile -File bin/state-lock.ps1 -CheckOwner
-pwsh -NoProfile -File bin/state-lock.ps1 -Release
+mdr-kernel state-lock -CheckOwner
+mdr-kernel state-lock -Release
 ```
 
 Acquire is fail-closed: it refuses a config-fallback identity, and a live same-model lock refuses
@@ -190,7 +190,7 @@ is never evidence by itself. Never retrieve someone else's token from the lock f
 
 ## Decisions and upgrades
 
-Use `bin/add-decision.ps1` for new proposals and quoted operator rulings. Work reports belong in
+Use `mdr-kernel add-decision` for new proposals and quoted operator rulings. Work reports belong in
 handoffs. The human alone performs hash-bound ratification in their own terminal. Read
 `docs/decision-authority.md` before migrating an existing log: no historical entry is ratified
 just because the software was upgraded, and an old entry that already quotes an operator ruling
@@ -211,5 +211,5 @@ The worker exits. The record stays.
 
 Directory Path: protocol/
 Next Sequential File: ../docs/adoption-guide.md
-Related Workflows: CONTRACT.md, ../docs/adoption-guide.md, ../skills/mdr-kernel/SKILL.md, ../docs/brand-manual.md, bin/start-session.ps1, bin/close-session.ps1
+Related Workflows: CONTRACT.md, ../docs/adoption-guide.md, ../skills/mdr-kernel/SKILL.md, ../docs/brand-manual.md, native/src/session.rs, native/src/close.rs
 AI Execution Prompts: CONTRACT.md

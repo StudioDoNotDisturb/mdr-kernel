@@ -1,4 +1,4 @@
-//! Front-door sync. A port of `bin/sync-doors.ps1`: copy the canonical BRAIN-CONTRACT block from
+//! Front-door sync copies the canonical BRAIN-CONTRACT block from
 //! `protocol/CONTRACT.md` into CLAUDE.md, AGENTS.md and GEMINI.md, and BRAIN-ADVISORY into
 //! `protocol/advisory.md`. `-Check` reports drift; `-Check -Staged` judges the index blobs, which
 //! is what a commit snapshots.
@@ -63,7 +63,7 @@ Context: Generated advisory instructions for chat surfaces that cannot read the 
 
 # {title}
 
-_This file is generated from protocol/CONTRACT.md by bin/sync-doors.ps1. Edit the
+_This file is generated from protocol/CONTRACT.md by mdr-kernel sync-doors. Edit the
 contract, then run sync - do not edit this copy._
 
 {block}
@@ -74,7 +74,7 @@ contract, then run sync - do not edit this copy._
 
 Directory Path: protocol/
 Next Sequential File: CONTRACT.md
-Related Workflows: CONTRACT.md, ../bin/sync-doors.ps1
+Related Workflows: CONTRACT.md, ../native/src/doors.rs
 AI Execution Prompts: CONTRACT.md"
         );
     }
@@ -86,7 +86,7 @@ Context: Generated CLI-agent instructions that mirror the canonical mdr-kernel c
 
 # {door}
 
-_This file is generated from protocol/CONTRACT.md by bin/sync-doors.ps1. Edit the
+_This file is generated from protocol/CONTRACT.md by mdr-kernel sync-doors. Edit the
 contract, then run sync - do not edit this copy._
 
 {block}
@@ -97,7 +97,7 @@ contract, then run sync - do not edit this copy._
 
 Directory Path: ./
 Next Sequential File: protocol/CONTRACT.md
-Related Workflows: protocol/CONTRACT.md, bin/sync-doors.ps1
+Related Workflows: protocol/CONTRACT.md, native/src/doors.rs
 AI Execution Prompts: protocol/CONTRACT.md"
     )
 }
@@ -176,7 +176,7 @@ pub fn sync(root: &Path, check: bool, staged: bool) -> Outcome {
             return outcome(
                 1,
                 format!(
-                    "TARGETS OUT OF SYNC: {}\nFix: pwsh -NoProfile -File bin/sync-doors.ps1\n",
+                    "TARGETS OUT OF SYNC: {}\nFix: mdr-kernel sync-doors\n",
                     drift.join(", ")
                 ),
                 "",
@@ -244,7 +244,7 @@ mod tests {
         let check = sync(&root, true, false);
         assert_eq!(
             check.out,
-            "TARGETS OUT OF SYNC: AGENTS.md\nFix: pwsh -NoProfile -File bin/sync-doors.ps1\n"
+            "TARGETS OUT OF SYNC: AGENTS.md\nFix: mdr-kernel sync-doors\n"
         );
         assert_eq!(sync(&root, false, false).out, "Updated: AGENTS.md\n");
         assert_eq!(

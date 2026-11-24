@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 
 pub const LINE_LIMIT: u64 = 60;
 const CODE_EXT: [&str; 11] = [
-    ".rs", ".ps1", ".psm1", ".py", ".sh", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+    "rs", "ps1", "psm1", "py", "sh", "js", "mjs", "cjs", "ts", "tsx", "jsx",
 ];
 
 fn pattern(cell: &'static OnceLock<Regex>, source: &str) -> &'static Regex {
@@ -35,7 +35,8 @@ fn dated_handoff() -> &'static Regex {
 }
 
 pub fn is_code(path: &str) -> bool {
-    CODE_EXT.iter().any(|e| path.ends_with(e))
+    path.rsplit_once('.')
+        .is_some_and(|(_, ext)| CODE_EXT.contains(&ext))
         || (path.starts_with(".githooks/") && !path.rsplit('/').next().unwrap_or("").contains('.'))
 }
 
@@ -82,7 +83,7 @@ pub fn check_code(text: &str, lines: u64, new_bin: &[String]) -> String {
         ));
     }
     format!(
-        "X mdr-kernel commit-msg: this commit {}.\n  Walk the least-code ladder (protocol/CONTRACT.md): needed at all? already in the repo (grep)?\n  stdlib or platform? an installed dependency? one line? Then say which rung held, as a trailer:\n    Least-code: <what you reused or why nothing smaller works, at least 10 characters>\n  close-session.ps1 takes it as -LeastCode '<text>'.",
+        "X mdr-kernel commit-msg: this commit {}.\n  Walk the least-code ladder (protocol/CONTRACT.md): needed at all? already in the repo (grep)?\n  stdlib or platform? an installed dependency? one line? Then say which rung held, as a trailer:\n    Least-code: <what you reused or why nothing smaller works, at least 10 characters>\n  mdr-kernel close-session takes it as -LeastCode '<text>'.",
         why.join(" and ")
     )
 }
@@ -122,7 +123,7 @@ pub fn check_files(text: &str, added: &[String], head_dirs: &BTreeSet<String>) -
         why.push_str(&format!(" and folder(s): {}", first(&folders, 5)));
     }
     format!(
-        "X mdr-kernel commit-msg: this commit {why}.\n  Walk the least-file ladder (protocol/CONTRACT.md): does anyone need it after this session? can an\n  existing file hold it? is it bulk, generated or temporary? does it belong in another repo?\n  A new folder needs three files landing now, or a tool that requires the path. Then say why:\n    Least-file: <why no existing file could hold it, at least 10 characters>\n  close-session.ps1 takes it as -LeastFile '<text>'."
+        "X mdr-kernel commit-msg: this commit {why}.\n  Walk the least-file ladder (protocol/CONTRACT.md): does anyone need it after this session? can an\n  existing file hold it? is it bulk, generated or temporary? does it belong in another repo?\n  A new folder needs three files landing now, or a tool that requires the path. Then say why:\n    Least-file: <why no existing file could hold it, at least 10 characters>\n  mdr-kernel close-session takes it as -LeastFile '<text>'."
     )
 }
 
@@ -182,9 +183,14 @@ mod tests {
                 .map(|(n, _)| n)
                 .sum()
         };
-        assert_eq!(lines("3\t1\tbin/a.ps1\x0010\t0\tREADME.md\x00-\t-\tlogo.png\x007\t0\tnative/src/x.rs\x00"), 10);
         assert_eq!(
-            lines("0\t0\t\0old.ps1\0_archive/old.ps1\x005\t2\t\0a.sh\0b.sh\0"),
+            lines(
+                "3\t1\tbin/a.sh\x0010\t0\tREADME.md\x00-\t-\tlogo.png\x007\t0\tnative/src/x.rs\x00"
+            ),
+            10
+        );
+        assert_eq!(
+            lines("0\t0\t\0old.sh\0_archive/old.sh\x005\t2\t\0a.sh\0b.sh\0"),
             5
         );
         assert!(is_code(".githooks/commit-msg") && !is_code(".githooks/README.md"));
@@ -194,7 +200,7 @@ mod tests {
     fn trailers_hold_at_their_edges() {
         assert!(check_code("subject", 60, &[]).is_empty());
         assert!(check_code("subject", 61, &[]).contains("adds 61 code lines"));
-        assert!(check_code("subject", 0, &["bin/new.ps1".into()]).contains("new bin/ file"));
+        assert!(check_code("subject", 0, &["bin/new.sh".into()]).contains("new bin/ file"));
         assert!(!check_code("subject\n\nLeast-code: ok", 500, &[]).is_empty());
         assert!(check_code(
             "subject\n\nleast-code: reused the existing parser",
