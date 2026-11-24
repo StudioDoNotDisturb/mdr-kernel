@@ -78,23 +78,37 @@ replacement of STATE, decisions, handoffs, references, local gates or your remot
 
 ### Rehearse in a throwaway clone first
 
-Before modifying your live checkout, test the full upgrade and a session close in an isolated,
-remote-free copy:
+Before modifying your live checkout, test the full upgrade and a local session close in an
+isolated, remote-free copy:
 
 ```sh
 git clone . /tmp/mdr-upgrade-test
 cd /tmp/mdr-upgrade-test
 git remote remove origin
-# Run the upgrade steps below in /tmp/mdr-upgrade-test, then verify:
+# Run Steps 1-8 below in /tmp/mdr-upgrade-test, then run a clean local close check:
 ./bin/mdr-kernel doctor
 ./bin/mdr-kernel start-session -Model '<your-model-id>'
-./bin/mdr-kernel close-session -Topic upgrade-smoke -Model '<your-model-id>'
+./bin/mdr-kernel close-session -NoHandoff -Model '<your-model-id>'
 ```
 
-On Windows PowerShell, clone to `"$env:TEMP\mdr-upgrade-test"`, remove `origin`, run the upgrade,
-and verify `.\bin\mdr-kernel.exe doctor`, `.\bin\mdr-kernel.exe start-session -Model '<id>'`, and
-`.\bin\mdr-kernel.exe close-session -Topic upgrade-smoke -Model '<id>'`. Delete the throwaway
-clone when finished, then run the same upgrade in your live memory checkout.
+On Windows PowerShell, clone to `"$env:TEMP\mdr-upgrade-test"`, remove `origin`, run Steps 1–8,
+and run `.\bin\mdr-kernel.exe doctor`, `.\bin\mdr-kernel.exe start-session -Model '<id>'`, and
+`.\bin\mdr-kernel.exe close-session -NoHandoff -Model '<id>'`.
+
+- **What `close-session -NoHandoff` verifies:** lock acquisition and release, STATE budget checks,
+  hard doctor checks, and node-map verification on a clean tree (without needing a dummy handoff
+  or `handoffs/INDEX.md` row). When nothing is modified, it passes without creating a commit.
+- **Exercising the commit hooks separately:** Step 7's upgrade commit in the throwaway clone
+  exercises `.githooks/pre-commit`, `.githooks/prepare-commit-msg`, and `.githooks/commit-msg`.
+  To also exercise a normal session commit through the hooks before deleting the throwaway clone,
+  commit a throwaway non-coordination note (such as `inbox/upgrade-smoke.md` with `BRAIN_MODEL`
+  set) or create `handoffs/<YYYY-MM-DD>-upgrade-smoke.md` plus its `handoffs/INDEX.md` row and
+  run `./bin/mdr-kernel close-session -Topic upgrade-smoke -Model '<your-model-id>'`.
+- **Pre-push limit:** a remote-free clone (`git remote remove origin`) cannot verify
+  `.githooks/pre-push` or `sync-private` through a normal close; those run when you sync to your
+  private remote in Step 8 of your live checkout.
+
+Delete the throwaway clone when finished, then run the same upgrade in your live memory checkout.
 
 ### Exact steps (0.2.0 to 2.0.0)
 
@@ -106,12 +120,12 @@ Run every step from the root of your private memory in one shell session so `BRA
 Linux (`bash`):
 
 ```sh
-export BRAIN_MODEL='<your-model-id>'
-test -z "$(git status --porcelain)"
-test ! -e STATE.lock
-test "$(tr -d '\r\n' < VERSION)" = "0.2.0"
-git diff --quiet HEAD -- DECISIONS.md
-git branch mdr-before-2.0.0
+export BRAIN_MODEL='<your-model-id>' &&
+  test -z "$(git status --porcelain)" &&
+  test ! -e STATE.lock &&
+  test "$(tr -d '\r\n' < VERSION)" = "0.2.0" &&
+  git diff --quiet HEAD -- DECISIONS.md &&
+  git branch mdr-before-2.0.0
 ```
 
 Windows (PowerShell):
@@ -129,12 +143,37 @@ git branch mdr-before-2.0.0
 
 #### 2. Fetch `v2.0.0` read-only and pin `v0.2.0`
 
+Verify the fetched `v2.0.0` commit ID against the published release before continuing. Any fetch
+error or commit mismatch stops the block before release files are applied:
+
+Linux (`bash`):
+
 ```sh
 mdr='https://github.com/StudioDoNotDisturb/mdr-kernel.git'
 expected='<full-40-char-commit-id-from-v2.0.0-release>'
-git fetch --no-tags "$mdr" refs/tags/v2.0.0:refs/mdr/v2.0.0
-test "$(git rev-parse 'refs/mdr/v2.0.0^{commit}')" = "$expected"
+printf '%s\n' "$expected" | grep -Eq '^[0-9a-fA-F]{40}$' || { echo 'STOP: set expected to the full 40-char release commit ID' >&2; false; } &&
+  git fetch --no-tags "$mdr" refs/tags/v2.0.0:refs/mdr/v2.0.0 &&
+  actual=$(git rev-parse 'refs/mdr/v2.0.0^{commit}') &&
+  { test "$actual" = "$expected" || { git update-ref -d refs/mdr/v2.0.0; echo "STOP: release tag commit $actual does not match expected $expected" >&2; false; }; } &&
+  git update-ref refs/mdr/v0.2.0 82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3 &&
+  git diff --stat refs/mdr/v0.2.0 HEAD -- bin .githooks tests docs protocol/CONTRACT.md protocol/coordination-files.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+$mdr = 'https://github.com/StudioDoNotDisturb/mdr-kernel.git'
+$expected = '<full-40-char-commit-id-from-v2.0.0-release>'
+if ($expected -notmatch '^[a-fA-F0-9]{40}$') { throw 'STOP: set $expected to the full 40-char release commit ID' }
+git fetch --no-tags $mdr 'refs/tags/v2.0.0:refs/mdr/v2.0.0'
+if ($LASTEXITCODE -ne 0) { throw 'STOP: failed to fetch v2.0.0' }
+$actual = git rev-parse 'refs/mdr/v2.0.0^{commit}'
+if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) {
+  git update-ref -d refs/mdr/v2.0.0 2>$null
+  throw "STOP: release tag commit '$actual' does not match expected '$expected'"
+}
 git update-ref refs/mdr/v0.2.0 82b6b6a8efbf89242c53ee516d65a4b6fe9c36a3
+if ($LASTEXITCODE -ne 0) { throw 'STOP: failed to pin refs/mdr/v0.2.0' }
 git diff --stat refs/mdr/v0.2.0 HEAD -- bin .githooks tests docs protocol/CONTRACT.md protocol/coordination-files.txt
 ```
 
@@ -309,9 +348,11 @@ Verify the upgraded memory:
 
 1. `./bin/mdr-kernel doctor` must report `doctor: ok.` and exit 0.
 2. `./bin/mdr-kernel start-session -Model '<your-model-id>'` must end with `STARTUP_STATUS=READY`.
-3. If you have not already done a test `close-session` in a throwaway clone, run one before normal
-   session work to confirm pre-commit, commit-msg, and pre-push hooks fire cleanly through
-   `bin/mdr-kernel`.
+3. `./bin/mdr-kernel close-session -NoHandoff -Model '<your-model-id>'` confirms clean-tree lock,
+   budget, doctor, and node-map close checks without creating a commit (a remote-free throwaway
+   clone cannot exercise `.githooks/pre-push`; `sync-private` above exercises it on a live
+   `private-remote` memory, and your first session close with a handoff exercises all hooks end to
+   end).
 
 If your host config (`.claude/settings.json`, `.codex/hooks.json`, `.mcp.json`) still points at
 `pwsh -NoProfile -File bin/hook-recall.ps1`, update it to invoke `bin/mdr-kernel hook-recall`
