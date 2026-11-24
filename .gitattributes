@@ -5,3 +5,6 @@
 *.json text eol=lf
 *.yml text eol=lf
 .githooks/* text eol=lf
+# Thin sh launchers and Git hooks that hand off to the Rust binary; left out of GitHub's language bar.
+bin/* linguist-detectable=false
+.githooks/* linguist-detectable=false
