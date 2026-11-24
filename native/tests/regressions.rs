@@ -171,3 +171,6 @@ mod session_safety;
 
 #[path = "regressions/private_onboarding.rs"]
 mod private_onboarding;
+
+#[path = "regressions/cold_clone.rs"]
+mod cold_clone;
