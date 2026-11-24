@@ -43,6 +43,15 @@ param(
 )
 
 $root = Split-Path -Parent $PSScriptRoot
+# The native engine runs this same command when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine check-decision-history @forward
+  exit $LASTEXITCODE
+}
 if (-not $Path) { $Path = Join-Path $root 'DECISIONS.md' }
 $errors = [System.Collections.Generic.List[string]]::new()
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)

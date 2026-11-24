@@ -11,11 +11,21 @@
 param()
 $ErrorActionPreference = 'Stop'
 $source = Split-Path -Parent $PSScriptRoot
+$engine = $env:MDR_TEST_ENGINE
 $tools = 'check-decision-history.ps1','add-decision.ps1','build-rulings.ps1','ratify-decision.ps1','initialize-decision-authority.ps1','state-lock.ps1'
 function New-Fixture([string]$tag) {
   $dir = Join-Path ([IO.Path]::GetTempPath()) ("mdr-authority-$tag-" + [guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory -Path "$dir/bin","$dir/protocol" -Force | Out-Null
   foreach ($n in $tools) { Copy-Item -LiteralPath "$source/bin/$n" -Destination "$dir/bin/$n" }
+  if ($engine) {
+    Copy-Item -LiteralPath $engine -Destination (Join-Path $dir "bin/mdr-kernel$(if ($IsWindows) { '.exe' })")
+    # The native freshness check compares the binary with indexed compiler inputs.
+    foreach ($path in (& git -C $source ls-files -- native)) {
+      $dest = Join-Path $dir $path
+      New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+      Copy-Item -LiteralPath (Join-Path $source $path) -Destination $dest
+    }
+  }
   return $dir
 }
 $fixture = New-Fixture 'a'
@@ -207,6 +217,7 @@ try {
   & git -C $fixture init -q
   & git -C $fixture config core.hooksPath disabled-test-hooks
   & git -C $fixture config core.autocrlf false
+  if ($engine) { & git -C $fixture add -- native }
   & git -C $fixture config user.name 'Authority test'
   & git -C $fixture config user.email 'test@example.invalid'
   Run 'build-rulings.ps1' @()
@@ -245,6 +256,8 @@ try {
   # --- initialize-decision-authority (own git fixture and a real fixture lock) ----------------------
   $fixture = New-Fixture 'init'
   & git -C $fixture init -q
+  & git -C $fixture config core.autocrlf false
+  if ($engine) { & git -C $fixture add -- native }
   & git -C $fixture config core.hooksPath disabled-test-hooks
   & git -C $fixture config user.name 'Authority test'
   & git -C $fixture config user.email 'test@example.invalid'

@@ -26,6 +26,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+function Assert-DecisionValidation([int]$Code) {
+  if ($Code -ne 0) { throw 'Decision validation failed; no rulings compiled.' }
+}
+# The native engine runs this same command when bin/mdr-kernel is installed (README).
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', $root) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine build-rulings -ScriptHandoff @forward
+  # Exit 3 is internal to the handoff. Render the same terminating error as the legacy path.
+  if ($LASTEXITCODE -eq 3) { Assert-DecisionValidation $LASTEXITCODE }
+  exit $LASTEXITCODE
+}
 $rel = [ordered]@{
   decisions = 'DECISIONS.md'
   ratifications = 'protocol/decision-ratifications.jsonl'; gates = 'protocol/recall-gates.json'
@@ -70,7 +84,7 @@ if ($FromIndex) { $checkArgs += '-FromIndex' }
 if ($DecisionsPath) { $checkArgs += @('-Path', $DecisionsPath) }
 if ($RatificationsPath) { $checkArgs += @('-RatificationsPath', $RatificationsPath) }
 & pwsh @checkArgs | Out-Host
-if ($LASTEXITCODE -ne 0) { throw 'Decision validation failed; no rulings compiled.' }
+Assert-DecisionValidation $LASTEXITCODE
 
 $decisions = Read-Source 'decisions'
 $fixtureLog = $DecisionsPath -and -not [IO.Path]::GetFullPath($DecisionsPath).Equals([IO.Path]::GetFullPath((Join-Path $root $rel.decisions)), [StringComparison]::OrdinalIgnoreCase)

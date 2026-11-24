@@ -1,7 +1,7 @@
 //! First run and repair. Ports of `bin/setup-private.ps1` (verify and pin the destination, then
 //! bootstrap and push the first checkpoint) and `bin/bootstrap-clone.ps1` (arm hooks, scaffold
-//! the grow-your-own files under STATE.lock, optionally commit them, run the doctor). Decision
-//! rulings and node-map generation still run their PowerShell scripts until checkpoint 6.
+//! the grow-your-own files under STATE.lock, optionally commit them, run the doctor).
+//! Node-map generation still runs its PowerShell script.
 //!
 //!   mdr-kernel setup-private -Model <id> [-LocalOnly | -ConfirmPrivateRemote]
 //!   mdr-kernel bootstrap-clone -Model <id> [-CommitScaffold]
@@ -397,10 +397,9 @@ fn bootstrap_steps(root: &Path, model: &str, current: &str, commit: bool) -> Res
         }
     }
     if authority.exists() {
-        let built = pwsh_command(root, "build-rulings.ps1", &[])
-            .status()
-            .is_ok_and(|s| s.success());
-        if !built {
+        let built = crate::decisions::build_default(root, false);
+        built.emit();
+        if built.code != 0 {
             return Err("Could not compile decision rulings.".into());
         }
     }

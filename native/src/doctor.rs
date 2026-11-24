@@ -1,7 +1,7 @@
 //! The public doctor. A port of `bin/brain-doctor.ps1`: advisory warnings for drift and
 //! non-compliance only for real hazards (a committed secret, broken startup wiring, a private
-//! memory that lost its origin, a failed authority or recall check). The hook-recall probe,
-//! decision authority and node-map parity still run their PowerShell scripts
+//! memory that lost its origin, a failed authority or recall check). The hook-recall probe
+//! and node-map parity still run their PowerShell scripts
 //! until their own checkpoints.
 //!
 //!   mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
@@ -492,10 +492,9 @@ pub fn run(root: &Path, o: &Options) -> (i32, String) {
     }
     // build-rulings -Check runs the decision-history check first and fails on either.
     if exists("DECISIONS.md") && exists("bin/build-rulings.ps1") {
-        let (code, lines) = pwsh_all(root, "build-rulings.ps1", &["-Check"], None);
-        let ansi = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
-        let result = ansi.replace_all(&lines.join(" "), "").into_owned();
-        if code != 0 {
+        let rulings = crate::decisions::build_default(root, true);
+        let result = read_lines((rulings.out + &rulings.err).as_bytes()).join(" ");
+        if rulings.code != 0 {
             r.fail(&format!("decision authority: {result}"));
         } else {
             r.ok(&format!("decision authority: {result}"));
