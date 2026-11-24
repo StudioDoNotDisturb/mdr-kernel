@@ -251,16 +251,31 @@ try {
   $arrays = (Get-Content -Raw -LiteralPath $gatePath) -match '"triggers": \[\s*"solo"\s*\]'
   Expect 'increment round trip keeps fields, order and single-item arrays and stays valid' ($r.code -eq 0 -and $kept -and $arrays -and $after.gates[1].traps[0].times_recurred -eq 1 -and $check.code -eq 0)
   Reset-Gates
+  # The PowerShell adapters run bin/brain-recall.ps1 as a child process, so a missing, failing,
+  # noisy or hung matcher script must degrade visibly. The engine runs recall in process: the
+  # same six cases instead prove that a replaced matcher script cannot change its answer.
+  $engineMode = [bool]$env:MDR_TEST_ENGINE
+  $clear = { param($R) $R.code -eq 0 -and -not $R.output -and -not $R.error }
   Move-Item -LiteralPath $matcherPath -Destination "$matcherPath.saved"
-  Expect 'missing matcher is visible through adapter' (Degraded (Hook '{"prompt":"deploy"}') 'missing-matcher')
-  $r = Run 'prepare-work.ps1' @('-Objective', 'deploy')
-  Expect 'missing matcher blocks fallback with stable diagnostic' ($r.code -eq 2 -and $r.error -match 'PREPARE_WORK_STATUS=BLOCKED reason=missing-matcher')
+  if ($engineMode) {
+    $r = Hook '{"prompt":"deploy"}'
+    Expect 'engine: hook answers from the gates with the matcher script missing' ($r.code -eq 0 -and $r.output -match 'EXAMPLE-DOMAIN' -and $r.output -notmatch 'DEGRADED')
+    $r = Run 'prepare-work.ps1' @('-Objective', 'deploy')
+    Expect 'engine: fallback is READY with the matcher script missing' ($r.code -eq 0 -and $r.output -match 'EXAMPLE-DOMAIN' -and $r.output -match 'PREPARE_WORK_STATUS=READY')
+  } else {
+    Expect 'missing matcher is visible through adapter' (Degraded (Hook '{"prompt":"deploy"}') 'missing-matcher')
+    $r = Run 'prepare-work.ps1' @('-Objective', 'deploy')
+    Expect 'missing matcher blocks fallback with stable diagnostic' ($r.code -eq 2 -and $r.error -match 'PREPARE_WORK_STATUS=BLOCKED reason=missing-matcher')
+  }
   [IO.File]::WriteAllText($matcherPath, 'exit 2')
-  Expect 'matcher failure cannot become healthy CLEAR' (Degraded (Hook '{"prompt":"ordinary"}') 'matcher-failed')
+  if ($engineMode) { Expect 'engine: a failing matcher script does not change the answer' (& $clear (Hook '{"prompt":"ordinary"}')) }
+  else { Expect 'matcher failure cannot become healthy CLEAR' (Degraded (Hook '{"prompt":"ordinary"}') 'matcher-failed') }
   [IO.File]::WriteAllText($matcherPath, '[Console]::Error.WriteLine("warning"); exit 0')
-  Expect 'matcher stderr with exit zero is a degradation' (Degraded (Hook '{"prompt":"ordinary"}') 'matcher-failed')
+  if ($engineMode) { Expect 'engine: a noisy matcher script does not change the answer' (& $clear (Hook '{"prompt":"ordinary"}')) }
+  else { Expect 'matcher stderr with exit zero is a degradation' (Degraded (Hook '{"prompt":"ordinary"}') 'matcher-failed') }
   [IO.File]::WriteAllText($matcherPath, 'Write-Output "unexpected output"')
-  Expect 'unexpected matcher stdout fails visibly' (Degraded (Hook '{"prompt":"ordinary"}') 'invalid-matcher-output')
+  if ($engineMode) { Expect 'engine: unexpected matcher-script output does not reach the hook' (& $clear (Hook '{"prompt":"ordinary"}')) }
+  else { Expect 'unexpected matcher stdout fails visibly' (Degraded (Hook '{"prompt":"ordinary"}') 'invalid-matcher-output') }
   $pidFile = Join-Path $fixture 'matcher.pid'
   [IO.File]::WriteAllText($matcherPath, ('[IO.File]::WriteAllText(''{0}'', [string]$PID); Start-Sleep -Seconds 60' -f $pidFile))
   $clock = [Diagnostics.Stopwatch]::StartNew()
@@ -268,7 +283,11 @@ try {
   $elapsed = $clock.Elapsed.TotalSeconds
   $childPid = if (Test-Path -LiteralPath $pidFile) { [int][IO.File]::ReadAllText($pidFile) } else { 0 }
   $alive = $childPid -and (Get-Process -Id $childPid -ErrorAction SilentlyContinue)
-  Expect 'hung matcher is killed and degrades within adapter budget' ((Degraded $r 'matcher-timeout') -and $childPid -and -not $alive -and $elapsed -lt 20) "elapsed=$elapsed pid=$childPid alive=$([bool]$alive)"
+  if ($engineMode) {
+    Expect 'engine: a hanging matcher script is never started and the hook answers at once' ((& $clear $r) -and -not $childPid -and $elapsed -lt 20) "elapsed=$elapsed pid=$childPid"
+  } else {
+    Expect 'hung matcher is killed and degrades within adapter budget' ((Degraded $r 'matcher-timeout') -and $childPid -and -not $alive -and $elapsed -lt 20) "elapsed=$elapsed pid=$childPid alive=$([bool]$alive)"
+  }
 } finally {
   # Resolve and check the exact target before recursive deletion; never derive a shell command.
   $resolved = [IO.Path]::GetFullPath($fixture)

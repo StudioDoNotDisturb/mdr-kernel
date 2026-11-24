@@ -32,6 +32,7 @@ const COMMANDS: &str =
        mdr-kernel setup-private -Model <id> [-LocalOnly | -ConfirmPrivateRemote]
        mdr-kernel bootstrap-clone -Model <id> [-CommitScaffold]
        mdr-kernel brain-recall -Objective <text> | -FromStdin | -GateId <id> | -Ruling <id> | -CheckGates | -Increment <trap> [-Brief|-Json|-Header|-Quiet]
+       mdr-kernel hook-recall (UserPromptSubmit JSON on stdin) | prepare-work -Objective <text> | -FromStdin
        mdr-kernel sync-doors [-Check [-Staged]]
        mdr-kernel doctor [-HardOnly] [-StaleDays 14] [-StateMaxLines 90] [-StateMaxKB 10]
        mdr-kernel install";
@@ -67,6 +68,9 @@ fn main() {
         Some((cmd, args)) if cmd == "doctor" => doctor::cli(args),
         Some((cmd, args)) if cmd == "sync-doors" => doors::cli(args),
         Some((cmd, args)) if cmd == "brain-recall" => recall::cli(args),
+        Some((cmd, args)) if matches!(cmd.as_str(), "hook-recall" | "prepare-work") => {
+            recall::adapter_cli(cmd, args)
+        }
         Some((cmd, args)) if matches!(cmd.as_str(), "setup-private" | "bootstrap-clone") => {
             onboard::cli(cmd, args)
         }

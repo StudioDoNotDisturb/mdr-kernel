@@ -727,16 +727,179 @@ fn increment(path: &Path, data: &mut Value, trap_id: &str) -> Outcome {
 }
 
 /// Read stdin as UTF-8 (BOM dropped), one character past the budget so overflow is visible.
-fn read_stdin() -> Result<String, ()> {
+fn read_stdin(max_chars: usize) -> Result<String, ()> {
     use std::io::Read;
     let mut bytes = Vec::new();
-    let limit = (MAX_OBJECTIVE as u64 + 1) * 4 + 3;
+    // Four bytes per character bound one character past the budget, so overflow stays visible.
+    let limit = (max_chars as u64 + 1) * 4 + 3;
     std::io::stdin()
         .take(limit)
         .read_to_end(&mut bytes)
         .map_err(|_| ())?;
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
     Ok(String::from_utf8_lossy(bytes).into_owned())
+}
+
+// ---------- adapters: the UserPromptSubmit hook and the prepare-work fallback ----------
+
+const HOOK_PAYLOAD_LIMIT: usize = 1_048_576;
+
+fn hook_wire(context: &str) -> String {
+    serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": context,
+        }
+    })
+    .to_string()
+        + "\n"
+}
+
+fn hook_degraded(reason: &str) -> String {
+    hook_wire(&format!("RECALL_HOOK_STATUS=DEGRADED reason={reason}; automatic recall was not evaluated. Before acting run pwsh -NoProfile -File bin/prepare-work.ps1 -Objective '<operator objective>' (or pipe the complete objective with -FromStdin)."))
+}
+
+/// PowerShell property access ignores case: `$payload.user_input` also reads `User_Input`.
+fn field<'a>(object: &'a Map<String, Value>, name: &str) -> Option<&'a Value> {
+    object
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v)
+}
+
+/// The hook: bounded typed input, complete recall in process, visible degradation. Healthy
+/// CLEAR prints nothing. Payload text never reaches the degraded context.
+pub fn hook(root: &Path, raw: &str) -> String {
+    if units(raw) > HOOK_PAYLOAD_LIMIT {
+        return hook_degraded("payload-too-large");
+    }
+    if raw.is_empty() {
+        return hook_degraded("empty-input");
+    }
+    // ConvertFrom-Json turns blank text into $null, which is not an object.
+    let payload = if raw.trim().is_empty() {
+        Value::Null
+    } else {
+        match serde_json::from_str::<Value>(raw) {
+            Ok(v) => v,
+            Err(_) => return hook_degraded("invalid-json"),
+        }
+    };
+    let Some(object) = payload.as_object() else {
+        return hook_degraded("payload-not-object");
+    };
+    let prompt = match field(object, "user_input") {
+        None | Some(Value::Null) => field(object, "prompt"),
+        Some(Value::String(s)) if s.trim().is_empty() => field(object, "prompt"),
+        other => other,
+    };
+    let Some(prompt) = prompt.and_then(Value::as_str) else {
+        return hook_degraded("prompt-not-string");
+    };
+    if prompt.trim().is_empty() {
+        return hook_degraded("missing-prompt");
+    }
+    if units(prompt) > MAX_OBJECTIVE {
+        return hook_degraded("prompt-too-large");
+    }
+    let args = match Args::parse(&["-FromStdin".into(), "-Brief".into()], &VALUES, &SWITCHES) {
+        Ok(a) => a,
+        Err(_) => return hook_degraded("adapter-error"),
+    };
+    let outcome = run(root, &args, Some(prompt.to_string()));
+    if outcome.code != 0 || !outcome.err.trim().is_empty() {
+        return hook_degraded("matcher-failed");
+    }
+    let banner = outcome.out.trim();
+    if banner.is_empty() {
+        return String::new();
+    }
+    if units(banner) > BRIEF_BUDGET || !banner.starts_with("RECALL_STATUS=MATCHED ") {
+        return hook_degraded("invalid-matcher-output");
+    }
+    hook_wire(banner)
+}
+
+/// The fallback for a surface without a proven prompt hook: full recall, then READY or BLOCKED.
+pub fn prepare_work(root: &Path, objective: Option<&str>, stdin: Option<String>) -> Outcome {
+    let mut out = String::from("RECALL_SURFACE=fallback-wrapper status=RUNNING\n");
+    let argv: Vec<String> = match (objective, &stdin) {
+        (_, Some(_)) => vec!["-FromStdin".into()],
+        (Some(o), None) => vec![format!("-Objective:{o}")],
+        (None, None) => Vec::new(),
+    };
+    let recall = match Args::parse(&argv, &VALUES, &SWITCHES) {
+        Ok(args) => run(root, &args, stdin),
+        Err(e) => blocked(&e),
+    };
+    out.push_str(&recall.out);
+    if recall.code != 0 {
+        return Outcome {
+            code: recall.code,
+            out,
+            err: recall.err + "PREPARE_WORK_STATUS=BLOCKED reason=recall-failed\n",
+        };
+    }
+    out.push_str(
+        "PREPARE_WORK_STATUS=READY (read any matched gates and required sources before acting)\n",
+    );
+    done(0, out)
+}
+
+fn root_arg(args: &Args) -> Result<PathBuf, String> {
+    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+    let root = args
+        .value("Root")
+        .map_or_else(|| top(&cwd), |r| Ok(PathBuf::from(r)))
+        .map(|r| crate::args::absolute(&r))?;
+    crate::hook::fresh_in_repo(&root)?;
+    Ok(root)
+}
+
+/// `mdr-kernel hook-recall` (JSON on stdin, always exit 0) and `mdr-kernel prepare-work`.
+pub fn adapter_cli(command: &str, argv: &[String]) -> i32 {
+    if command == "hook-recall" {
+        // A failure before recall still continues the prompt, visibly degraded.
+        let wire = Args::parse(argv, &["Root"], &[])
+            .and_then(|args| root_arg(&args))
+            .map_or_else(
+                |_| hook_degraded("adapter-error"),
+                |root| match read_stdin(HOOK_PAYLOAD_LIMIT) {
+                    Ok(raw) => hook(&root, &raw),
+                    Err(()) => hook_degraded("adapter-error"),
+                },
+            );
+        print!("{wire}");
+        return 0;
+    }
+    let result = (|| -> Result<Outcome, String> {
+        let args = Args::parse(argv, &["Objective", "Root"], &["FromStdin"])?;
+        let objective = args.value("Objective");
+        match (objective, args.switch("FromStdin")) {
+            (Some(_), true) => return Err("Parameter set cannot be resolved using the specified named parameters.".into()),
+            (None, false) => return Err("Cannot process command because of one or more missing mandatory parameters: Objective.".into()),
+            (Some(""), false) => return Err("Cannot validate argument on parameter 'Objective'. The argument is null or empty.".into()),
+            _ => {}
+        }
+        let root = root_arg(&args)?;
+        let stdin = if args.switch("FromStdin") {
+            Some(read_stdin(MAX_OBJECTIVE).map_err(|()| "could not read stdin".to_string())?)
+        } else {
+            None
+        };
+        Ok(prepare_work(&root, objective, stdin))
+    })();
+    match result {
+        Ok(o) => {
+            print!("{}", o.out);
+            eprint!("{}", o.err);
+            o.code
+        }
+        Err(e) => {
+            eprintln!("X mdr-kernel prepare-work: {e}");
+            1
+        }
+    }
 }
 
 pub fn cli(argv: &[String]) -> i32 {
@@ -749,7 +912,7 @@ pub fn cli(argv: &[String]) -> i32 {
             .map(|r| crate::args::absolute(&r))?;
         crate::hook::fresh_in_repo(&root)?;
         let stdin = if args.switch("FromStdin") {
-            match read_stdin() {
+            match read_stdin(MAX_OBJECTIVE) {
                 Ok(text) => Some(text),
                 Err(()) => return Ok(blocked("objective-too-large (maximum 131072 characters)")),
             }

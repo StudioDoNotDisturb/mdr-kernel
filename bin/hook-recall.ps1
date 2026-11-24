@@ -10,6 +10,16 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+# The native engine runs this same adapter, with recall in process, when bin/mdr-kernel is
+# installed (README); stdin reaches it unchanged.
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', (Split-Path -Parent $PSScriptRoot)) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine hook-recall @forward
+  exit $LASTEXITCODE
+}
 function Exit-Degraded([string]$Reason) {
   @{ hookSpecificOutput = @{
     hookEventName = 'UserPromptSubmit'

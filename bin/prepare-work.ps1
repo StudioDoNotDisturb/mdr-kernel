@@ -9,6 +9,16 @@ param(
   [Parameter(Mandatory, ParameterSetName = 'Stdin')][switch]$FromStdin
 )
 $ErrorActionPreference = 'Stop'
+# The native engine runs this same adapter, with recall in process, when bin/mdr-kernel is
+# installed (README); stdin reaches it unchanged.
+$engine = @('mdr-kernel.exe', 'mdr-kernel') | ForEach-Object { Join-Path $PSScriptRoot $_ } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($engine -and $env:MDR_ENGINE -ne 'legacy') {
+  $forward = @('-Root', (Split-Path -Parent $PSScriptRoot)) + @(foreach ($p in $PSBoundParameters.GetEnumerator()) {
+    if ($p.Value -is [switch]) { if ($p.Value) { "-$($p.Key)" } } else { "-$($p.Key):$($p.Value)" }
+  })
+  & $engine prepare-work @forward
+  exit $LASTEXITCODE
+}
 $matcher = Join-Path $PSScriptRoot 'brain-recall.ps1'
 if (-not (Test-Path -LiteralPath $matcher -PathType Leaf)) {
   [Console]::Error.WriteLine('PREPARE_WORK_STATUS=BLOCKED reason=missing-matcher')
